@@ -1,0 +1,34 @@
+# Selection
+
+`F-SELECT` adds a shared selection model for rows, cells, ranges, merged cells, visible rows, and
+server-dataset token selection. Core owns the immutable state and token policy; the DOM renderer
+owns pointer, checkbox, toolbar, and keyboard interactions.
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  merge: { enabled: true },
+  selection: {
+    mode: "range",
+    multiple: true,
+    checkbox: true,
+    selectAll: "server",
+    serverSelectionToken: "selection-budget"
+  }
+});
+```
+
+Supported modes are `row`, `cell`, and `range`. `checkbox` adds row checkboxes to the first visible
+cell in each rendered row. Shift+Arrow extends the range from the current anchor, Space toggles the
+focused row or cell, and Shift+click extends ranges with merge-aware state.
+
+`selectAll: "visible"` selects only rendered row keys. `selectAll: "server"` emits a stable
+`ServerSelectionToken` derived from row model, filter model, sort model, and snapshot version so
+large server datasets do not need to be materialized in the browser.
+
+The executable example is available as `F-SELECT` in the examples app and includes vanilla, React,
+and Vue variants.

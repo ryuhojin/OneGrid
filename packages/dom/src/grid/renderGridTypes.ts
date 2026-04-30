@@ -1,0 +1,23 @@
+import type {
+  AggregateResult,
+  InfiniteRowEntry,
+  MergeMeta,
+  ServerRowEntry,
+  TreeRowEntry,
+  ViewportRowEntry
+} from "@onegrid/core";
+import type { TreeRowRuntime } from "./treeRowRenderer.js";
+
+export interface RowRenderState<TData = unknown> {
+  readonly entries: readonly (
+    InfiniteRowEntry<TData> | ServerRowEntry<TData> | ViewportRowEntry<TData> | TreeRowEntry<TData>
+  )[];
+  readonly rowCount: number;
+  readonly loading: boolean;
+  readonly hasMore: boolean;
+  readonly aggregate?: AggregateResult;
+  readonly error?: unknown;
+  readonly mergeMeta?: readonly MergeMeta[];
+  onLoadMore(): void;
+  readonly treeRuntime?: TreeRowRuntime;
+}

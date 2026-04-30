@@ -1,0 +1,39 @@
+# Row Virtualization
+
+`LAY-002` adds the row virtualization baseline used by large client datasets and by later
+viewport/server layouts. The DOM renderer uses a fixed row-height window plus top and bottom
+spacers, so rendered row elements stay proportional to viewport size and overscan.
+The row viewport is separated from header, summary, and footer chrome, so fast wheel or scrollbar
+input only moves the body rows and cannot expose blank space above the header.
+
+```ts
+import { OneGrid } from "@onegrid/dom";
+
+new OneGrid({
+  el,
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  rowHeight: 32,
+  layout: { width: "100%", height: 433, bodyHeight: 433 },
+  virtualization: {
+    enabled: true,
+    rowHeight: 32,
+    overscan: { before: 3, after: 5 },
+    maxDomRows: 64,
+    segmented: true,
+    maxScrollHeight: 24_000_000
+  }
+});
+```
+
+The public DOM instance exposes `scrollToRow(rowIndex, align)` for controlled navigation:
+
+```ts
+await grid.scrollToRow(2_499, "start");
+```
+
+The segmented scroll helpers in `@onegrid/core` are designed for 10M to 100M logical row ranges
+without creating equivalent client arrays or DOM nodes. Server, infinite, and viewport row models
+still own data loading and cache eviction; virtualization only decides the visible window.

@@ -1,0 +1,14 @@
+{
+  "name": "@onegrid/playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -b tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@onegrid/core": "workspace:*",
+    "@onegrid/dom": "workspace:*"
+  }
+}

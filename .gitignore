@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.docusaurus/
+
+# Tool caches
+.turbo/
+.vite/
+.cache/
+
+# Test outputs
+test-results/
+playwright-report/
+coverage/
+
+# Local agent/runtime state
+.omx/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and OS files
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# TypeScript incremental state
+*.tsbuildinfo

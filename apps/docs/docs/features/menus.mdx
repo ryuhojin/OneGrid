@@ -1,0 +1,58 @@
+# Menus
+
+`F-MENU` defines OneGrid menu behavior across header menus, column action menus, filter panels,
+and cell context menus. Core owns the menu model and item enablement. The DOM renderer owns
+positioning, focus trapping, keyboard navigation, and pointer or keyboard activation.
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  columnUi: {
+    resize: true,
+    autoSize: true,
+    reorder: true,
+    menu: true,
+    toolPanel: true
+  },
+  filtering: { enabled: true, quickFilter: true },
+  selection: { mode: "range", multiple: true, checkbox: true },
+  editing: { enabled: true },
+  clipboard: { enabled: true, includeHeaders: true },
+  contextMenu: {
+    enabled: true,
+    defaultItems: ["copyCell", "copyRow", "copyWithHeaders", "startEdit"],
+    items: [
+      {
+        id: "flag-row",
+        label: "Flag row for review",
+        scope: "row",
+        onSelect: ({ rowKey }) => console.log(rowKey)
+      }
+    ]
+  }
+});
+```
+
+Column header buttons expose ARIA menu semantics and open the same overlay positioning layer used
+by filter panels. Context menus open with right click, `Shift+F10`, or the Context Menu key when a
+body cell is focused. Menu items use roving keyboard navigation with Arrow Up, Arrow Down, Home,
+End, Tab focus trapping, and Escape close.
+
+Default context menu items are intentionally small and delegate to existing grid APIs:
+
+- `copyCell`
+- `copyRow`
+- `copyWithHeaders`
+- `startEdit`
+- `clearSelection`
+
+Custom items can be static or generated per context. `scope: "row"` items also appear from a cell
+context menu because a cell always carries row context. React and Vue use the same
+`GridOptions.contextMenu` option.
+
+The executable example is available as `F-MENU` in the examples app and includes vanilla, React,
+and Vue variants.

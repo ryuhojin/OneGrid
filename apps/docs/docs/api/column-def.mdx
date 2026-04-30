@@ -1,0 +1,100 @@
+# ColumnDef
+
+`ColumnDef<TData>` supports data columns and grouped columns. Group headers and merge-aware layout
+are first-class design constraints even though the initial renderer shell only paints leaf columns.
+
+Columns can opt into body cell merge calculation:
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  { field: "region", merge: { mode: "value" } },
+  {
+    field: "memo",
+    merge: {
+      mode: "custom",
+      colSpan: ({ row }) => row.memoSpan ? 2 : 1
+    }
+  }
+];
+```
+
+String cell values are still rendered as text by default. Merge only changes layout and ARIA span
+metadata; it does not opt into HTML rendering.
+
+Columns participate in sorting unless `sortable: false` is set. A column can define an initial sort
+direction or a custom comparator:
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  { field: "amount", type: "number", sort: "desc" },
+  {
+    field: "status",
+    sortComparator: (left, right) => statusRank[String(left)] - statusRank[String(right)]
+  }
+];
+```
+
+`sortComparator` receives the two resolved values plus the left and right row context. When a
+`valueGetter` is present, client sorting uses the getter value instead of reading `row[field]`.
+
+Columns can opt into text, number, date, boolean, set, or custom filtering:
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  { field: "agency", filter: "text" },
+  { field: "amount", type: "number", filter: "number" },
+  { field: "status", filter: { kind: "set", values: ["Approved", "Review"] } },
+  {
+    field: "service",
+    filter: {
+      kind: "custom",
+      predicate: ({ value, filterValue }) =>
+        String(value).toLocaleLowerCase().includes(String(filterValue).toLocaleLowerCase())
+    }
+  }
+];
+```
+
+`FilterOptions.serverOnly` keeps a column filter in the remote request model while skipping
+client evaluation. `valueGetter` is used by client filters and quick filter when present.
+
+Columns opt into editing with `editable` and `editor`. The core lifecycle resolves the editor,
+parses raw values, runs sync or async validators, and applies either `valueSetter` or a shallow
+field update:
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  {
+    field: "amount",
+    type: "number",
+    editable: true,
+    editor: "number",
+    validator: (value) => Number(value) < 0 ? ["Amount must be positive"] : []
+  },
+  {
+    field: "status",
+    editable: true,
+    editor: {
+      kind: "select",
+      options: [
+        { value: "Draft", label: "Draft" },
+        { value: "Approved", label: "Approved" }
+      ]
+    }
+  },
+  {
+    field: "code",
+    editable: true,
+    editor: {
+      kind: "custom",
+      validate: async (value) => String(value).startsWith("ERR")
+        ? ["Code cannot start with ERR"]
+        : []
+    },
+    parser: (value) => String(value).trim().toUpperCase()
+  }
+];
+```
+
+Supported editor kinds are `text`, `number`, `date`, `datetime`, `checkbox`, `select`,
+`multi-select`, `radio`, `textarea`, `autocomplete`, and `custom`.

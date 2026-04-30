@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneGrid Summary</title>
+  </head>
+  <body>
+    <main>
+      <h1>Summary</h1>
+      <section id="example" aria-label="Summary example"></section>
+    </main>
+    <script type="module">
+      import { mountSummaryExample } from "./vanilla.ts";
+
+      const host = document.querySelector("#example");
+      if (host instanceof HTMLElement) {
+        mountSummaryExample(host);
+      }
+    </script>
+  </body>
+</html>

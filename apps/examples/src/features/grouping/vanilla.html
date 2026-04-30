@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneGrid Grouping</title>
+  </head>
+  <body>
+    <main>
+      <h1>Grouping</h1>
+      <section id="example" aria-label="Grouping example"></section>
+    </main>
+    <script type="module">
+      import { mountGroupingExample } from "./vanilla.ts";
+
+      const host = document.querySelector("#example");
+      if (host) {
+        mountGroupingExample(host);
+      }
+    </script>
+  </body>
+</html>

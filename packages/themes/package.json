@@ -1,0 +1,23 @@
+{
+  "name": "@onegrid/themes",
+  "version": "0.0.0",
+  "description": "Theme tokens and CSS for OneGrid.",
+  "type": "module",
+  "sideEffects": ["./dist/*.css", "./src/*.css"],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./default.css": "./src/default.css"
+  },
+  "files": ["dist", "src/*.css"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && pnpm run build:css",
+    "build:css": "mkdir -p dist && cp src/*.css dist/",
+    "typecheck": "tsc -b tsconfig.json --pretty false"
+  }
+}

@@ -1,0 +1,82 @@
+---
+title: Tree
+---
+
+# Tree
+
+`F-TREE` builds on the tree row model foundation and makes tree behavior part of the
+public grid contract. The tree column owns expand/collapse controls, lazy loading uses
+`DataSource.getChildren`, and filter/sort policies preserve hierarchy instead of flattening rows.
+
+```ts
+const options: GridOptions<TreeRow> = {
+  columns,
+  data,
+  dataSource,
+  rowKey: "id",
+  rowModel: "tree",
+  sorting: { model: [{ field: "budget", direction: "desc" }] },
+  filtering: { enabled: true },
+  tree: {
+    treeColumnField: "name",
+    childrenField: "children",
+    hasChildrenField: "hasChildren",
+    lazy: true,
+    expandedKeys: ["CAP"],
+    filterPolicy: "withAncestors",
+    sortPolicy: "siblings",
+    selection: { policy: "descendants" }
+  }
+};
+```
+
+## Tree Column
+
+`tree.treeColumnField` chooses the data column that renders indentation, expand/collapse,
+and checkbox controls. If omitted, OneGrid uses the first rendered column in the pane that
+owns tree controls.
+
+## Lazy And Server Tree
+
+Lazy child requests call `DataSource.getChildren()` with the parent key, depth, current
+sort model, and current filter model:
+
+```ts
+const dataSource: DataSource<TreeRow> = {
+  async getRows() {
+    return { rows: roots, rowCount: roots.length };
+  },
+  async getChildren(request) {
+    return fetchChildren({
+      parentKey: request.parentKey,
+      sortModel: request.sortModel,
+      filterModel: request.filterModel
+    });
+  }
+};
+```
+
+Set `tree.serverOnly: true` when the server owns child filtering and sibling sorting.
+
+## Filtering And Sorting
+
+Tree filters use `tree.filterPolicy`:
+
+- `strict`: show only matched nodes that are reachable from visible roots.
+- `withAncestors`: show matched nodes plus parent context.
+- `withDescendants`: show matched nodes plus loaded descendants.
+- `withAncestorsAndDescendants`: show matched nodes with both context and subtree.
+
+Tree sorting uses `tree.sortPolicy`. `siblings` sorts only nodes with the same parent, so
+hierarchy is preserved. `none` keeps source order.
+
+## Selection
+
+`tree.selection.policy: "descendants"` cascades checkbox selection to loaded descendants.
+Parent checkboxes expose a mixed state when only part of the loaded subtree is selected.
+
+```ts
+await api.expandTreeNode("CAP");
+api.selectTreeNode("CAP", true);
+const selectedKeys = api.getTreeSelection();
+```

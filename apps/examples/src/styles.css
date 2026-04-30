@@ -1,0 +1,157 @@
+body {
+  color: #101828;
+  font-family: system-ui, sans-serif;
+  margin: 0;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 960px;
+  padding: 24px;
+}
+
+h1 {
+  font-size: 28px;
+  letter-spacing: 0;
+  margin: 0 0 16px;
+}
+
+.example-title {
+  font-size: 18px;
+  letter-spacing: 0;
+  margin: 0 0 12px;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+nav a {
+  color: #1b4d89;
+  font-weight: 600;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+section {
+  min-height: 240px;
+}
+
+.example-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.example-action-button {
+  appearance: none;
+  background: #1f2937;
+  border: 0;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
+.example-action-button:focus-visible,
+.example-action-button:hover {
+  background: #334155;
+  outline: 2px solid #2f6fed;
+  outline-offset: 2px;
+}
+
+.example-inspector {
+  border: 1px solid #d7dbe0;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.35fr) minmax(220px, 1fr);
+  margin: 16px 0 0;
+}
+
+.example-inspector dt,
+.example-inspector dd {
+  border-block-end: 1px solid #d7dbe0;
+  margin: 0;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.example-inspector dt {
+  background: #f3f6f8;
+  font-weight: 650;
+}
+
+.example-inspector dd {
+  overflow-wrap: anywhere;
+}
+
+.pagination-example-stack {
+  display: grid;
+  gap: 22px;
+}
+
+.pagination-example-section {
+  border-block-start: 1px solid #d7dbe0;
+  min-height: 0;
+  padding-block-start: 14px;
+}
+
+.pagination-example-section:first-child {
+  border-block-start: 0;
+  padding-block-start: 0;
+}
+
+.pagination-example-heading {
+  font-size: 15px;
+  letter-spacing: 0;
+  margin: 0 0 8px;
+}
+
+.pagination-example-inspector {
+  margin-block-start: 8px;
+}
+
+.renderer-foundation-header {
+  font-weight: 750;
+}
+
+.risk-badge {
+  border: 1px solid #cdd5df;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.risk-badge--low {
+  background: #eaf7ef;
+  color: #17663a;
+}
+
+.risk-badge--medium {
+  background: #fff3d6;
+  color: #8a4b00;
+}
+
+.risk-badge--high {
+  background: #fdecec;
+  color: #a51f1f;
+}
+
+@media (max-width: 640px) {
+  main {
+    padding: 16px;
+  }
+
+  .example-inspector {
+    grid-template-columns: 1fr;
+  }
+}

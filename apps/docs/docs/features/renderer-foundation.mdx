@@ -1,0 +1,44 @@
+---
+id: renderer-foundation
+title: Renderer Foundation
+---
+
+`DOM-001` defines the browser renderer foundation used by OneGrid feature renderers.
+
+The DOM package owns mount/destroy, render scheduling, invalidation scopes, renderer hosts, and
+overlay state. Framework wrappers pass options into this renderer and do not reimplement cell or
+header rendering.
+
+## Renderer hosts
+
+Cell renderers support three forms:
+
+- `kind: "text"` writes to `textContent`.
+- `kind: "element"` builds DOM through the OneGrid element builder.
+- `kind: "html"` is blocked as text unless `security.html.allowHtmlRenderer` and a sanitizer are provided.
+
+Group header renderers use the same element builder for DOM-safe content. Inline event attributes,
+`style` attributes, unsafe tags, and unsafe URL protocols are ignored by the element host.
+
+## Invalidations
+
+The DOM renderer batches invalidation scopes before commit:
+
+- `columns`
+- `rows`
+- `layout`
+- `overlay`
+- `all`
+
+The current renderer can still choose a full shell commit when a partial patch is not safe, but
+callers now express the affected surface explicitly.
+
+## Overlays
+
+The foundation overlay layer supports empty, loading, and error states:
+
+- `No rows`
+- `Loading rows`
+- `Unable to load rows`
+
+See the `DOM-001` example for vanilla, React, and Vue usage.

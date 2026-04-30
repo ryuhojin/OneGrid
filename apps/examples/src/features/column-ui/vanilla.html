@@ -1,0 +1,11 @@
+<div id="column-ui-example"></div>
+<script type="module">
+  import { mountColumnUiExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#column-ui-example");
+  if (!host) {
+    throw new Error("Column UI example host was not found.");
+  }
+
+  mountColumnUiExample(host);
+</script>

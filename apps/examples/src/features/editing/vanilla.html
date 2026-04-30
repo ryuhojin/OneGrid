@@ -1,0 +1,10 @@
+<section id="F-EDIT" aria-label="Editing example"></section>
+<script type="module">
+  import { mountEditingExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#F-EDIT");
+  if (!host) {
+    throw new Error("Editing example host was not found.");
+  }
+  mountEditingExample(host);
+</script>

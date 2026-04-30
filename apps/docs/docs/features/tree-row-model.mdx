@@ -1,0 +1,48 @@
+---
+title: Tree Row Model
+---
+
+# Tree Row Model
+
+`ROW-005` adds the tree row model foundation. Core normalizes nested rows into stable tree nodes,
+tracks expand/collapse state, loads lazy children through `DataSource.getChildren`, computes
+indentation metadata, and applies the configured tree selection policy.
+
+```ts
+import { TreeRowModel } from "@onegrid/core";
+
+const model = new TreeRowModel(rows, {
+  rowKey: "id",
+  childrenField: "children",
+  hasChildrenField: "hasChildren",
+  indentSize: 22,
+  selection: { policy: "descendants" },
+  dataSource
+});
+
+await model.expand("OPS");
+model.select("FIN", true);
+model.visibleRows;
+```
+
+DOM, React, and Vue use the same `GridOptions` contract:
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  dataSource,
+  rowKey: "id",
+  rowModel: "tree",
+  tree: {
+    childrenField: "children",
+    hasChildrenField: "hasChildren",
+    indentSize: 22,
+    selection: { policy: "descendants" }
+  }
+});
+```
+
+The example route `ROW-005` verifies nested rows, lazy children, indentation, and descendants
+selection through visible grid controls.

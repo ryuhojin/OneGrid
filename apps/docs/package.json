@@ -1,0 +1,22 @@
+{
+  "name": "@onegrid/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "DOCUSAURUS_NO_PERSISTENT_CACHE=1 docusaurus build --config docusaurus.config.cjs",
+    "typecheck": "tsc -b tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@docusaurus/core": "latest",
+    "@docusaurus/preset-classic": "latest",
+    "@mdx-js/react": "latest",
+    "clsx": "latest",
+    "prism-react-renderer": "latest",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "typescript": "latest"
+  }
+}

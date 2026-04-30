@@ -1,0 +1,31 @@
+---
+id: keyboard-focus
+title: Keyboard Focus
+---
+
+`DOM-002` defines the DOM renderer focus model for cell navigation.
+
+The grid uses roving cell focus instead of wrapper-specific state. Vanilla, React, and Vue pass
+the same grid options into `@onegrid/dom`, and the renderer owns the browser focus surface.
+
+## Navigation
+
+Supported keys:
+
+- Arrow keys move between body cells.
+- `Home` and `End` move to the first or last cell in the current row.
+- `Ctrl+Home` and `Ctrl+End` move to the first or last logical cell.
+- `PageUp` and `PageDown` move by the visible page size.
+- `Tab` and `Shift+Tab` move to the next or previous rendered cell, leaving the grid at the edge.
+
+Merged cells are treated as layout spans. Covered cells are not focusable; focus lands on the
+visible span anchor or the next reachable cell. Pinned panes participate in the same row/column
+coordinate model as center cells.
+
+## Focus state
+
+The active cell receives `data-focus-active="true"` and is exposed through
+`aria-activedescendant` on the grid root. This is intentionally separate from selection because
+selection is owned by Phase 7.
+
+See the `DOM-002` example for vanilla, React, and Vue usage.

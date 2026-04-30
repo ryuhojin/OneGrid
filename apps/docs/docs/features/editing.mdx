@@ -1,0 +1,59 @@
+# Editing
+
+`F-EDIT` introduces the shared editing lifecycle. Core owns editable checks, editor resolution,
+parsing, validation, value setting, and commit/cancel results. The DOM renderer owns the editor
+overlay, focus handoff, keyboard policy, and IME-aware commit handling.
+
+```ts
+new OneGrid({
+  el,
+  columns: [
+    { field: "title", editable: true, editor: "text" },
+    { field: "budget", type: "number", editable: true },
+    {
+      field: "status",
+      editable: true,
+      editor: {
+        kind: "select",
+        options: [
+          { value: "Draft", label: "Draft" },
+          { value: "Approved", label: "Approved" }
+        ]
+      }
+    }
+  ],
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  editing: {
+    enabled: true,
+    commitMode: "batch",
+    blurAction: "cancel",
+    validateOnCommit: true
+  }
+});
+```
+
+Supported editors are `text`, `number`, `date`, `datetime`, `checkbox`, `select`,
+`multi-select`, `radio`, `textarea`, `autocomplete`, and `custom`.
+
+Boolean fields can use the checkbox editor, and enum-style fields can use the radio editor with
+`EditorOption` values. The DOM renderer keeps checkbox and radio editors as basic form controls so
+they match the grid's inline editing behavior without a separate custom widget contract.
+
+The DOM renderer starts editing with Enter, F2, printable keys, double click, or
+`GridApi.startEdit()`. Enter commits single-line editors, Ctrl/Cmd+Enter commits textarea editors,
+Escape cancels, and IME composition suppresses premature Enter commits. Blur behavior is explicit:
+`blurAction: "commit"` commits when focus leaves the editor, while `blurAction: "cancel"` keeps
+commit under Enter or `GridApi.stopEdit({ commit: true })`.
+
+`commitMode: "cell"` applies each accepted editor value immediately. `commitMode: "batch"` stages
+accepted editor values in pending history; applications finalize them with
+`GridApi.commitPendingEdits()` or discard them with `GridApi.cancelPendingEdits()`.
+
+Commit, staged, and cancel events include timing metadata. `cellEditStaged.trigger` and
+`cellEditCommitted.trigger` are `enter`, `blur`, or `api`; `cellEditCancelled.reason` is `escape`,
+`blur`, `api`, or `replace`.
+
+The executable example is available as `F-EDIT` in the examples app and includes vanilla, React,
+and Vue variants.

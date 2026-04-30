@@ -1,0 +1,389 @@
+import {
+  calculateFixedColumnVirtualWindow,
+  clipHeaderRowsToColumns
+} from "@onegrid/core";
+import { createBodyPane } from "./bodyPaneRenderer.js";
+import { createHeaderPane } from "./headerRenderer.js";
+import { applyGridSelection } from "./selectionRuntime.js";
+import { createSummaryPane } from "./summaryRenderer.js";
+import { getRenderedRows } from "./virtualBodyWindow.js";
+import {
+  clampScrollPosition,
+  getMaxScrollLeft,
+  isWheelBoundaryHit,
+  normalizeWheelDelta
+} from "./wheelScroll.js";
+import type {
+  ColumnModel,
+  CellSpanModel,
+  ColumnUiState,
+  FixedColumnVirtualWindow,
+  FixedRowVirtualWindow,
+  HeaderModel,
+  HeaderRow,
+  LayoutPane,
+  LayoutPaneKey,
+  SecurityOptions,
+  SummaryRow
+} from "@onegrid/core";
+import type { BodyRowEntry } from "./bodyRowRenderer.js";
+import type { ColumnUiRuntime, ResolvedColumnUiOptions } from "./columnControls.js";
+import type { ColumnVirtualScrollRuntime } from "./columnVirtualScrollRuntime.js";
+import type { DomGridOptions } from "./OneGrid.js";
+import type { HeaderFilterRuntime } from "./filterRuntime.js";
+import type { GridEditRuntime } from "./editRuntime.js";
+import type { GroupRowRuntime } from "./groupRowRenderer.js";
+import type { GridSelectionRuntime } from "./selectionRuntime.js";
+import type { RowRenderState } from "./renderGridShell.js";
+import type { HeaderSortRuntime } from "./sortRuntime.js";
+
+type PaneRecord<TData> = Readonly<Record<LayoutPaneKey, LayoutPane<TData>>>;
+
+export interface PaneRenderState<TData> {
+  panes: PaneRecord<TData>;
+}
+
+export function createColumnVirtualWindow<TData>(
+  options: DomGridOptions<TData>,
+  pane: LayoutPane<TData>,
+  runtime: ColumnVirtualScrollRuntime | undefined
+): FixedColumnVirtualWindow | undefined {
+  if (!runtime?.enabled) {
+    return undefined;
+  }
+
+  return calculateFixedColumnVirtualWindow({
+    columnWidths: pane.columns.map((column) => column.width),
+    scrollLeft: runtime.scrollLeft,
+    viewportWidth: runtime.viewportWidth,
+    overscan: options.virtualization?.columns?.overscan,
+    maxDomColumns: options.virtualization?.columns?.maxDomColumns
+  });
+}
+
+export function getRenderedPanes<TData>(
+  panes: PaneRecord<TData>,
+  columnWindow: FixedColumnVirtualWindow | undefined
+): PaneRecord<TData> {
+  if (!columnWindow) {
+    return panes;
+  }
+
+  return Object.freeze({
+    left: panes.left,
+    center: createVirtualCenterPane(panes.center, columnWindow),
+    right: panes.right
+  });
+}
+
+export function getRenderedHeaderRows<TData>(
+  rows: readonly HeaderRow[],
+  pane: LayoutPane<TData>
+): readonly HeaderRow[] {
+  return pane.virtual
+    ? clipHeaderRowsToColumns(rows, pane.key, pane.columns)
+    : rows;
+}
+
+export interface ColumnVirtualScrollAttachInput<TData> {
+  readonly grid: HTMLElement;
+  readonly scrollElement: HTMLElement;
+  readonly options: DomGridOptions<TData>;
+  readonly columnModel: ColumnModel<TData>;
+  readonly headerModel: HeaderModel<TData>;
+  readonly panes: PaneRecord<TData>;
+  readonly paneState: PaneRenderState<TData>;
+  readonly allRows: readonly BodyRowEntry<TData>[];
+  readonly summary: SummaryRow | undefined;
+  readonly rowRenderState: RowRenderState<TData> | undefined;
+  readonly cellSpanModel: CellSpanModel;
+  readonly centerOwnsTreeControls: boolean;
+  getRowWindow(): FixedRowVirtualWindow | undefined;
+  readonly columnState: ColumnUiState;
+  readonly columnUi: ResolvedColumnUiOptions;
+  readonly columnUiRuntime: ColumnUiRuntime | undefined;
+  readonly sortRuntime?: HeaderSortRuntime;
+  readonly filterRuntime?: HeaderFilterRuntime;
+  readonly groupRuntime?: GroupRowRuntime;
+  readonly editRuntime?: GridEditRuntime;
+  readonly selectionRuntime?: GridSelectionRuntime;
+  readonly columnVirtualScrollRuntime: ColumnVirtualScrollRuntime | undefined;
+  readonly columnWindow: FixedColumnVirtualWindow | undefined;
+  readonly security?: SecurityOptions;
+}
+
+export function attachColumnVirtualScroll<TData>(
+  input: ColumnVirtualScrollAttachInput<TData>
+): void {
+  if (!input.columnWindow || !input.columnVirtualScrollRuntime?.enabled) {
+    attachStaticColumnScrollSync(input.grid, input.scrollElement, input.columnVirtualScrollRuntime);
+    return;
+  }
+
+  const runtime = input.columnVirtualScrollRuntime;
+  let currentWindow = input.columnWindow;
+  const updateColumns = (nextWindow: FixedColumnVirtualWindow): void => {
+    syncColumnScroll(input.grid, input.scrollElement);
+    runtime.onScroll(nextWindow.scrollLeft, nextWindow.viewportWidth);
+    if (sameRenderedColumnWindow(currentWindow, nextWindow)) {
+      currentWindow = nextWindow;
+      return;
+    }
+
+    const panes = getRenderedPanes(input.panes, nextWindow);
+    input.paneState.panes = panes;
+    replaceCenterPanes({ ...input, panes, columnWindow: nextWindow });
+    syncColumnScroll(input.grid, input.scrollElement);
+    currentWindow = nextWindow;
+  };
+  const getWindowForScrollLeft = (scrollLeft: number): FixedColumnVirtualWindow =>
+    calculateFixedColumnVirtualWindow({
+      columnWidths: input.panes.center.columns.map((column) => column.width),
+      scrollLeft,
+      viewportWidth: resolveCenterViewportWidth(input.scrollElement, input.panes)
+        || runtime.viewportWidth,
+      overscan: input.options.virtualization?.columns?.overscan,
+      maxDomColumns: input.options.virtualization?.columns?.maxDomColumns
+    });
+
+  input.scrollElement.addEventListener("wheel", (event) => {
+    const wheelDeltaX = Math.abs(event.deltaX) >= 1 || !event.shiftKey
+      ? event.deltaX
+      : event.deltaY;
+    const deltaX = normalizeWheelDelta(wheelDeltaX, event.deltaMode, input.scrollElement.clientWidth);
+    if (Math.abs(deltaX) < 1) {
+      return;
+    }
+
+    const maxScrollLeft = getMaxScrollLeft(input.scrollElement);
+    const nextScrollLeft = clampScrollPosition(input.scrollElement.scrollLeft + deltaX, maxScrollLeft);
+    if (
+      nextScrollLeft === input.scrollElement.scrollLeft
+      && !isWheelBoundaryHit(input.scrollElement.scrollLeft, deltaX, maxScrollLeft)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    input.scrollElement.scrollLeft = nextScrollLeft;
+    updateColumns(getWindowForScrollLeft(nextScrollLeft));
+  }, { passive: false });
+
+  input.scrollElement.addEventListener("scroll", () => {
+    const nextWindow = calculateFixedColumnVirtualWindow({
+      columnWidths: input.panes.center.columns.map((column) => column.width),
+      scrollLeft: input.scrollElement.scrollLeft,
+      viewportWidth: resolveCenterViewportWidth(input.scrollElement, input.panes)
+        || runtime.viewportWidth,
+      overscan: input.options.virtualization?.columns?.overscan,
+      maxDomColumns: input.options.virtualization?.columns?.maxDomColumns
+    });
+    updateColumns(nextWindow);
+  }, { passive: true });
+}
+
+function attachStaticColumnScrollSync(
+  grid: HTMLElement,
+  scrollElement: HTMLElement,
+  runtime?: ColumnVirtualScrollRuntime
+): void {
+  const sync = (): void => {
+    syncColumnScroll(grid, scrollElement);
+    runtime?.onScroll(scrollElement.scrollLeft, scrollElement.clientWidth);
+  };
+  sync();
+  scrollElement.addEventListener("scroll", sync, { passive: true });
+}
+
+export function restoreColumnVirtualScroll(
+  scrollElement: HTMLElement,
+  markerElement: HTMLElement,
+  runtime: ColumnVirtualScrollRuntime | undefined,
+  columnWindow: FixedColumnVirtualWindow | undefined
+): void {
+  if (!columnWindow || !runtime?.enabled) {
+    if (runtime) {
+      scrollElement.scrollLeft = runtime.scrollLeft;
+      syncColumnScroll(markerElement, scrollElement);
+    }
+    return;
+  }
+
+  markerElement.dataset.virtualizedColumns = "true";
+  scrollElement.dataset.virtualizedColumns = "true";
+  scrollElement.scrollLeft = runtime.scrollLeft;
+  syncColumnScroll(markerElement, scrollElement);
+}
+
+function createVirtualCenterPane<TData>(
+  pane: LayoutPane<TData>,
+  columnWindow: FixedColumnVirtualWindow
+): LayoutPane<TData> {
+  const columns = Object.freeze(
+    pane.columns.slice(columnWindow.firstColumn, columnWindow.lastColumn + 1)
+  );
+
+  return Object.freeze({
+    ...pane,
+    columns,
+    ariaColumnOffset: pane.ariaColumnOffset + columnWindow.firstColumn,
+    columnTemplate: columns.map((column) => `${column.width}px`).join(" "),
+    virtual: {
+      firstColumn: columnWindow.firstColumn,
+      lastColumn: columnWindow.lastColumn,
+      offsetLeft: columnWindow.offsetLeft,
+      renderedWidth: columnWindow.renderedWidth,
+      totalWidth: columnWindow.totalWidth
+    }
+  });
+}
+
+function replaceCenterPanes<TData>(
+  input: ColumnVirtualScrollAttachInput<TData> & {
+    readonly panes: PaneRecord<TData>;
+    readonly columnWindow: FixedColumnVirtualWindow;
+  }
+): void {
+  replacePane(
+    input.grid,
+    "header",
+    createHeaderPane({
+      rows: getRenderedHeaderRows(input.headerModel.regions.center.rows, input.panes.center),
+      columnTemplate: input.panes.center.columnTemplate,
+      ariaColumnOffset: input.panes.center.ariaColumnOffset,
+      rowCount: input.headerModel.depth,
+      columnModel: input.columnModel,
+      columnState: input.columnState,
+      columnUi: input.columnUi,
+      runtime: input.columnUiRuntime,
+      ...(input.options.sorting === undefined ? {} : { sorting: input.options.sorting }),
+      ...(input.sortRuntime === undefined ? {} : { sortRuntime: input.sortRuntime }),
+      ...(input.filterRuntime === undefined ? {} : { filterRuntime: input.filterRuntime }),
+      pane: input.panes.center,
+      ...(input.security === undefined ? {} : { security: input.security })
+    })
+  );
+
+  replacePane(
+    input.grid,
+    "body",
+    createBodyPane(
+      input.panes.center,
+      getRenderedRows(input.allRows, input.getRowWindow()),
+      {
+        ...(input.rowRenderState?.treeRuntime === undefined
+          ? {}
+          : { treeRuntime: input.rowRenderState.treeRuntime }),
+        ...(input.rowRenderState?.treeRuntime?.treeColumnField === undefined
+          ? {}
+          : { treeColumnField: input.rowRenderState.treeRuntime.treeColumnField }),
+        ...(input.groupRuntime === undefined ? {} : { groupRuntime: input.groupRuntime }),
+        cellSpanModel: input.cellSpanModel,
+        ...(input.options.editing === undefined ? {} : { editing: input.options.editing }),
+        ...(input.security === undefined ? {} : { security: input.security })
+      },
+      input.centerOwnsTreeControls,
+      input.getRowWindow()
+    )
+  );
+
+  if (input.summary) {
+    replaceSummaryPanes(input.grid, input.panes.center, input.summary);
+  }
+  if (input.selectionRuntime) {
+    applyGridSelection(input.grid, input.selectionRuntime);
+  }
+}
+
+function replacePane(
+  grid: HTMLElement,
+  section: "header" | "body" | "summary",
+  content: HTMLElement
+): void {
+  const paneElement = grid.querySelector<HTMLElement>(
+    `[data-layout-section="${section}"] [data-layout-pane="center"]`
+  );
+  paneElement?.replaceChildren(content);
+}
+
+function replaceSummaryPanes<TData>(
+  grid: HTMLElement,
+  pane: LayoutPane<TData>,
+  summary: SummaryRow
+): void {
+  grid
+    .querySelectorAll<HTMLElement>('[data-layout-section="summary"] [data-layout-pane="center"]')
+    .forEach((paneElement) => {
+      const rowIndex = readAriaRowIndex(paneElement);
+      paneElement.replaceChildren(createSummaryPane(pane, summary, rowIndex));
+    });
+}
+
+function readAriaRowIndex(paneElement: HTMLElement): number {
+  const current = paneElement.querySelector<HTMLElement>(".og-grid__summary-row");
+  const parsed = Number(current?.getAttribute("aria-rowindex") ?? "1");
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function sameRenderedColumnWindow(
+  left: FixedColumnVirtualWindow,
+  right: FixedColumnVirtualWindow
+): boolean {
+  return left.firstColumn === right.firstColumn
+    && left.lastColumn === right.lastColumn
+    && left.offsetLeft === right.offsetLeft
+    && left.renderedWidth === right.renderedWidth;
+}
+
+function resolveCenterViewportWidth<TData>(
+  viewport: HTMLElement,
+  panes: PaneRecord<TData>
+): number {
+  return Math.max(0, viewport.clientWidth - panes.left.width - panes.right.width);
+}
+
+function syncColumnScroll(
+  grid: HTMLElement,
+  scrollElement: HTMLElement
+): void {
+  for (const sectionKey of ["header", "summary"] as const) {
+    syncSections(grid, sectionKey, scrollElement.scrollLeft);
+  }
+}
+
+function syncSections(
+  grid: HTMLElement,
+  sectionKey: "header" | "summary",
+  scrollLeft: number
+): void {
+  grid
+    .querySelectorAll<HTMLElement>(`[data-layout-section="${sectionKey}"]`)
+    .forEach((section) => syncSection(section, scrollLeft));
+}
+
+function syncSection(section: HTMLElement, scrollLeft: number): void {
+  section.style.transform = scrollLeft > 0
+    ? `translateX(${-scrollLeft}px)`
+    : "";
+
+  const leftPane = section.querySelector<HTMLElement>('[data-layout-pane="left"]');
+  if (leftPane) {
+    leftPane.style.transform = scrollLeft > 0
+      ? `translateX(${scrollLeft}px)`
+      : "";
+  }
+
+  const rightPane = section.querySelector<HTMLElement>('[data-layout-pane="right"]');
+  if (rightPane) {
+    rightPane.style.transform = scrollLeft > 0
+      ? `translateX(${scrollLeft}px)`
+      : "";
+  }
+
+  const gutterPane = section.querySelector<HTMLElement>(".og-grid__pane--scrollbar-gutter");
+  if (gutterPane) {
+    gutterPane.style.transform = scrollLeft > 0
+      ? `translateX(${scrollLeft}px)`
+      : "";
+  }
+}

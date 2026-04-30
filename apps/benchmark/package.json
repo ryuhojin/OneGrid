@@ -1,0 +1,13 @@
+{
+  "name": "@onegrid/benchmark",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -b tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@onegrid/testing": "workspace:*"
+  }
+}

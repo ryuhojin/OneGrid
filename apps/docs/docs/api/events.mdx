@@ -1,0 +1,44 @@
+# Events
+
+`GridEventMap<TData>` defines the typed event surface for lifecycle, data, selection, sorting,
+filtering, editing, validation, and error events.
+
+Editing emits lifecycle events through the same map:
+
+```ts
+const events: GridEventHandlers<OrderRow> = {
+  cellEditStarted: ({ position }) => console.log("editing", position.field),
+  cellEditStaged: ({ previousValue, nextValue, trigger }) =>
+    console.log("staged", trigger, previousValue, nextValue),
+  cellEditCommitted: ({ previousValue, nextValue, trigger }) =>
+    console.log(trigger, previousValue, nextValue),
+  cellEditCancelled: ({ position, reason }) => console.log("cancelled", position.field, reason),
+  validationFailed: ({ issues }) => console.warn(issues)
+};
+```
+
+`validationFailed` keeps the editor open in the DOM renderer and exposes field, row key, message,
+and severity metadata from core validation. `cellEditStaged.trigger` and
+`cellEditCommitted.trigger` identify whether the value came from Enter, blur, or the API;
+`cellEditCancelled.reason` identifies Escape, blur, API cancel, or replacement by another edit
+session.
+
+Selection emits row keys, selected cells, selected ranges, and optional server dataset token:
+
+```ts
+const events: GridEventHandlers<OrderRow> = {
+  selectionChanged: ({ rowKeys, cells, ranges, allRowsToken }) => {
+    console.log(rowKeys, cells.length, ranges.length, allRowsToken?.token);
+  }
+};
+```
+
+Pagination emits one-based page state after toolbar or API navigation:
+
+```ts
+const events: GridEventHandlers<OrderRow> = {
+  pageChanged: ({ page, pageSize }) => {
+    console.log(page, pageSize);
+  }
+};
+```

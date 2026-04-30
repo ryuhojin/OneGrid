@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/pagination" },
+    { "path": "packages/dom" },
+    { "path": "packages/react" },
+    { "path": "packages/vue" },
+    { "path": "packages/themes" },
+    { "path": "packages/adapters" },
+    { "path": "packages/testing" },
+    { "path": "apps/examples" },
+    { "path": "apps/benchmark" },
+    { "path": "apps/playground" }
+  ]
+}

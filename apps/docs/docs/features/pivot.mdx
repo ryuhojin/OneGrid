@@ -1,0 +1,73 @@
+# Pivot
+
+`F-PIVOT` turns row data into a cross-tab grid while preserving the shared OneGrid row,
+column, renderer, accessibility, and server request contracts.
+
+```ts
+const pivotModel = {
+  rows: ["region", "agency"],
+  columns: ["quarter"],
+  values: [
+    { field: "amount", function: "sum", alias: "amountTotal", label: "Amount" },
+    { field: "budget", function: "avg", alias: "avgBudget", label: "Avg budget" }
+  ],
+  totals: "both",
+  subtotals: true
+} satisfies PivotModel;
+
+const options: GridOptions<BudgetRow> = {
+  columns,
+  data,
+  rowModel: "client",
+  pivot: {
+    enabled: true,
+    panel: true,
+    model: pivotModel
+  }
+};
+```
+
+## Model
+
+- `rows` are the left-side row fields.
+- `columns` are the pivoted column dimensions.
+- `values` are aggregated measure fields. A string value defaults to `sum`; an object can set
+  `function`, `alias`, and a visible `label`.
+- `totals: "columns"` adds per-row total columns.
+- `totals: "rows"` adds a grand total row.
+- `totals: "both"` enables both total directions.
+- `subtotals: true` adds subtotal rows for the first row field.
+
+## Client Pivot
+
+Client pivot is calculated in `@onegrid/core` from the filtered and sorted client row set. The DOM
+renderer receives generated column groups and pivot rows, then renders them through the normal grid
+pipeline. Wrappers do not reimplement pivot behavior.
+
+## Server Pivot
+
+For large datasets use server pivot:
+
+```ts
+const options: GridOptions<PivotResultRow> = {
+  columns: serverPivotColumns,
+  rowModel: "server",
+  dataSource,
+  pivot: {
+    enabled: true,
+    serverOnly: true,
+    panel: true,
+    model: pivotModel
+  }
+};
+```
+
+`DataSource.getRows()` receives `request.pivotModel`. The server owns pivot execution and returns
+rows shaped for the configured result columns. This keeps 10M to 100M row scenarios out of browser
+memory.
+
+## Panel Foundation
+
+`pivot.panel: true` renders a keyboard-reachable pivot panel that lists row fields, column fields,
+value fields, totals, and rendered pivot metadata. The current foundation is intentionally model
+driven; drag-and-drop mutation can build on the same public model later.

@@ -1,0 +1,43 @@
+# Filtering
+
+Filtering is owned by the shared `FilterModel` and consumed by client, infinite, server, and
+viewport row models. The DOM renderer exposes quick filter input and column menu filter dialogs
+without wrapper-specific logic.
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  { field: "agency", filter: "text" },
+  { field: "amount", type: "number", filter: "number" },
+  { field: "dueDate", type: "date", filter: "date" },
+  { field: "urgent", type: "boolean", filter: "boolean" },
+  { field: "status", pinned: "right", filter: { kind: "set" } },
+  {
+    field: "service",
+    filter: {
+      kind: "custom",
+      predicate: ({ value, filterValue }) =>
+        String(value).includes(String(filterValue))
+    }
+  }
+];
+
+const grid = new OneGrid({
+  el,
+  columns,
+  rowModel: "server",
+  dataSource,
+  filtering: {
+    enabled: true,
+    quickFilter: true
+  }
+});
+```
+
+Column menu filters update `GridOptions.filtering.model` through the same model that
+`GridApi.setFilterModel()` accepts. Text, number, date, boolean, set, custom, and two-condition
+column filters are represented as `FilterCondition[]`; conditions are ANDed by the client row
+model. Quick filter is stored as `quickText`.
+
+For remote row models, filter changes recreate the active row model request and send the current
+`FilterModel` to `DataSource.getRows`. Set filters can call `DataSource.getDistinctValues` so the
+backend can provide distinct values without loading the full dataset into the browser.

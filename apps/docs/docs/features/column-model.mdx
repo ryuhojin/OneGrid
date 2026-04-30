@@ -1,0 +1,25 @@
+---
+title: Column Model
+---
+
+# Column Model
+
+The column model is a core-only normalization layer. It resolves stable column ids, leaf columns,
+hidden columns, pinned leaf groups, width bounds, flex metadata, and column order before the DOM
+renderer or framework wrappers receive renderable columns.
+
+```ts
+import { createColumnModel } from "@onegrid/core";
+
+const model = createColumnModel(columns, {
+  columnOrder: ["status", "order-id", "customer"]
+});
+
+model.visibleLeafColumns;
+model.hiddenLeafColumns;
+model.pinnedLeafColumns.left;
+model.order.visible;
+```
+
+The examples app includes the executable `COL-001` route for the vanilla, React, and Vue example
+sources.

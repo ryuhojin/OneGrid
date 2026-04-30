@@ -1,0 +1,64 @@
+# Pagination
+
+`F-PAGE` adds pagination state, navigation UI, and server request metadata without
+changing the core row model contract.
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  pagination: {
+    mode: "client",
+    position: "bottom",
+    page: 1,
+    pageSize: 50,
+    pageSizeOptions: [25, 50, 100],
+    pageGroupSize: 5
+  }
+};
+```
+
+## Modes
+
+- `client` slices the filtered and sorted client row model.
+- `server` sends zero-based `request.page` and `request.pageSize` to `DataSource.getRows`.
+- `cursor` sends `request.cursor` and stores returned `nextCursor` values by page.
+- `append-scroll` uses the infinite row model and appends loaded blocks.
+- `infinite` and `viewport` remain large-data row model modes; pagination UI is not required
+  for viewport windows.
+
+## UI Placement
+
+`pagination.position` defaults to `bottom` and also supports `top` and `both`. The toolbar exposes first,
+previous, page group, next, last, and page size controls. Buttons use `aria-current="page"`
+for the current page and a polite live status for screen readers.
+
+## Server Contract
+
+```ts
+const dataSource: DataSource<OrderRow> = {
+  async getRows(request) {
+    return {
+      rows: await fetchRows({
+        page: request.page,
+        pageSize: request.pageSize,
+        cursor: request.cursor
+      }),
+      rowCount: totalRows,
+      nextCursor,
+      hasMore
+    };
+  }
+};
+```
+
+Server and cursor pagination keep the full dataset outside browser memory. The DOM renderer
+only renders the page rows returned by the data source.
+
+## API
+
+`GridApi.setPage(page)` changes the one-based page displayed by the grid.
+`GridApi.setPageSize(pageSize)` resets to page 1 and rerenders or reloads the current row model.
+`pageChanged` fires with the new `page` and `pageSize`.

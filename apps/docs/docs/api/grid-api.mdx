@@ -1,0 +1,125 @@
+# GridApi
+
+`GridApi<TData>` is the public method contract for future engine and renderer implementations.
+
+Virtual navigation methods use the shared `ScrollAlign` contract:
+
+```ts
+api.scrollToRow(2_499, "start");
+api.scrollToColumn("metric32", "nearest");
+```
+
+Sorting methods update the shared `SortModel[]` used by header state, client row model sorting,
+and remote row model requests:
+
+```ts
+api.setSortModel([{ field: "amount", direction: "desc" }]);
+const sortModel = api.getSortModel();
+```
+
+Filtering methods update the shared `FilterModel` used by client evaluation and remote row model
+requests:
+
+```ts
+api.setFilterModel({
+  quickText: "office",
+  conditions: [{ field: "status", kind: "set", operator: "in", value: ["Approved"] }]
+});
+
+const filterModel = api.getFilterModel();
+```
+
+Grouping methods update the shared `GroupModel` used by client grouping and server group requests:
+
+```ts
+api.setGroupModel({ fields: ["region"], expandedKeys: ["group:region=Capital"] });
+api.expandGroup("group:region=Regional");
+api.collapseGroup("group:region=Capital");
+api.toggleGroup("group:region=Digital");
+
+const groupModel = api.getGroupModel();
+```
+
+For server row models, `expandGroup("Capital")` sets `groupKeys` to `["Capital"]` before the next
+`DataSource.getRows()` call. `collapseGroup("Capital")` returns to the root group list.
+
+Tree methods operate on the tree row model and reuse the configured lazy-loading and cascade
+selection policy:
+
+```ts
+await api.expandTreeNode("DIG-AUD");
+api.collapseTreeNode("CAP");
+await api.toggleTreeNode("REG");
+api.selectTreeNode("DIG", true);
+
+const selectedTreeKeys = api.getTreeSelection();
+```
+
+`expandTreeNode()` and `toggleTreeNode()` return a promise because expanding a lazy node may call
+`DataSource.getChildren()`.
+
+Editing methods use the shared `CellPosition` contract. `startEdit()` opens the renderer editor for
+the visible cell, and `stopEdit()` commits or cancels the active editor:
+
+```ts
+api.startEdit({ rowIndex: 0, rowKey: "ED-0001", field: "title" });
+api.stopEdit({ commit: true, validate: true });
+api.stopEdit({ commit: false });
+```
+
+The DOM renderer also starts editing from Enter, F2, printable keys, and cell double click.
+`stopEdit({ commit: true })` emits `cellEditCommitted` with `trigger: "api"`;
+`stopEdit({ commit: false })` emits `cellEditCancelled` with `reason: "api"`.
+When `editing.commitMode` is `"batch"`, `stopEdit({ commit: true })` stages the cell value instead
+of finalizing it. Use the pending-edit API to inspect, finalize, or discard the staged history:
+
+```ts
+const pending = api.getPendingEdits();
+await api.commitPendingEdits();
+api.cancelPendingEdits();
+```
+
+Each pending edit includes `rowKey`, `position.field`, `position.rowIndex`, `sourceIndex` when the
+renderer can resolve the original client data index, `previousValue`, `nextValue`, and `stagedAt`.
+
+Selection methods expose the same core state used by pointer and keyboard interaction:
+
+```ts
+api.selectRows(["SEL-0001", "SEL-0002"]);
+api.selectCell({ rowKey: "SEL-0001", rowIndex: 0, field: "agency", columnIndex: 2 });
+api.selectCellRange(
+  { rowKey: "SEL-0001", rowIndex: 0, field: "agency", columnIndex: 2 },
+  { rowKey: "SEL-0002", rowIndex: 1, field: "memo", columnIndex: 4 }
+);
+api.selectAllVisibleRows();
+api.selectServerDataset();
+
+const selection = api.getSelectionState();
+const rows = api.getSelectedRows();
+```
+
+`selectServerDataset()` produces a server-selection token instead of materializing remote rows.
+
+Pagination methods use one-based page numbers and keep wrappers aligned with the DOM renderer:
+
+```ts
+api.setPage(3);
+const page = api.getPage();
+
+api.setPageSize(100);
+const pageSize = api.getPageSize();
+```
+
+Changing page size resets to page 1. Server and cursor pagination reload the server row model with
+the new `pageSize`; client pagination rerenders the paged visible row slice.
+
+Clipboard methods use the current selection and the same edit validation pipeline as normal cell
+editing:
+
+```ts
+await api.copyToClipboard({ selectedOnly: true, includeHeaders: true });
+await api.pasteFromClipboard("Grant review\t410000");
+```
+
+`copyToClipboard()` writes `text/plain` only. `pasteFromClipboard()` parses TSV, skips read-only or
+out-of-range targets, and emits normal edit commit or validation events for accepted cells.

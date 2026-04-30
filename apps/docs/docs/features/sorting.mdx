@@ -1,0 +1,38 @@
+# Sorting
+
+Sorting is owned by the shared core model and rendered consistently by DOM, React, and Vue.
+The DOM renderer toggles the same `SortModel[]` that server and viewport row models send to
+`DataSource.getRows`.
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  { field: "id", pinned: "left" },
+  { field: "agency" },
+  { field: "amount", type: "number" },
+  {
+    field: "status",
+    pinned: "right",
+    sortComparator: (left, right) => statusRank[String(left)] - statusRank[String(right)]
+  }
+];
+
+const grid = new OneGrid({
+  el,
+  columns,
+  data,
+  rowModel: "client",
+  sorting: {
+    enabled: true,
+    multiSort: true,
+    sortOrder: ["asc", "desc", null]
+  }
+});
+```
+
+Users click a sortable header to cycle through ascending, descending, and none. Shift-click adds
+the column to the current model when `multiSort` is enabled. Sortable headers expose `aria-sort`
+and can be toggled with Enter or Space.
+
+For server-owned data, set `rowModel: "server"` or another remote row model and keep the sort
+model in `GridOptions.sorting.model`. Header changes rebuild the row model request with the new
+sort model instead of sorting partial browser data.

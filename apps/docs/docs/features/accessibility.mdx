@@ -1,0 +1,39 @@
+# Accessibility
+
+`DOM-003` defines the baseline accessibility contract for the DOM renderer.
+
+The grid root exposes `role="grid"`, logical `aria-rowcount` and `aria-colcount`, an accessible
+label, readonly state, busy state, and `aria-activedescendant` when keyboard focus is active.
+Header rows, body rows, column headers, grid cells, merged anchors, covered cells, virtual rows,
+and pinned panes keep ARIA coordinates aligned with the same core column and row models used by
+vanilla, React, and Vue.
+
+```ts
+const options = {
+  columns,
+  data,
+  accessibility: {
+    label: "Contracts grid",
+    description: "Keyboard navigable financial contract data.",
+    liveRegion: "polite"
+  }
+};
+```
+
+The DOM renderer adds a screen-reader-only live region by default. It announces ready, loading, and
+error states without exposing internal state APIs to wrappers.
+
+Column menus use `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`, `role="menu"`,
+`role="menuitem"`, arrow-key movement, Escape close, and a shared overlay focus trap foundation.
+The same focus trap utility is reserved for editor overlays so future editing work can avoid
+reimplementing modal focus behavior.
+
+The `DOM-003` example and accessibility tests verify:
+
+- grid, header, row, and cell roles
+- logical row and column counts
+- virtual row `aria-rowindex`
+- live region text
+- column menu ARIA and keyboard behavior
+- overlay focus trap wrapping
+- axe-core scan with zero violations for the accessibility example

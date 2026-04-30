@@ -1,0 +1,49 @@
+---
+title: Viewport Row Model
+---
+
+# Viewport Row Model
+
+`ROW-004` adds the viewport row model foundation for very large datasets. The model calculates a
+visible range from scroll metrics, requests only that range from `DataSource.getRows`, caches recent
+viewport ranges, discards stale responses, and can prefetch additional rows when scroll velocity is
+high.
+
+```ts
+import { ViewportRowModel } from "@onegrid/core";
+
+const model = new ViewportRowModel({
+  dataSource,
+  rowKey: "id",
+  rowHeight: 30,
+  viewportSize: 20,
+  overscan: 2,
+  prefetchRows: 40,
+  initialRowCount: 10_000_000
+});
+
+await model.loadViewport({ scrollTop: 0, viewportHeight: 600 });
+model.applyLiveUpdate({ rowIndex: 10, row: nextRow });
+```
+
+DOM, React, and Vue use the same `GridOptions` contract:
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  rowKey: "id",
+  rowModel: "viewport",
+  dataSource,
+  viewport: {
+    rowHeight: 30,
+    viewportSize: 20,
+    overscan: 2,
+    prefetchRows: 40,
+    initialRowCount: 10_000_000
+  }
+});
+```
+
+The example route `ROW-004` renders a synchronized viewport over 10M logical rows without creating a
+full client array.

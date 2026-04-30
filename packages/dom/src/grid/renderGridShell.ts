@@ -1,0 +1,387 @@
+import {
+  createCellSpanModel,
+  createColumnModel,
+  createGridLayoutModel,
+  createHeaderModel,
+  createSummaryRow
+} from "@onegrid/core";
+import type {
+  CellSpanModel,
+  LayoutPane,
+  SummaryRow
+} from "@onegrid/core";
+import { createBodyPane } from "./bodyPaneRenderer.js";
+import type { ColumnVirtualScrollRuntime } from "./columnVirtualScrollRuntime.js";
+import { resolveColumnUiOptions } from "./columnControls.js";
+import type { ColumnUiRuntime } from "./columnControls.js";
+import type { HeaderFilterRuntime } from "./filterRuntime.js";
+import { createFooterSection, createOverlayLayer } from "./footerRenderer.js";
+import { applyGridAccessibility } from "./gridAccessibility.js";
+import { attachGridFocusForHost, disposeGridFocus } from "./gridFocus.js";
+import { attachGridScrollbarsForHost, disposeGridScrollbars } from "./gridScrollbars.js";
+import { createBodyShell, createBodyViewport, createSection } from "./gridSections.js";
+import { appendBottomPagination, appendTopToolbars } from "./gridToolbarRenderer.js";
+import { createHeaderPane } from "./headerRenderer.js";
+import type { GroupRowRuntime } from "./groupRowRenderer.js";
+import { attachInfiniteScroll } from "./infiniteScrollTrigger.js";
+import type { GridEditRuntime } from "./editRuntime.js";
+import type { DomGridOptions } from "./OneGrid.js";
+import { createPivotRenderData } from "./pivotRenderData.js";
+import {
+  createPaginationRenderModel,
+} from "./paginationRenderer.js";
+import type { GridPaginationRuntime } from "./paginationRenderer.js";
+import type { RenderInvalidation } from "./renderInvalidation.js";
+import {
+  createCellSpanRows,
+  getGridRowData,
+  getSummaryRows
+} from "./renderGridData.js";
+import type { RowRenderState } from "./renderGridTypes.js";
+import { attachGridSelectionForHost, disposeGridSelection } from "./selectionRuntime.js";
+import type { GridSelectionRuntime } from "./selectionRuntime.js";
+import type { HeaderSortRuntime } from "./sortRuntime.js";
+import { createSummaryPane } from "./summaryRenderer.js";
+import {
+  attachColumnVirtualScroll,
+  createColumnVirtualWindow,
+  getRenderedHeaderRows,
+  getRenderedPanes,
+  restoreColumnVirtualScroll
+} from "./virtualColumnWindow.js";
+import {
+  attachVirtualScroll,
+  createVirtualWindow,
+  getRenderedRows,
+  restoreVirtualScroll
+} from "./virtualBodyWindow.js";
+import type { VirtualScrollRuntime } from "./virtualScrollRuntime.js";
+import { attachWheelBoundaryGuard } from "./wheelScroll.js";
+
+export type { RowRenderState } from "./renderGridTypes.js";
+
+export function disposeGridShell(host: HTMLElement): void {
+  disposeGridScrollbars(host);
+  disposeGridFocus(host);
+  disposeGridSelection(host);
+}
+
+export function renderGridShell<TData>(
+  host: HTMLElement,
+  options: DomGridOptions<TData>,
+  runtime?: ColumnUiRuntime,
+  rowRenderState?: RowRenderState<TData>,
+  virtualScrollRuntime?: VirtualScrollRuntime,
+  columnVirtualScrollRuntime?: ColumnVirtualScrollRuntime,
+  sortRuntime?: HeaderSortRuntime,
+  filterRuntime?: HeaderFilterRuntime,
+  groupRuntime?: GroupRowRuntime,
+  editRuntime?: GridEditRuntime,
+  selectionRuntime?: GridSelectionRuntime,
+  paginationRuntime?: GridPaginationRuntime,
+  invalidation?: RenderInvalidation
+): void {
+  disposeGridShell(host);
+  host.replaceChildren();
+
+  const pivotRenderData = createPivotRenderData(options, rowRenderState !== undefined);
+  const renderOptions = pivotRenderData.options;
+  const columnModel = createColumnModel(renderOptions.columns, {
+    ...(renderOptions.columnOrder === undefined ? {} : { columnOrder: renderOptions.columnOrder }),
+    ...(renderOptions.columnState === undefined ? {} : { columnState: renderOptions.columnState })
+  });
+  const headerModel = createHeaderModel(
+    columnModel,
+    renderOptions.headerMerge === undefined ? {} : { merge: renderOptions.headerMerge }
+  );
+  const rowData = getGridRowData(renderOptions, rowRenderState);
+  const allRows = rowData.rows;
+  const rowCount = rowRenderState?.rowCount ?? allRows.length;
+  const paginationModel = createPaginationRenderModel(
+    renderOptions,
+    rowData.totalRowCount,
+    rowRenderState
+  );
+  const virtualWindow = createVirtualWindow(
+    renderOptions,
+    rowCount,
+    rowRenderState,
+    virtualScrollRuntime
+  );
+  const rowWindowState: { window: typeof virtualWindow } = { window: virtualWindow };
+  const rows = getRenderedRows(allRows, virtualWindow);
+  const cellSpanModel = createCellSpanModel({
+    rows: createCellSpanRows(allRows),
+    columns: columnModel.visibleLeafColumns,
+    ...(renderOptions.merge === undefined ? {} : { options: renderOptions.merge }),
+    ...(rowRenderState?.mergeMeta === undefined ? {} : { serverMeta: rowRenderState.mergeMeta })
+  });
+  const summary = createSummaryRow(
+    columnModel.visibleLeafColumns,
+    getSummaryRows(renderOptions, allRows, rowRenderState),
+    rowRenderState?.aggregate === undefined ? {} : { aggregateValues: rowRenderState.aggregate.values }
+  );
+  const summaryPlacements = getSummaryPlacements(renderOptions, summary);
+  const layout = createGridLayoutModel(columnModel, {
+    hasSummary: summaryPlacements.length > 0,
+    hasFooter: true,
+    hasOverlay: true
+  });
+  const columnWindow = createColumnVirtualWindow(
+    renderOptions,
+    layout.panes.center,
+    columnVirtualScrollRuntime
+  );
+  const paneState = { panes: getRenderedPanes(layout.panes, columnWindow) };
+  const columnUi = resolveColumnUiOptions(renderOptions.columnUi);
+  const shell = document.createElement("div");
+  shell.className = "og-grid-shell";
+  if (invalidation) {
+    shell.dataset.renderInvalidation = invalidation.scopes.join(",");
+  }
+
+  appendTopToolbars({
+    shell,
+    columnModel,
+    columnUi,
+    ...(runtime === undefined ? {} : { columnUiRuntime: runtime }),
+    options: renderOptions,
+    ...(selectionRuntime === undefined ? {} : { selectionRuntime }),
+    ...(filterRuntime === undefined ? {} : { filterRuntime }),
+    ...(pivotRenderData.meta === undefined ? {} : { pivotMeta: pivotRenderData.meta }),
+    ...(paginationRuntime === undefined ? {} : { paginationRuntime }),
+    ...(paginationModel === undefined ? {} : { paginationModel })
+  });
+  const grid = createGridRoot(
+    layout.totalColumnWidth,
+    columnModel.visibleLeafColumns.length,
+    rowCount,
+    renderOptions
+  );
+  applyGridAccessibility(shell, grid, renderOptions.accessibility, {
+    rowCount,
+    columnCount: columnModel.visibleLeafColumns.length,
+    loading: rowRenderState?.loading ?? false,
+    ...(rowRenderState?.error === undefined ? {} : { error: rowRenderState.error })
+  });
+  const bodyViewport = createBodyViewport();
+  const bodyShell = createBodyShell(bodyViewport);
+  attachWheelBoundaryGuard(bodyViewport);
+  attachInfiniteScroll(bodyViewport, rowRenderState);
+  attachVirtualScroll({
+    scrollElement: bodyViewport,
+    options: renderOptions,
+    rowCount,
+    allRows,
+    panes: paneState.panes,
+    rowRenderState,
+    cellSpanModel,
+    centerOwnsTreeControls: paneState.panes.left.columns.length === 0,
+    virtualScrollRuntime,
+    virtualWindow,
+    getPanes: () => paneState.panes,
+    onWindowChange: (nextWindow) => {
+      rowWindowState.window = nextWindow;
+    }
+  });
+  bodyViewport.append(createSection("body", paneState.panes, (pane) =>
+      createBodyPane(
+        pane,
+        rows,
+        createBodyPaneRuntime(renderOptions, rowRenderState, cellSpanModel, groupRuntime),
+      paneState.panes.left.columns.length === 0,
+      virtualWindow
+    )
+  ));
+
+  grid.append(
+    createSection("header", paneState.panes, (pane) =>
+      createHeaderPane({
+        rows: getRenderedHeaderRows(headerModel.regions[pane.key].rows, pane),
+        columnTemplate: pane.columnTemplate,
+        ariaColumnOffset: pane.ariaColumnOffset,
+        rowCount: headerModel.depth,
+        columnModel,
+        columnState: renderOptions.columnState ?? {},
+        columnUi,
+        runtime,
+        ...(renderOptions.sorting === undefined ? {} : { sorting: renderOptions.sorting }),
+        ...(sortRuntime === undefined ? {} : { sortRuntime }),
+        ...(filterRuntime === undefined ? {} : { filterRuntime }),
+        pane,
+        ...(renderOptions.security === undefined ? {} : { security: renderOptions.security })
+      })
+    )
+  );
+
+  if (summaryPlacements.includes("top")) {
+    grid.append(createSummarySection(paneState.panes, summary, "top", headerModel.depth + 1));
+  }
+
+  grid.append(bodyShell);
+
+  if (summaryPlacements.includes("bottom")) {
+    grid.append(createSummarySection(
+      paneState.panes,
+      summary,
+      "bottom",
+      headerModel.depth + rowCount + 1
+    ));
+  }
+
+  if (layout.sections.footer) {
+    grid.append(createFooterSection({
+      rowCount,
+      loading: rowRenderState?.loading ?? false,
+      hasMore: rowRenderState?.hasMore ?? false,
+      onLoadMore: rowRenderState?.onLoadMore ?? (() => undefined)
+    }));
+  }
+
+  grid.append(createOverlayLayer({
+    rowCount,
+    renderedRowCount: rows.length,
+    loading: rowRenderState?.loading ?? false,
+    ...(rowRenderState?.error === undefined ? {} : { error: rowRenderState.error })
+  }));
+  attachColumnVirtualScroll({
+    grid,
+    scrollElement: bodyViewport,
+    options: renderOptions,
+    columnModel,
+    headerModel,
+    panes: layout.panes,
+    paneState,
+    allRows,
+    summary,
+    rowRenderState,
+    cellSpanModel,
+    centerOwnsTreeControls: paneState.panes.left.columns.length === 0,
+    getRowWindow: () => rowWindowState.window,
+    columnState: renderOptions.columnState ?? {},
+    columnUi,
+    columnUiRuntime: runtime,
+    ...(sortRuntime === undefined ? {} : { sortRuntime }),
+    ...(filterRuntime === undefined ? {} : { filterRuntime }),
+    ...(groupRuntime === undefined ? {} : { groupRuntime }),
+    ...(editRuntime === undefined ? {} : { editRuntime }),
+    ...(selectionRuntime === undefined ? {} : { selectionRuntime }),
+    columnVirtualScrollRuntime,
+    columnWindow,
+    ...(renderOptions.security === undefined ? {} : { security: renderOptions.security })
+  });
+  shell.append(grid);
+  appendBottomPagination({
+    shell,
+    columnModel,
+    columnUi,
+    ...(runtime === undefined ? {} : { columnUiRuntime: runtime }),
+    options: renderOptions,
+    ...(selectionRuntime === undefined ? {} : { selectionRuntime }),
+    ...(filterRuntime === undefined ? {} : { filterRuntime }),
+    ...(pivotRenderData.meta === undefined ? {} : { pivotMeta: pivotRenderData.meta }),
+    ...(paginationRuntime === undefined ? {} : { paginationRuntime }),
+    ...(paginationModel === undefined ? {} : { paginationModel })
+  });
+  host.append(shell);
+  restoreVirtualScroll(bodyViewport, grid, virtualScrollRuntime, virtualWindow);
+  restoreColumnVirtualScroll(bodyViewport, grid, columnVirtualScrollRuntime, columnWindow);
+  attachGridScrollbarsForHost(host, { grid: bodyShell, viewport: bodyViewport, panes: layout.panes });
+  attachGridFocusForHost(host, {
+    grid,
+    viewport: bodyViewport,
+    ...(editRuntime === undefined ? {} : { editRuntime }),
+    ...(selectionRuntime === undefined ? {} : { selectionRuntime })
+  });
+  if (selectionRuntime) {
+    attachGridSelectionForHost(host, { grid, runtime: selectionRuntime });
+  }
+}
+
+function createGridRoot<TData>(
+  totalColumnWidth: number,
+  columnCount: number,
+  rowCount: number,
+  options: DomGridOptions<TData>
+): HTMLElement {
+  const grid = document.createElement("div");
+  grid.className = "og-grid";
+  grid.setAttribute("role", options.rowModel === "tree" ? "treegrid" : "grid");
+  grid.setAttribute("aria-colcount", String(columnCount));
+  grid.setAttribute("aria-rowcount", String(rowCount));
+  grid.style.setProperty("--og-layout-width", `${totalColumnWidth}px`);
+  setGridRowHeight(grid, options);
+  setSize(grid, "inlineSize", options.layout?.width ?? options.width);
+  setSize(grid, "blockSize", options.layout?.height ?? options.height);
+  setSize(grid, "maxBlockSize", options.layout?.bodyHeight ?? options.bodyHeight);
+  return grid;
+}
+
+function createBodyPaneRuntime<TData>(
+  options: DomGridOptions<TData>,
+  rowRenderState: RowRenderState<TData> | undefined,
+  cellSpanModel: CellSpanModel,
+  groupRuntime: GroupRowRuntime | undefined
+) {
+  return {
+    ...(rowRenderState?.treeRuntime === undefined ? {} : { treeRuntime: rowRenderState.treeRuntime }),
+    ...(groupRuntime === undefined ? {} : { groupRuntime }),
+    ...(options.tree?.treeColumnField === undefined ? {} : { treeColumnField: options.tree.treeColumnField }),
+    cellSpanModel,
+    ...(options.editing === undefined ? {} : { editing: options.editing }),
+    ...(options.security === undefined ? {} : { security: options.security })
+  };
+}
+
+function setGridRowHeight<TData>(grid: HTMLElement, options: DomGridOptions<TData>): void {
+  const rowHeight = typeof options.rowHeight === "number"
+    ? options.rowHeight
+    : options.virtualization?.rowHeight;
+  if (rowHeight !== undefined && Number.isFinite(rowHeight) && rowHeight > 0) {
+    grid.style.setProperty("--og-row-height", `${rowHeight}px`);
+  }
+}
+
+function shouldRenderSummary<TData>(
+  options: DomGridOptions<TData>,
+  summary: SummaryRow | undefined
+): boolean {
+  return summary !== undefined && options.summary?.enabled !== false;
+}
+
+function getSummaryPlacements<TData>(
+  options: DomGridOptions<TData>,
+  summary: SummaryRow | undefined
+): readonly ("top" | "bottom")[] {
+  if (!shouldRenderSummary(options, summary)) {
+    return [];
+  }
+
+  const position = options.summary?.position ?? "bottom";
+  return position === "both" ? ["top", "bottom"] : [position];
+}
+
+function createSummarySection<TData>(
+  panes: Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>,
+  summary: SummaryRow | undefined,
+  position: "top" | "bottom",
+  ariaRowIndex: number
+): HTMLElement {
+  const section = createSection("summary", panes, (pane) =>
+    createSummaryPane(pane, summary, ariaRowIndex)
+  );
+  section.dataset.summaryPosition = position;
+  return section;
+}
+
+function setSize(
+  element: HTMLElement,
+  property: "inlineSize" | "blockSize" | "maxBlockSize",
+  value: number | string | undefined
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  element.style[property] = typeof value === "number" ? `${value}px` : value;
+}

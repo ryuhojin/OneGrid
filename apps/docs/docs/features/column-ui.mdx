@@ -1,0 +1,48 @@
+---
+title: Column UI Features
+---
+
+# Column UI Features
+
+`COL-003` adds the first interactive column operations surface. The DOM renderer exposes resize
+handles, drag/drop reorder, a header menu, and a columns tool panel, but the state transitions stay
+in `@onegrid/core`.
+
+```ts
+import { OneGrid } from "@onegrid/dom";
+
+new OneGrid({
+  el,
+  columns,
+  data,
+  rowModel: "client",
+  columnUi: {
+    resize: true,
+    autoSize: true,
+    reorder: true,
+    menu: true,
+    toolPanel: true
+  }
+});
+```
+
+The core state is represented by `ColumnUiState`. Renderers can apply it through `GridOptions`:
+
+```ts
+import { createColumnModel, resizeColumn } from "@onegrid/core";
+
+const model = createColumnModel(columns);
+const columnState = resizeColumn(model, {}, "customer", 220);
+const nextModel = createColumnModel(columns, { columnState });
+```
+
+Supported operations in this foundation:
+
+- resize and auto-size a leaf column
+- reorder a leaf column through an immutable order array
+- show or hide a leaf column
+- pin left, pin right, or unpin a leaf column
+- build a renderer-agnostic column menu model
+- build a renderer-agnostic columns tool panel model
+
+The example catalog includes route `COL-003` with vanilla, React, and Vue source files.

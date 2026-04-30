@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OneGrid Base Layout Vanilla Example</title>
+  </head>
+  <body>
+    <main>
+      <div id="app"></div>
+    </main>
+    <script type="module">
+      import "@onegrid/themes/default.css";
+      import { mountBaseLayoutExample } from "./vanilla.ts";
+
+      const app = document.querySelector("#app");
+      if (!app) {
+        throw new Error("Example root was not found.");
+      }
+      mountBaseLayoutExample(app);
+    </script>
+  </body>
+</html>

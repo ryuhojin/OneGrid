@@ -1,0 +1,76 @@
+# Row Grouping
+
+`F-GROUP` groups rows by one or more fields and keeps grouping in the shared row model contract.
+Client grouping applies filtering and sorting first, then builds group rows, child rows, aggregates,
+and optional group footers.
+
+```ts
+new OneGrid({
+  el,
+  columns: [
+    { field: "id", pinned: "left" },
+    { field: "region" },
+    { field: "agency" },
+    { field: "program" },
+    { field: "amount", summary: { kind: "sum", aggregateKey: "amountTotal", label: "Total" } },
+    { field: "status", pinned: "right", summary: { kind: "count", aggregateKey: "rowCount", label: "Rows" } }
+  ],
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  sorting: { model: [{ field: "amount", direction: "desc" }] },
+  filtering: {
+    model: {
+      conditions: [{ field: "status", kind: "set", operator: "in", value: ["Approved", "Review"] }]
+    }
+  },
+  grouping: {
+    enabled: true,
+    footer: "bottom",
+    model: {
+      fields: ["region"],
+      expandedKeys: ["group:region=Capital"]
+    }
+  },
+  aggregation: {
+    model: {
+      fields: [
+        { field: "amount", function: "sum", alias: "amountTotal" },
+        { field: "id", function: "count", alias: "rowCount" }
+      ]
+    }
+  }
+});
+```
+
+The DOM renderer displays group rows with an expand/collapse button. Group labels render in the
+center pane so pinned ID columns do not clip long aggregate labels. Group footer rows use the same
+summary mapping rules as summary rows: `SummaryDef.aggregateKey` maps aggregate aliases to the
+visible columns.
+
+## Server Grouping
+
+Server row models send `groupModel`, `groupKeys`, `sortModel`, `filterModel`, and `aggregateModel`
+with every `DataSource.getRows()` request. The data source can return `groupMeta` to render group
+rows and footer rows without loading every child row into the browser.
+
+```ts
+return {
+  rows: [],
+  rowCount: 3,
+  groupMeta: [
+    {
+      key: "Capital",
+      field: "region",
+      value: "Capital",
+      level: 0,
+      childCount: 2,
+      expanded: false,
+      aggregateValues: { amountTotal: 2000, rowCount: 2 }
+    }
+  ]
+};
+```
+
+Calling `api.expandGroup("Capital")` sets `groupKeys` to `["Capital"]` for the next server request.
+Calling `api.collapseGroup("Capital")` returns to the root server group list.

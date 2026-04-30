@@ -1,0 +1,49 @@
+---
+title: Server Row Model
+---
+
+# Server Row Model
+
+`ROW-003` adds the server-side row model foundation. The core model builds typed
+`DataSource.getRows` requests with sorting, filtering, grouping, aggregation, and pivot models
+without running those operations in the browser.
+
+```ts
+import { ServerRowModel } from "@onegrid/core";
+
+const model = new ServerRowModel({
+  dataSource,
+  rowKey: "id",
+  pageSize: 100,
+  sortModel: [{ field: "amount", direction: "desc" }],
+  filterModel,
+  groupModel,
+  aggregateModel,
+  pivotModel
+});
+
+await model.loadPage(0);
+await model.refresh();
+await model.applyTransaction([{ rowKey: "ORD-1", row: { status: "Approved" } }]);
+```
+
+DOM, React, and Vue use the same `GridOptions` contract:
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  rowKey: "id",
+  rowModel: "server",
+  dataSource,
+  server: { pageSize: 100 },
+  sorting: { serverOnly: true, model: sortModel },
+  filtering: { serverOnly: true, model: filterModel },
+  grouping: { serverOnly: true, model: groupModel },
+  aggregation: { serverOnly: true, model: aggregateModel },
+  pivot: { serverOnly: true, model: pivotModel }
+});
+```
+
+The example route `ROW-003` renders a server-managed page, exposes request model metadata, refreshes
+the server cache, and applies a transaction update through `DataSource.updateRows`.

@@ -1,0 +1,37 @@
+---
+title: Group Header
+---
+
+# Group Header
+
+The group header model is a core layout contract. It converts normalized columns into a header tree,
+a renderable matrix, pinned-region clipped matrices, optional merge labels or merge rows, and ARIA
+labels.
+
+```ts
+import { createColumnModel, createHeaderModel } from "@onegrid/core";
+
+const columnModel = createColumnModel(columns);
+const headerModel = createHeaderModel(columnModel, {
+  merge: {
+    rules: [
+      {
+        id: "financial-merge-label",
+        headerName: "Financial Metrics",
+        columnIds: ["amount", "tax"],
+        presentation: "label"
+      }
+    ]
+  }
+});
+
+headerModel.rows;
+headerModel.regions.left;
+headerModel.ariaLabels;
+```
+
+Use `presentation: "label"` when the intent is to annotate an existing group header without adding
+another structural header row.
+
+The executable example is registered as `COL-002` in the examples app and includes vanilla, React,
+and Vue source files.

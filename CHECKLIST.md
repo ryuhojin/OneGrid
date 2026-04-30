@@ -1,0 +1,3382 @@
+# CHECKLIST.md — OneGrid 1.0 Enterprise Release Checklist
+
+> 사용법: 위에서 아래로 하나씩 수행한다.  
+> 각 항목 완료 시 Evidence에 파일 경로, PR, 테스트 명령, 문서 경로를 기록한다.  
+> 완료 기준을 충족하지 못하면 체크하지 않는다.  
+> 상태 표기: `[ ]` 미완료, `[x]` 완료, `[~]` 진행 중, `[!]` 위험/보류
+
+---
+
+## 0. 진행 원칙
+
+- 모든 작업 전 `AGENTS.md`, `ARCHITECT.md`, 현재 `CHECKLIST.md`를 읽는다.
+- 기능 개발은 `설계 -> core -> renderer/wrapper -> example -> E2E -> docs -> checklist 기록` 순서로 진행한다.
+- examples는 모든 기능을 포함해야 한다.
+- UI 테스트는 사용자가 실제로 보는 화면과 조작을 기준으로 자동화한다.
+- 100M rows 목표는 server/viewport 기반으로 검증한다.
+- 단일 파일 크기 제한을 준수한다.
+
+---
+
+## 1. Phase 0 — Governance / Repository Baseline
+
+### G-001 문서 고정
+
+- [x] G-001-001 `AGENTS.md` 추가
+  - Evidence:
+    - AGENTS.md
+- [x] G-001-002 `ARCHITECT.md` 추가
+  - Evidence:
+    - ARCHITECT.md
+- [x] G-001-003 `CHECKLIST.md` 추가
+  - Evidence:
+    - CHECKLIST.md
+- [x] G-001-004 `API_CHANGELOG.md` 추가
+  - Evidence:
+    - API_CHANGELOG.md
+- [x] G-001-005 `CONTRIBUTING.md` 추가
+  - Evidence:
+    - CONTRIBUTING.md
+- [x] G-001-006 `SECURITY.md` 추가
+  - Evidence:
+    - SECURITY.md
+
+### G-002 Monorepo 초기화
+
+- [x] G-002-001 pnpm workspace 구성
+  - Evidence:
+    - pnpm-workspace.yaml
+    - package.json
+    - pnpm-lock.yaml
+- [x] G-002-002 TypeScript base config 구성
+  - Evidence:
+    - tsconfig.base.json
+    - tsconfig.json
+    - packages/core/tsconfig.json
+- [x] G-002-003 turbo 또는 동등 build pipeline 구성
+  - Evidence:
+    - turbo.json
+    - package.json
+- [x] G-002-004 ESLint 구성
+  - Evidence:
+    - eslint.config.mjs
+    - package.json
+- [x] G-002-005 Prettier 구성
+  - Evidence:
+    - prettier.config.cjs
+- [x] G-002-006 Changesets 구성
+  - Evidence:
+    - .changeset/config.json
+    - .changeset/README.md
+- [x] G-002-007 package naming convention 확정
+  - Evidence:
+    - package.json
+    - packages/core/package.json
+    - packages/dom/package.json
+    - packages/react/package.json
+    - packages/vue/package.json
+
+### G-003 품질 명령어
+
+- [x] G-003-001 `pnpm lint`
+  - Evidence:
+    - package.json
+    - eslint.config.mjs
+  - Verified:
+    - pnpm lint
+- [x] G-003-002 `pnpm typecheck`
+  - Evidence:
+    - package.json
+    - tsconfig.base.json
+    - packages/*/tsconfig.json
+    - apps/*/tsconfig.json
+  - Verified:
+    - pnpm typecheck
+- [x] G-003-003 `pnpm test:unit`
+  - Evidence:
+    - vitest.config.ts
+    - packages/core/test/public-types.test.ts
+    - packages/dom/test/onegrid-shell.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] G-003-004 `pnpm test:e2e`
+  - Evidence:
+    - playwright.config.ts
+    - tests/e2e/features/basic.spec.ts
+    - apps/examples/src/features/basic
+  - Verified:
+    - pnpm test:e2e
+- [x] G-003-005 `pnpm test:e2e:visual`
+  - Evidence:
+    - tests/e2e/visual/basic.visual.spec.ts
+    - tests/e2e/visual/basic.visual.spec.ts-snapshots/basic-grid-shell-chromium-darwin.png
+  - Verified:
+    - pnpm test:e2e:visual
+- [x] G-003-006 `pnpm test:a11y`
+  - Evidence:
+    - tests/a11y/basic-a11y.spec.ts
+    - packages/dom/src/grid/renderGridShell.ts
+  - Verified:
+    - pnpm test:a11y
+- [x] G-003-007 `pnpm test:perf:smoke`
+  - Evidence:
+    - tests/perf/smoke.test.ts
+    - packages/testing/src/index.ts
+  - Verified:
+    - pnpm test:perf:smoke
+- [x] G-003-008 `pnpm build`
+  - Evidence:
+    - turbo.json
+    - packages/*/package.json
+    - apps/*/package.json
+  - Verified:
+    - pnpm build
+- [x] G-003-009 `pnpm docs:build`
+  - Evidence:
+    - apps/docs/package.json
+    - apps/docs/docusaurus.config.cjs
+    - apps/docs/docs/index.mdx
+  - Verified:
+    - pnpm docs:build
+
+---
+
+## 2. Phase 1 — Package Structure
+
+### P-001 Core Packages
+
+- [x] P-001-001 `packages/core` 생성
+  - Evidence:
+    - packages/core/package.json
+    - packages/core/src/index.ts
+    - packages/core/src/types
+- [x] P-001-002 `packages/dom` 생성
+  - Evidence:
+    - packages/dom/package.json
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/renderGridShell.ts
+- [x] P-001-003 `packages/react` 생성
+  - Evidence:
+    - packages/react/package.json
+    - packages/react/src/OneGrid.tsx
+- [x] P-001-004 `packages/vue` 생성
+  - Evidence:
+    - packages/vue/package.json
+    - packages/vue/src/OneGrid.ts
+- [x] P-001-005 `packages/pagination` 생성
+  - Evidence:
+    - packages/pagination/package.json
+    - packages/pagination/src/index.ts
+- [x] P-001-006 `packages/themes` 생성
+  - Evidence:
+    - packages/themes/package.json
+    - packages/themes/src/default.css
+    - packages/themes/src/index.ts
+- [x] P-001-007 `packages/adapters` 생성
+  - Evidence:
+    - packages/adapters/package.json
+    - packages/adapters/src/index.ts
+- [x] P-001-008 `packages/testing` 생성
+  - Evidence:
+    - packages/testing/package.json
+    - packages/testing/src/index.ts
+
+### P-002 Apps
+
+- [x] P-002-001 `apps/examples` 생성
+  - Evidence:
+    - apps/examples/package.json
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/features/basic
+- [x] P-002-002 `apps/docs` Docusaurus 생성
+  - Evidence:
+    - apps/docs/package.json
+    - apps/docs/docusaurus.config.cjs
+    - apps/docs/sidebars.cjs
+    - apps/docs/docs
+- [x] P-002-003 `apps/benchmark` 생성
+  - Evidence:
+    - apps/benchmark/package.json
+    - apps/benchmark/src/index.ts
+- [x] P-002-004 `apps/playground` 생성
+  - Evidence:
+    - apps/playground/package.json
+    - apps/playground/src/index.ts
+
+### P-003 Tests
+
+- [x] P-003-001 `tests/e2e` 생성
+  - Evidence:
+    - tests/e2e
+- [x] P-003-002 `tests/e2e/features` 생성
+  - Evidence:
+    - tests/e2e/features/basic.spec.ts
+- [x] P-003-003 `tests/e2e/scenarios` 생성
+  - Evidence:
+    - tests/e2e/scenarios
+- [x] P-003-004 `tests/e2e/visual` 생성
+  - Evidence:
+    - tests/e2e/visual/basic.visual.spec.ts
+    - tests/e2e/visual/basic.visual.spec.ts-snapshots/basic-grid-shell-chromium-darwin.png
+- [x] P-003-005 `tests/e2e/csp` 생성
+  - Evidence:
+    - tests/e2e/csp
+- [x] P-003-006 `tests/perf` 생성
+  - Evidence:
+    - tests/perf/smoke.test.ts
+- [x] P-003-007 `tests/a11y` 생성
+  - Evidence:
+    - tests/a11y/basic-a11y.spec.ts
+
+---
+
+## 3. Phase 2 — Core Contracts
+
+### C-001 Public Types
+
+- [x] C-001-001 `GridOptions<TData>` 정의
+  - Evidence:
+    - packages/core/src/types/grid-options.ts
+    - packages/core/test/public-types.test.ts
+- [x] C-001-002 `ColumnDef<TData>` 정의
+  - Evidence:
+    - packages/core/src/types/column.ts
+    - packages/core/test/public-types.test.ts
+- [x] C-001-003 `ColumnGroupDef<TData>` 정의
+  - Evidence:
+    - packages/core/src/types/column.ts
+    - packages/core/test/public-types.test.ts
+- [x] C-001-004 `DataSource<TData>` 정의
+  - Evidence:
+    - packages/core/src/types/data.ts
+    - packages/core/test/public-types.test.ts
+- [x] C-001-005 `GetRowsRequest` 정의
+  - Evidence:
+    - packages/core/src/types/data.ts
+    - packages/core/test/public-types.test.ts
+- [x] C-001-006 `GetRowsResult<TData>` 정의
+  - Evidence:
+    - packages/core/src/types/data.ts
+    - packages/core/test/public-types.test.ts
+- [x] C-001-007 `GridApi<TData>` 정의
+  - Evidence:
+    - packages/core/src/types/grid-api.ts
+- [x] C-001-008 `GridEventMap<TData>` 정의
+  - Evidence:
+    - packages/core/src/types/events.ts
+- [x] C-001-009 `GridPlugin` 정의
+  - Evidence:
+    - packages/core/src/types/plugin.ts
+    - packages/core/test/public-types.test.ts
+
+### C-002 State / Events / Commands
+
+- [x] C-002-001 immutable grid state 구조 설계
+  - Evidence:
+    - packages/core/src/state/gridState.ts
+    - packages/core/src/state/stateStore.ts
+    - packages/core/test/state-events-commands.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/state-events-commands.test.ts
+- [x] C-002-002 event bus 구현
+  - Evidence:
+    - packages/core/src/events/eventBus.ts
+    - packages/core/test/state-events-commands.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/state-events-commands.test.ts
+- [x] C-002-003 cancellable before-event 구현
+  - Evidence:
+    - packages/core/src/events/eventBus.ts
+    - packages/core/test/state-events-commands.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/state-events-commands.test.ts
+- [x] C-002-004 command bus 구현
+  - Evidence:
+    - packages/core/src/commands/commandBus.ts
+    - packages/core/test/state-events-commands.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/state-events-commands.test.ts
+- [x] C-002-005 state transaction 구현
+  - Evidence:
+    - packages/core/src/state/stateStore.ts
+    - packages/core/test/state-events-commands.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/state-events-commands.test.ts
+- [x] C-002-006 undo/redo command foundation 구현
+  - Evidence:
+    - packages/core/src/commands/undoRedo.ts
+    - packages/core/test/state-events-commands.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/state-events-commands.test.ts
+
+### C-003 Plugin System
+
+- [x] C-003-001 plugin lifecycle 정의
+  - Evidence:
+    - packages/core/src/plugin/lifecycle.ts
+    - packages/core/src/plugin/pluginContext.ts
+    - packages/core/test/plugin-registry.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/plugin-registry.test.ts
+- [x] C-003-002 plugin registry 구현
+  - Evidence:
+    - packages/core/src/plugin/pluginRegistry.ts
+    - packages/core/src/plugin/index.ts
+    - packages/core/test/plugin-registry.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/plugin-registry.test.ts
+- [x] C-003-003 plugin dependency validation 구현
+  - Evidence:
+    - packages/core/src/plugin/lifecycle.ts
+    - packages/core/test/plugin-registry.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/plugin-registry.test.ts
+- [x] C-003-004 plugin cleanup 구현
+  - Evidence:
+    - packages/core/src/plugin/pluginContext.ts
+    - packages/core/src/plugin/pluginRegistry.ts
+    - packages/core/test/plugin-registry.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/plugin-registry.test.ts
+
+---
+
+## 4. Phase 3 — Column / Header Foundation
+
+### COL-001 Column Model
+
+- [x] COL-001-001 column normalization 구현
+  - Evidence:
+    - packages/core/src/column/columnModel.ts
+    - packages/core/test/column-model.test.ts
+    - apps/examples/src/features/column-model
+    - tests/e2e/features/column-model.spec.ts
+    - apps/docs/docs/features/column-model.mdx
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/column-model.test.ts
+    - pnpm test:e2e
+- [x] COL-001-002 leaf column flattening 구현
+  - Evidence:
+    - packages/core/src/column/columnModel.ts
+    - packages/core/test/column-model.test.ts
+    - apps/examples/src/features/column-model
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/column-model.test.ts
+- [x] COL-001-003 column id/field resolution 구현
+  - Evidence:
+    - packages/core/src/column/columnIds.ts
+    - packages/core/src/types/column.ts
+    - packages/core/test/column-model.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/column-model.test.ts
+- [x] COL-001-004 width/min/max/flex 계산 구현
+  - Evidence:
+    - packages/core/src/column/columnSizing.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/core/test/column-model.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/column-model.test.ts
+    - pnpm test:e2e:visual
+- [x] COL-001-005 hidden column 처리 구현
+  - Evidence:
+    - packages/core/src/column/columnModel.ts
+    - packages/core/test/column-model.test.ts
+    - tests/e2e/features/column-model.spec.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/column-model.test.ts
+    - pnpm test:e2e
+- [x] COL-001-006 pinned left/right 분리 구현
+  - Evidence:
+    - packages/core/src/column/columnOrder.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/themes/src/default.css
+    - tests/e2e/features/column-model.spec.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/column-model.test.ts
+    - pnpm test:e2e
+- [x] COL-001-007 column order model 구현
+  - Evidence:
+    - packages/core/src/column/columnOrder.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/core/test/column-model.test.ts
+    - apps/examples/src/features/column-model
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/column-model.test.ts
+    - pnpm test:e2e
+
+### COL-002 Group Header / Header Merge
+
+- [x] COL-002-001 header tree model 구현
+  - Evidence:
+    - packages/core/src/header/headerTree.ts
+    - packages/core/src/header/headerTypes.ts
+    - packages/core/test/header-model.test.ts
+    - apps/examples/src/features/group-header
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/header-model.test.ts
+- [x] COL-002-002 header matrix 생성 구현
+  - Evidence:
+    - packages/core/src/header/headerMatrix.ts
+    - packages/core/src/header/headerModel.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - tests/e2e/features/group-header.spec.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/header-model.test.ts
+    - pnpm test:e2e
+- [x] COL-002-003 group header span 계산 구현
+  - Evidence:
+    - packages/core/src/header/headerMatrix.ts
+    - packages/core/test/header-model.test.ts
+    - tests/e2e/visual/group-header.visual.spec.ts
+  - Verified:
+    - pnpm test:unit -- packages/core/test/header-model.test.ts
+    - pnpm test:e2e:visual
+- [x] COL-002-004 header merge rule 구현
+  - Evidence:
+    - packages/core/src/header/headerMerge.ts
+    - packages/core/src/header/headerModel.ts
+    - packages/core/src/types/grid-options.ts
+    - apps/examples/src/features/group-header
+    - tests/e2e/features/group-header.spec.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/header-model.test.ts
+    - pnpm test:e2e
+  - Notes:
+    - 2026-04-27: explicit merge row가 일부 컬럼만 덮을 때 parent 없는 leaf header(ID/Status)가 top row까지 rowSpan 되도록 보정했다.
+    - 2026-04-27: 예제 UI에서 부분 merge row가 표 깨짐처럼 보이지 않도록 `presentation: "label"`을 추가하고 `Financial` 그룹 헤더 안의 라벨로 표현했다.
+- [x] COL-002-005 pinned 영역 header clipping 구현
+  - Evidence:
+    - packages/core/src/header/headerRegions.ts
+    - packages/core/test/header-model.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/header-model.test.ts
+- [x] COL-002-006 column resize 시 header matrix 재계산
+  - Evidence:
+    - packages/core/src/header/headerModel.ts
+    - packages/core/test/header-model.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/header-model.test.ts
+- [x] COL-002-007 column reorder 시 header matrix 재계산
+  - Evidence:
+    - packages/core/src/header/headerMatrix.ts
+    - packages/core/test/header-model.test.ts
+    - tests/e2e/features/group-header.spec.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/header-model.test.ts
+    - pnpm test:e2e
+- [x] COL-002-008 header ARIA label 생성
+  - Evidence:
+    - packages/core/src/header/headerAria.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/core/test/header-model.test.ts
+    - tests/e2e/features/group-header.spec.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm test:unit -- packages/core/test/header-model.test.ts
+    - pnpm test:a11y
+
+### COL-003 Column UI Features
+
+- [x] COL-003-001 column resize
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnControls.ts
+    - tests/e2e/features/column-ui.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+  - Notes:
+    - 2026-04-27: 리사이즈 핸들을 헤더 액션 박스에서 제거하고 컬럼 경계선 hit zone 기반 실시간 pointermove 리사이즈로 개선했다.
+- [x] COL-003-002 auto size column
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnControls.ts
+    - tests/e2e/features/column-ui.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] COL-003-003 column reorder drag/drop
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnControls.ts
+    - tests/e2e/features/column-ui.spec.ts
+  - Verified:
+    - pnpm test:e2e
+  - Notes:
+    - 2026-04-29: HTML5 drag/drop 이벤트가 발생하지 않는 browser/test path에서도 reorder가 동작하도록 pointer drag fallback을 추가했다.
+- [x] COL-003-004 show/hide column
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnControls.ts
+    - tests/e2e/features/column-ui.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] COL-003-005 pin/unpin column
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnControls.ts
+    - tests/e2e/features/column-ui.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] COL-003-006 column menu
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnControls.ts
+    - apps/examples/src/features/column-ui
+    - tests/e2e/features/column-ui.spec.ts
+    - apps/docs/docs/features/column-ui.mdx
+  - Verified:
+    - pnpm test:e2e
+    - pnpm test:a11y
+  - Notes:
+    - 2026-04-27: `...` 텍스트 메뉴를 CSS 기반 세로 점 아이콘 버튼으로 교체하고, 메뉴를 body 포털 popover로 렌더링해 헤더 overflow clipping을 제거했다.
+- [x] COL-003-007 columns tool panel foundation
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnControls.ts
+    - packages/themes/src/default.css
+    - apps/examples/src/features/column-ui
+    - tests/e2e/features/column-ui.spec.ts
+    - tests/e2e/visual/column-ui.visual.spec.ts
+    - tests/a11y/column-ui-a11y.spec.ts
+    - apps/docs/docs/features/column-ui.mdx
+  - Notes:
+    - 2026-04-30: Columns panel checkbox에 공통 `og-grid__checkbox` 스킨을 적용해 Chrome/Safari/Edge 기본 checkbox 차이를 제거했다.
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+
+---
+
+## 5. Phase 4 — Row Models / Data
+
+### ROW-001 Client Row Model
+
+- [x] ROW-001-001 row identity 구현
+  - Evidence:
+    - packages/core/src/row/rowIdentity.ts
+    - packages/core/src/row/clientRowModel.ts
+    - packages/core/test/client-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-001-002 setData 구현
+  - Evidence:
+    - packages/core/src/row/clientTransactions.ts
+    - packages/core/test/client-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-001-003 appendRows 구현
+  - Evidence:
+    - packages/core/src/row/clientTransactions.ts
+    - packages/core/test/client-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-001-004 updateRows 구현
+  - Evidence:
+    - packages/core/src/row/clientTransactions.ts
+    - packages/core/test/client-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-001-005 removeRows 구현
+  - Evidence:
+    - packages/core/src/row/clientTransactions.ts
+    - packages/core/test/client-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-001-006 client filter pipeline 연결
+  - Evidence:
+    - packages/core/src/row/clientFilter.ts
+    - packages/core/src/row/clientRowModel.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - tests/e2e/features/client-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-001-007 client sort pipeline 연결
+  - Evidence:
+    - packages/core/src/row/clientSort.ts
+    - packages/core/src/row/clientRowModel.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - tests/e2e/features/client-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-001-008 client group pipeline 연결
+  - Evidence:
+    - packages/core/src/row/clientGroup.ts
+    - packages/core/src/row/clientRowModel.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - apps/examples/src/features/client-row-model
+    - tests/e2e/features/client-row-model.spec.ts
+    - tests/e2e/visual/client-row-model.visual.spec.ts
+    - apps/docs/docs/features/client-row-model.mdx
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+- [x] ROW-001-009 client aggregate pipeline 연결
+  - Evidence:
+    - packages/core/src/row/clientAggregate.ts
+    - packages/core/src/row/clientGroup.ts
+    - packages/core/src/row/clientRowModel.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - apps/examples/src/features/client-row-model
+    - tests/e2e/features/client-row-model.spec.ts
+    - tests/e2e/visual/client-row-model.visual.spec.ts
+    - tests/a11y/client-row-model-a11y.spec.ts
+    - apps/docs/docs/features/client-row-model.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+
+### ROW-002 Infinite Row Model
+
+- [x] ROW-002-001 block cache 구현
+  - Evidence:
+    - packages/core/src/row/infiniteCache.ts
+    - packages/core/src/row/infiniteRowModel.ts
+    - packages/core/test/infinite-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-002-002 block request 구현
+  - Evidence:
+    - packages/core/src/row/infiniteRequest.ts
+    - packages/core/src/types/data.ts
+    - packages/core/test/infinite-row-model.test.ts
+    - apps/examples/src/features/infinite-row-model/data.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-002-003 request dedupe 구현
+  - Evidence:
+    - packages/core/src/row/infiniteRowModel.ts
+    - packages/core/test/infinite-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-002-004 request cancellation 구현
+  - Evidence:
+    - packages/core/src/row/infiniteCancellation.ts
+    - packages/core/src/row/infiniteRequest.ts
+    - packages/core/src/row/infiniteRowModel.ts
+    - packages/core/test/infinite-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-002-005 cache eviction 구현
+  - Evidence:
+    - packages/core/src/row/infiniteCache.ts
+    - packages/core/src/row/infiniteRowModel.ts
+    - packages/core/test/infinite-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-002-006 append scroll 구현
+  - Evidence:
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/vue/src/OneGrid.ts
+    - apps/examples/src/features/infinite-row-model
+    - tests/e2e/features/infinite-row-model.spec.ts
+    - apps/docs/docs/features/infinite-row-model.mdx
+  - Verified:
+    - pnpm test:e2e
+    - pnpm test:a11y
+- [x] ROW-002-007 loading skeleton row 구현
+  - Evidence:
+    - packages/core/src/row/infiniteTypes.ts
+    - packages/core/src/row/infiniteRowModel.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/themes/src/default.css
+    - tests/e2e/visual/infinite-row-model.visual.spec.ts
+    - tests/e2e/visual/infinite-row-model.visual.spec.ts-snapshots/infinite-row-model-grid-chromium-darwin.png
+    - apps/docs/docs/features/infinite-row-model.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+
+### ROW-003 Server Row Model
+
+- [x] ROW-003-001 server request builder 구현
+  - Evidence:
+    - packages/core/src/row/serverRequest.ts
+    - packages/core/src/row/serverRowModel.ts
+    - packages/core/test/server-row-model.test.ts
+    - apps/examples/src/features/server-row-model
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-003-002 server sort model serialization
+  - Evidence:
+    - packages/core/src/row/serverSerialization.ts
+    - packages/core/test/server-row-model.test.ts
+    - tests/e2e/features/server-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-003-003 server filter model serialization
+  - Evidence:
+    - packages/core/src/row/serverSerialization.ts
+    - packages/core/src/row/serverRequest.ts
+    - packages/core/test/server-row-model.test.ts
+    - tests/e2e/features/server-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-003-004 server grouping request 구현
+  - Evidence:
+    - packages/core/src/row/serverRequest.ts
+    - packages/core/src/row/serverTypes.ts
+    - packages/core/test/server-row-model.test.ts
+    - tests/e2e/features/server-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-003-005 server aggregation request 구현
+  - Evidence:
+    - packages/core/src/row/serverRequest.ts
+    - packages/core/src/row/serverTypes.ts
+    - packages/core/test/server-row-model.test.ts
+    - tests/e2e/features/server-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-003-006 server pivot request 구현
+  - Evidence:
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/row/serverRequest.ts
+    - packages/core/test/server-row-model.test.ts
+    - apps/examples/src/features/server-row-model/vanilla.ts
+    - apps/docs/docs/features/server-row-model.mdx
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-003-007 server cache refresh 구현
+  - Evidence:
+    - packages/core/src/row/serverCache.ts
+    - packages/core/src/row/serverRowModel.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - tests/e2e/features/server-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-003-008 transaction update 구현
+  - Evidence:
+    - packages/core/src/row/serverRowModel.ts
+    - packages/core/src/row/serverTypes.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/vue/src/OneGrid.ts
+    - apps/examples/src/features/server-row-model
+    - tests/e2e/features/server-row-model.spec.ts
+    - tests/e2e/visual/server-row-model.visual.spec.ts
+    - tests/e2e/visual/server-row-model.visual.spec.ts-snapshots/server-row-model-grid-chromium-darwin.png
+    - tests/a11y/server-row-model-a11y.spec.ts
+    - apps/docs/docs/features/server-row-model.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+
+### ROW-004 Viewport Row Model
+
+- [x] ROW-004-001 visible range 계산
+  - Evidence:
+    - packages/core/src/row/viewportRange.ts
+    - packages/core/src/row/viewportRowModel.ts
+    - packages/core/test/viewport-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-004-002 viewport request 구현
+  - Evidence:
+    - packages/core/src/row/viewportRequest.ts
+    - packages/core/src/row/viewportTypes.ts
+    - packages/core/src/row/viewportRowModel.ts
+    - packages/core/test/viewport-row-model.test.ts
+    - tests/e2e/features/viewport-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-004-003 live update hook 구현
+  - Evidence:
+    - packages/core/src/row/viewportRowModel.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - apps/examples/src/features/viewport-row-model/vanilla.ts
+    - tests/e2e/features/viewport-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-004-004 stale response discard 구현
+  - Evidence:
+    - packages/core/src/row/viewportRowModel.ts
+    - packages/core/test/viewport-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-004-005 high velocity scroll prefetch 구현
+  - Evidence:
+    - packages/core/src/row/viewportRange.ts
+    - packages/core/src/row/viewportRowModel.ts
+    - packages/core/test/viewport-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-004-006 viewport cache 구현
+  - Evidence:
+    - packages/core/src/row/viewportCache.ts
+    - packages/core/src/row/viewportRowModel.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/rowModelOptions.ts
+    - packages/vue/src/OneGrid.ts
+    - apps/examples/src/features/viewport-row-model
+    - tests/e2e/features/viewport-row-model.spec.ts
+    - tests/e2e/visual/viewport-row-model.visual.spec.ts
+    - tests/e2e/visual/viewport-row-model.visual.spec.ts-snapshots/viewport-row-model-grid-chromium-darwin.png
+    - tests/a11y/viewport-row-model-a11y.spec.ts
+    - apps/docs/docs/features/viewport-row-model.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+
+### ROW-005 Tree Row Model
+
+- [x] ROW-005-001 tree data normalization
+  - Evidence:
+    - packages/core/src/row/treeNormalize.ts
+    - packages/core/src/row/treeTypes.ts
+    - packages/core/src/row/treeRowModel.ts
+    - packages/core/test/tree-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] ROW-005-002 expand/collapse state
+  - Evidence:
+    - packages/core/src/row/treeRowModel.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/treeRowRenderer.ts
+    - tests/e2e/features/tree-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-005-003 lazy children loading
+  - Evidence:
+    - packages/core/src/row/treeRowModel.ts
+    - packages/core/src/row/treeNormalize.ts
+    - apps/examples/src/features/tree-row-model/data.ts
+    - apps/examples/src/features/tree-row-model/vanilla.ts
+    - tests/e2e/features/tree-row-model.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] ROW-005-004 tree indentation model
+  - Evidence:
+    - packages/core/src/row/treeTypes.ts
+    - packages/core/src/row/treeRowModel.ts
+    - packages/dom/src/grid/treeRowRenderer.ts
+    - packages/themes/src/default.css
+    - tests/e2e/visual/tree-row-model.visual.spec.ts
+    - tests/e2e/visual/tree-row-model.visual.spec.ts-snapshots/tree-row-model-grid-chromium-darwin.png
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e:visual
+- [x] ROW-005-005 tree selection policy
+  - Evidence:
+    - packages/core/src/row/treeSelection.ts
+    - packages/core/src/row/treeRowModel.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/dom/src/grid/treeRowRenderer.ts
+    - packages/vue/src/OneGrid.ts
+    - apps/examples/src/features/tree-row-model
+    - tests/e2e/features/tree-row-model.spec.ts
+    - tests/a11y/tree-row-model-a11y.spec.ts
+    - apps/docs/docs/features/tree-row-model.mdx
+  - Notes:
+    - 2026-04-30: Tree selection checkbox에 공통 `og-grid__checkbox` 스킨을 적용해 WebKit 기본 checkbox 렌더링 차이를 제거했다.
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+
+---
+
+## 6. Phase 5 — Layout / Virtualization
+
+### LAY-001 Base Layout
+
+- [x] LAY-001-001 root layout 구현
+  - Evidence:
+    - packages/core/src/layout/gridLayout.ts
+    - packages/core/src/layout/layoutTypes.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/themes/src/default.css
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+- [x] LAY-001-002 header/body/footer 영역 분리
+  - Evidence:
+    - packages/dom/src/grid/headerRenderer.ts
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - packages/dom/src/grid/footerRenderer.ts
+    - apps/docs/docs/features/base-layout.mdx
+    - tests/e2e/features/base-layout.spec.ts
+    - tests/e2e/visual/base-layout.visual.spec.ts-snapshots/base-layout-grid-chromium-darwin.png
+  - Verified:
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+  - Notes:
+    - 2026-04-29: 수평 스크롤 source를 grid root에서 body viewport로 이전하고 header/body/footer/pinned pane 동기화 회귀 테스트를 추가했다.
+    - pnpm test:a11y
+  - Notes:
+    - 2026-04-28: vertical row scroll ownership을 body viewport로 분리해 header/footer는 row scroll 콘텐츠가 아닌 grid chrome으로 유지
+- [x] LAY-001-003 pinned left/center/right layout 구현
+  - Evidence:
+    - packages/core/src/layout/gridLayout.ts
+    - packages/dom/src/grid/gridSections.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/themes/src/default.css
+    - apps/examples/src/features/base-layout
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+  - Notes:
+    - 2026-04-29: empty pinned pane도 CSS grid slot을 유지하도록 `hidden` 제거 대신 `data-layout-pane-visible` 상태로 표시한다. Left pinned column을 숨긴 뒤 right pinned pane이 center columns를 덮는 회귀를 방지했다.
+- [x] LAY-001-004 summary/footer layout 구현
+  - Evidence:
+    - packages/core/src/layout/summaryModel.ts
+    - packages/dom/src/grid/summaryRenderer.ts
+    - packages/dom/src/grid/footerRenderer.ts
+    - packages/core/test/layout-model.test.ts
+    - apps/docs/docs/features/base-layout.mdx
+  - Verified:
+    - pnpm test:unit
+    - pnpm docs:build
+- [x] LAY-001-005 overlay layer 구현
+  - Evidence:
+    - packages/dom/src/grid/footerRenderer.ts
+    - packages/themes/src/default.css
+    - packages/dom/test/onegrid-shell.test.ts
+    - tests/e2e/features/base-layout.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] LAY-001-006 resize observer 연결
+  - Evidence:
+    - packages/dom/src/grid/resizeObserver.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - tests/a11y/base-layout-a11y.spec.ts
+  - Verified:
+    - pnpm test:a11y
+    - pnpm build
+
+### LAY-002 Row Virtualization
+
+- [x] LAY-002-001 fixed row height virtual scroll
+  - Evidence:
+    - packages/core/src/virtualization/rowVirtualization.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - packages/dom/src/grid/bodyPaneRenderer.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/gridScrollbars.ts
+    - packages/themes/src/default.css
+    - packages/dom/test/onegrid-shell.test.ts
+    - apps/examples/src/features/row-virtualization
+    - apps/docs/docs/features/row-virtualization.mdx
+    - playwright.config.ts
+    - tests/e2e/features/row-virtualization.spec.ts
+    - tests/e2e/features/virtual-scroll-scrollbars.spec.ts
+    - tests/e2e/visual/row-virtualization.visual.spec.ts-snapshots/row-virtualization-grid-chromium-darwin.png
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts --project=webkit
+  - Notes:
+    - wheel/scrollbar scroll 중 grid shell 교체 없이 body row window만 갱신하도록 보정
+    - footer는 row scroll 콘텐츠가 아닌 grid chrome으로 취급해 sticky bottom으로 유지
+    - 빠른 스크롤 bounce 방지를 위해 virtual row 높이와 spacer 계산을 일치시키고 scroll anchoring 차단
+    - 빠른 wheel/scrollbar 입력에서도 다음 animation frame을 기다리지 않고 같은 scroll 이벤트에서 visible window 갱신
+    - 2026-04-28: header/footer가 같은 세로 scroll container에 묶여 빠른 wheel/autoscroll에서 header 위 blank가 노출되는 구조를 제거하기 위해 body 전용 viewport(`data-layout-viewport="body"`)로 세로 row scroll을 이전
+    - 2026-04-28: E2E에서 빠른 wheel 입력 후 root grid scrollTop은 0으로 유지되고 body viewport만 scrollTop을 갖는지 검증
+    - 2026-04-28: footer pane 내부 overflow를 제거하고 Row Virtualization 예제 viewport 높이를 `32px * 11` row boundary에 맞춰 footer 경계에서 행 텍스트가 잘려 보이지 않도록 보정
+    - 2026-04-28: E2E에서 footer pane `scrollHeight <= clientHeight`와 초기 viewport 하단 partial row 미노출을 검증
+    - 2026-04-29: Safari/WebKit에서 native scrollbar 표시 정책 차이로 세로 scrollbar가 사라지는 문제를 제거하기 위해 body viewport native scrollbar를 숨기고 OneGrid controlled scrollbar layer를 추가했다. WebKit/Chromium E2E에서 vertical thumb 표시와 drag scroll을 검증했다.
+    - 2026-04-29: scrollbar thumb를 4px로 줄이고 body shell에 전용 gutter를 만들어 vertical scrollbar가 data viewport를 덮지 않도록 보정했다.
+- [x] LAY-002-002 overscan policy 구현
+  - Evidence:
+    - packages/core/src/virtualization/rowVirtualization.ts
+    - packages/core/test/row-virtualization.test.ts
+    - tests/e2e/features/row-virtualization.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] LAY-002-003 scrollToRow 구현
+  - Evidence:
+    - packages/core/src/virtualization/rowVirtualization.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - apps/examples/src/features/row-virtualization/vanilla.ts
+    - tests/e2e/features/row-virtualization.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] LAY-002-004 variable row height foundation
+  - Evidence:
+    - packages/core/src/virtualization/types.ts
+    - packages/core/src/virtualization/measuredRowHeightCache.ts
+    - packages/core/test/row-virtualization.test.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm typecheck
+- [x] LAY-002-005 measured row height cache
+  - Evidence:
+    - packages/core/src/virtualization/measuredRowHeightCache.ts
+    - packages/core/test/row-virtualization.test.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm typecheck
+- [x] LAY-002-006 segmented virtual scroll 구현
+  - Evidence:
+    - packages/core/src/virtualization/segmentedVirtualScroll.ts
+    - packages/core/test/row-virtualization.test.ts
+    - tests/perf/smoke.test.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:perf:smoke
+- [x] LAY-002-007 10M row mock benchmark
+  - Evidence:
+    - packages/core/src/virtualization/segmentedVirtualScroll.ts
+    - packages/core/test/row-virtualization.test.ts
+    - tests/perf/smoke.test.ts
+  - Verified:
+    - pnpm test:perf:smoke
+- [x] LAY-002-008 100M row viewport benchmark
+  - Evidence:
+    - packages/core/src/virtualization/rowVirtualization.ts
+    - packages/core/src/virtualization/segmentedVirtualScroll.ts
+    - packages/core/test/row-virtualization.test.ts
+    - tests/perf/smoke.test.ts
+  - Verified:
+    - pnpm test:perf:smoke
+
+### LAY-003 Column Virtualization
+
+- [x] LAY-003-001 visible column range 계산
+  - Evidence:
+    - packages/core/src/virtualization/columnVirtualization.ts
+    - packages/core/src/virtualization/types.ts
+    - packages/core/test/column-virtualization.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] LAY-003-002 horizontal overscan 구현
+  - Evidence:
+    - packages/core/src/virtualization/columnVirtualization.ts
+    - packages/core/test/column-virtualization.test.ts
+    - tests/e2e/features/column-virtualization.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] LAY-003-003 scrollToColumn 구현
+  - Evidence:
+    - packages/core/src/types/grid-api.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/vue/src/OneGrid.ts
+    - apps/examples/src/features/column-virtualization/vanilla.ts
+    - tests/e2e/features/column-virtualization.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] LAY-003-004 pinned columns와 연동
+  - Evidence:
+    - packages/dom/src/grid/wheelScroll.ts
+    - packages/dom/src/grid/gridScrollbars.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - packages/dom/src/grid/virtualColumnWindow.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/gridSections.ts
+    - packages/themes/src/default.css
+    - apps/examples/src/features/column-virtualization
+    - playwright.config.ts
+    - tests/e2e/features/column-virtualization.spec.ts
+    - tests/e2e/features/row-virtualization.spec.ts
+    - tests/e2e/features/virtual-scroll-scrollbars.spec.ts
+    - tests/e2e/visual/column-virtualization.visual.spec.ts-snapshots/column-virtualization-grid-chromium-darwin.png
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/column-virtualization.spec.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts --project=webkit
+  - Notes:
+    - 2026-04-29: 고속 wheel/trackpad 입력을 body viewport에서 clamp하고 row/column virtual window를 wheel event 안에서 동기 갱신해 native elastic bounce로 인한 white gap과 header/body desync를 방지했다.
+    - 2026-04-29: horizontal scrollbar를 body row 아래 전용 gutter에 렌더링하도록 변경했다. Thin thumb는 pinned left/right 폭을 포함하는 data viewport 전체 범위에서 움직이며 셀 데이터를 덮지 않는다.
+    - 2026-04-29: header/summary scrollbar gutter를 pinned right pane과 같은 scroll transform으로 동기화해 M6 같은 center header가 gutter로 쪼개지거나 unpinned header가 pinned header 위로 보이는 회귀를 방지했다.
+    - 2026-04-29: pinned pane separator를 border가 아닌 inset shadow로 처리하고 scrollbar track을 border-box로 고정해 Status header/body cell, header gutter, vertical scrollbar track의 우측 edge가 동일 좌표로 맞도록 보정했다.
+- [x] LAY-003-005 group header clipping 구현
+  - Evidence:
+    - packages/core/src/header/headerRegions.ts
+    - packages/dom/src/grid/virtualColumnWindow.ts
+    - packages/core/test/column-virtualization.test.ts
+    - apps/docs/docs/features/column-virtualization.mdx
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm docs:build
+
+### LAY-004 Cell Merge Layout
+
+- [x] LAY-004-001 CellSpan model 정의
+  - Evidence:
+    - packages/core/src/merge/cellSpanTypes.ts
+    - packages/core/src/merge/cellSpanModel.ts
+    - packages/core/src/merge/cellSpanWindow.ts
+    - packages/core/test/cell-span-model.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] LAY-004-002 value merge 구현
+  - Evidence:
+    - packages/core/src/merge/cellSpanModel.ts
+    - apps/examples/src/features/cell-merge/data.ts
+    - tests/e2e/features/cell-merge.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] LAY-004-003 custom merge callback 구현
+  - Evidence:
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/merge/cellSpanModel.ts
+    - apps/examples/src/features/cell-merge/data.ts
+    - packages/core/test/public-types.test.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm test:unit
+- [x] LAY-004-004 server mergeMeta 적용
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/rowRenderStateFactory.ts
+    - tests/e2e/features/cell-merge.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] LAY-004-005 virtual window span clipping
+  - Evidence:
+    - packages/core/src/merge/cellSpanWindow.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - packages/dom/src/grid/virtualColumnWindow.ts
+    - tests/perf/smoke.test.ts
+  - Verified:
+    - pnpm test:e2e
+    - pnpm test:perf:smoke
+- [x] LAY-004-006 pinned 영역 merge clipping
+  - Evidence:
+    - packages/dom/src/grid/bodyPaneRenderer.ts
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - packages/dom/src/grid/virtualColumnWindow.ts
+    - packages/themes/src/default.css
+    - apps/examples/src/features/cell-merge/vanilla.ts
+    - apps/examples/src/features/cell-merge/react.tsx
+    - apps/examples/src/features/cell-merge/vue.vue
+    - apps/docs/docs/features/cell-merge.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/column-def.mdx
+    - apps/docs/docs/api/datasource.mdx
+    - tests/e2e/features/cell-merge.spec.ts
+    - tests/e2e/visual/cell-merge.visual.spec.ts-snapshots/cell-merge-grid-chromium-darwin.png
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-04-29: column virtualization이 꺼진 cell merge 화면에서도 body horizontal scroll을 header/summary에 동기화하고, pinned pane z-index를 merged center cells보다 높여 pinned 침범을 방지했다. 일반 cell height를 row height로 고정해 vertical span anchor가 같은 행의 non-merged cell을 늘리지 않도록 했다. Popover/tool panel z-index는 header/footer/pinned pane보다 위에 유지한다.
+- [~] LAY-004-007 merge + selection 연동
+  - Evidence:
+    - packages/core/src/merge/cellSpanWindow.ts
+    - packages/core/test/cell-span-model.test.ts
+  - Verified:
+    - pnpm test:unit
+  - Notes:
+    - 2026-04-29: `resolveCellSpanAnchor`와 `expandCellSpanRange`로 selection anchor/range 확장 contract를 추가했다. 실제 cell/range selection UI는 별도 selection phase에서 연결한다.
+    - 2026-04-29: DOM-002 Keyboard / Focus 이후 Phase 7 `F-SELECT-001~007`에서 cell/range selection UI가 들어간 뒤 완료 가능하다.
+- [!] LAY-004-008 merge + editing 연동
+  - Evidence:
+  - Notes:
+    - 2026-04-29: editing subsystem이 아직 구현되지 않아 merge anchor routing만 선행 가능하다. Editing phase에서 covered cell 편집 요청을 anchor cell로 라우팅해야 한다.
+    - 2026-04-29: Phase 7 editing 항목과 DOM editor overlay/focus trap 이후 완료 가능하다.
+- [!] LAY-004-009 merge + copy/export 연동
+  - Evidence:
+  - Notes:
+    - 2026-04-29: clipboard/export subsystem이 아직 구현되지 않아 `CellSpanModel`의 anchor/range contract를 후속 copy/export 구현에서 사용한다.
+    - 2026-04-29: Phase 7 `F-CLIP-001~007` 및 `F-EXPORT-001~009` 구현 이후 완료 가능하다.
+
+---
+
+## 7. Phase 6 — Rendering / DOM / Accessibility
+
+### DOM-001 Renderer Foundation
+
+- [x] DOM-001-001 grid mount/destroy 구현
+  - Evidence:
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/rowModelFactory.ts
+    - packages/dom/test/onegrid-shell.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] DOM-001-002 render scheduler 구현
+  - Evidence:
+    - packages/dom/src/grid/renderScheduler.ts
+    - packages/dom/src/grid/renderInvalidation.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/test/onegrid-shell.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] DOM-001-003 partial invalidation 구현
+  - Evidence:
+    - packages/dom/src/grid/renderInvalidation.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/scrollPosition.ts
+    - tests/e2e/features/renderer-foundation.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] DOM-001-004 cell renderer host 구현
+  - Evidence:
+    - packages/dom/src/grid/rendererHost.ts
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - apps/examples/src/features/renderer-foundation
+    - tests/e2e/features/renderer-foundation.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] DOM-001-005 header renderer host 구현
+  - Evidence:
+    - packages/dom/src/grid/rendererHost.ts
+    - packages/dom/src/grid/headerRenderer.ts
+    - apps/examples/src/features/renderer-foundation
+    - tests/e2e/features/renderer-foundation.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:e2e
+- [x] DOM-001-006 empty/loading/error overlay 구현
+  - Evidence:
+    - packages/dom/src/grid/footerRenderer.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/test/onegrid-shell.test.ts
+    - tests/a11y/renderer-foundation-a11y.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:a11y
+  - Notes:
+    - 2026-04-29: DOM-001 Renderer Foundation 완료. DOM renderer는 microtask-batched scheduler, invalidation scopes, secure cell/header renderer host, empty/loading/error overlays를 가진다. Evidence includes vanilla/React/Vue renderer foundation examples, Docusaurus guide, E2E/a11y/visual coverage.
+
+### DOM-002 Keyboard / Focus
+
+- [x] DOM-002-001 focus model 구현
+  - Evidence:
+    - packages/dom/src/grid/gridFocus.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/themes/src/default.css
+    - tests/a11y/keyboard-focus-a11y.spec.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:a11y
+- [x] DOM-002-002 arrow navigation
+  - Evidence:
+    - packages/dom/src/grid/gridFocus.ts
+    - tests/e2e/features/keyboard-focus.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] DOM-002-003 Home/End navigation
+  - Evidence:
+    - packages/dom/src/grid/gridFocus.ts
+    - tests/e2e/features/keyboard-focus.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] DOM-002-004 PageUp/PageDown navigation
+  - Evidence:
+    - packages/dom/src/grid/gridFocus.ts
+    - tests/e2e/features/keyboard-focus.spec.ts
+  - Verified:
+    - pnpm test:e2e
+- [x] DOM-002-005 Tab navigation
+  - Evidence:
+    - packages/dom/src/grid/gridFocus.ts
+    - tests/e2e/features/keyboard-focus.spec.ts
+    - tests/a11y/keyboard-focus-a11y.spec.ts
+  - Verified:
+    - pnpm test:e2e
+    - pnpm test:a11y
+- [x] DOM-002-006 merge cell navigation
+  - Evidence:
+    - packages/dom/src/grid/gridFocus.ts
+    - apps/examples/src/features/keyboard-focus
+    - tests/e2e/features/keyboard-focus.spec.ts
+  - Verified:
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+- [x] DOM-002-007 pinned 영역 navigation
+  - Evidence:
+    - packages/dom/src/grid/gridFocus.ts
+    - packages/themes/src/default.css
+    - apps/examples/src/features/keyboard-focus
+    - tests/e2e/features/keyboard-focus.spec.ts
+    - tests/e2e/visual/keyboard-focus.visual.spec.ts
+    - tests/e2e/visual/keyboard-focus.visual.spec.ts-snapshots/keyboard-focus-grid-chromium-darwin.png
+    - apps/docs/docs/features/keyboard-focus.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-04-29: DOM renderer에 body cell roving focus를 추가했다. Focus는 selection과 분리하며 active cell은 data-focus-active와 aria-activedescendant로 노출한다.
+    - 2026-04-29: Arrow/Home/End/Page/Tab navigation은 rendered body cell 좌표를 기준으로 동작하고 covered merge cell은 anchor/span 좌표로 이동한다.
+    - 2026-04-29: pinned left/center/right pane은 aria row/column coordinate로 동일 navigation surface에 포함된다.
+    - 2026-04-29: center pane에 stacking context를 부여해 active focus/merge cell이 pinned pane 위로 paint되지 않도록 보정하고 E2E 회귀 테스트를 추가했다.
+    - 2026-04-29: header/menu overlay로 focus가 이동할 때 body cell active visual과 aria-activedescendant를 suspend하도록 보정했다. 메뉴 open 시 focus는 첫 body cell이 아니라 첫 menuitem으로 간다.
+    - 2026-04-29: header menu button pointerdown capture 단계에서 body active cell을 즉시 clear하고 grid root 초기 focus를 suppress해 menu open 동안 첫 body cell이 transient focus-active가 되지 않도록 보정했다.
+    - 2026-04-29: 일반 column header와 header pane 클릭도 non-body focus target으로 처리해 header click이 body 첫 셀 focus-active로 이어지지 않도록 보정했다.
+
+### DOM-003 Accessibility
+
+- [x] DOM-003-001 role="grid" 적용
+  - Evidence:
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/gridAccessibility.ts
+    - apps/examples/src/features/accessibility
+    - tests/a11y/accessibility-a11y.spec.ts
+  - Verified:
+    - pnpm test:a11y
+- [x] DOM-003-002 row/header/cell role 적용
+  - Evidence:
+    - packages/dom/src/grid/headerRenderer.ts
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - packages/dom/src/grid/treeRowRenderer.ts
+    - packages/dom/src/grid/summaryRenderer.ts
+    - tests/a11y/accessibility-a11y.spec.ts
+  - Verified:
+    - pnpm test:a11y
+    - pnpm test:e2e
+- [x] DOM-003-003 aria-rowcount/colcount 적용
+  - Evidence:
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/core/test/public-types.test.ts
+    - tests/a11y/accessibility-a11y.spec.ts
+    - tests/a11y/row-virtualization-a11y.spec.ts
+    - tests/a11y/column-virtualization-a11y.spec.ts
+  - Verified:
+    - pnpm test:a11y
+    - pnpm typecheck
+- [x] DOM-003-004 virtual row aria-rowindex 적용
+  - Evidence:
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - packages/dom/src/grid/treeRowRenderer.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - tests/a11y/accessibility-a11y.spec.ts
+    - tests/e2e/features/row-virtualization.spec.ts
+  - Verified:
+    - pnpm test:a11y
+    - pnpm test:e2e
+- [x] DOM-003-005 live region 구현
+  - Evidence:
+    - packages/core/src/types/grid-options.ts
+    - packages/dom/src/grid/gridAccessibility.ts
+    - packages/themes/src/default.css
+    - apps/examples/src/features/accessibility
+    - apps/docs/docs/features/accessibility.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm test:a11y
+    - pnpm test:unit
+    - pnpm docs:build
+- [x] DOM-003-006 menu ARIA 구현
+  - Evidence:
+    - packages/dom/src/grid/columnMenu.ts
+    - packages/dom/src/grid/columnControls.ts
+    - packages/dom/src/grid/focusTrap.ts
+    - tests/a11y/accessibility-a11y.spec.ts
+    - tests/e2e/features/accessibility.spec.ts
+  - Verified:
+    - pnpm test:a11y
+    - pnpm test:e2e
+- [x] DOM-003-007 editor focus trap 구현
+  - Evidence:
+    - packages/dom/src/grid/focusTrap.ts
+    - packages/dom/src/grid/editorFocusTrap.ts
+    - packages/dom/test/focus-trap.test.ts
+    - tests/a11y/accessibility-a11y.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm test:a11y
+  - Notes:
+    - 2026-04-29: Editor 기능은 아직 후속 Phase 7 범위이므로 public API 없이 DOM 내부 focus trap entrypoint로 구현했다. Column menu overlay에 먼저 적용했고 editor overlay 구현 시 동일 유틸을 연결한다.
+- [x] DOM-003-008 axe 테스트 통과
+  - Evidence:
+    - package.json
+    - pnpm-lock.yaml
+    - tests/a11y/axe-helper.ts
+    - tests/a11y/accessibility-a11y.spec.ts
+    - apps/docs/docs/features/accessibility.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-04-29: `axe-core` dev dependency를 추가해 DOM-003 grid surface를 Playwright에서 실제 브라우저 기준으로 스캔한다.
+    - 2026-04-29: `GridOptions.accessibility` shared option을 추가하고 Vue wrapper prop까지 반영했다.
+    - 2026-04-29: column menu open 시 body cell focus-active가 남지 않고 menuitem focus trap이 우선되는 회귀 테스트를 추가했다.
+    - 2026-04-29: column menu open 중 `data-focus-active` mutation이 한 번도 발생하지 않는 transient focus 회귀 테스트를 추가했다.
+    - 2026-04-29: 일반 header click 중 `data-focus-active` mutation이 한 번도 발생하지 않는 회귀 테스트를 추가했다.
+    - 2026-04-29: Columns tool panel에서 left pinned `ID`를 숨겨도 center `Department/Service/Owner`와 right pinned `Status`가 함께 유지되는 Chromium/WebKit 회귀 테스트를 추가했다.
+
+---
+
+## 8. Phase 7 — Core Features
+
+### F-SORT Sorting
+
+- [x] F-SORT-001 single sort
+  - Evidence:
+    - packages/core/src/sorting/sortModel.ts
+    - packages/core/src/row/clientSort.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - tests/e2e/features/sorting.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/sorting.spec.ts --project=chromium
+- [x] F-SORT-002 multi sort
+  - Evidence:
+    - packages/core/src/sorting/sortModel.ts
+    - packages/dom/src/grid/headerRenderer.ts
+    - tests/e2e/features/sorting.spec.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/sorting.spec.ts --project=chromium
+- [x] F-SORT-003 custom comparator
+  - Evidence:
+    - packages/core/src/types/column.ts
+    - packages/core/src/row/clientSort.ts
+    - packages/core/test/sorting.test.ts
+    - apps/examples/src/features/sorting/data.ts
+  - Verified:
+    - pnpm test:unit
+- [x] F-SORT-004 sort order cycle config
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/sorting/sortModel.ts
+    - packages/core/test/sorting.test.ts
+  - Verified:
+    - pnpm test:unit
+- [x] F-SORT-005 server sort model
+  - Evidence:
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/rowModelOptions.ts
+    - packages/core/src/row/serverRequest.ts
+    - packages/core/test/server-row-model.test.ts
+  - Verified:
+    - pnpm test:unit
+    - pnpm typecheck
+- [x] F-SORT-006 header sort UI
+  - Evidence:
+    - packages/dom/src/grid/headerRenderer.ts
+    - packages/dom/src/grid/sortRuntime.ts
+    - packages/themes/src/default.css
+    - tests/a11y/sorting-a11y.spec.ts
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/sorting-a11y.spec.ts --project=chromium
+- [x] F-SORT-007 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/sorting/vanilla.ts
+    - apps/examples/src/features/sorting/react.tsx
+    - apps/examples/src/features/sorting/vue.vue
+    - apps/examples/src/catalog.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm build
+- [x] F-SORT-008 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/sorting.spec.ts
+    - tests/a11y/sorting-a11y.spec.ts
+    - tests/e2e/visual/sorting.visual.spec.ts
+    - tests/e2e/visual/sorting.visual.spec.ts-snapshots/sorting-grid-chromium-darwin.png
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/sorting.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/sorting-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/visual/sorting.visual.spec.ts --project=chromium --update-snapshots
+- [x] F-SORT-009 docs
+  - Evidence:
+    - apps/docs/docs/features/sorting.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/column-def.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm docs:build
+
+### F-FILTER Filtering
+
+- [x] F-FILTER-001 text filter
+  - Evidence:
+    - packages/core/src/row/clientFilter.ts
+    - packages/core/src/filtering/filterModel.ts
+    - packages/core/test/filtering.test.ts
+    - tests/e2e/features/filtering.spec.ts
+- [x] F-FILTER-002 number filter
+  - Evidence:
+    - packages/core/src/row/clientFilter.ts
+    - packages/core/test/filtering.test.ts
+    - tests/e2e/features/filtering.spec.ts
+- [x] F-FILTER-003 date filter
+  - Evidence:
+    - packages/core/src/row/clientFilter.ts
+    - packages/core/test/filtering.test.ts
+    - tests/e2e/features/filtering.spec.ts
+- [x] F-FILTER-004 boolean filter
+  - Evidence:
+    - packages/core/src/row/clientFilter.ts
+    - packages/core/test/filtering.test.ts
+    - tests/e2e/features/filtering.spec.ts
+- [x] F-FILTER-005 set filter
+  - Evidence:
+    - packages/dom/src/grid/filterPanel.ts
+    - apps/examples/src/features/filtering/data.ts
+    - tests/e2e/features/filtering.spec.ts
+  - Notes:
+    - 2026-04-30: Set filter checkbox에 공통 `og-grid__checkbox` 스킨을 적용해 브라우저별 checkbox UI 편차를 제거했다.
+- [x] F-FILTER-006 multi condition filter
+  - Evidence:
+    - packages/dom/src/grid/filterPanel.ts
+    - packages/core/test/filtering.test.ts
+    - tests/e2e/features/filtering.spec.ts
+- [x] F-FILTER-007 custom filter
+  - Evidence:
+    - packages/core/src/types/column.ts
+    - packages/core/src/row/clientFilter.ts
+    - packages/core/test/filtering.test.ts
+    - apps/examples/src/features/filtering/data.ts
+- [x] F-FILTER-008 quick filter
+  - Evidence:
+    - packages/dom/src/grid/filterToolbar.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - tests/e2e/features/filtering.spec.ts
+- [x] F-FILTER-009 filter menu UI
+  - Evidence:
+    - packages/dom/src/grid/columnMenu.ts
+    - packages/dom/src/grid/filterPanel.ts
+    - packages/dom/src/grid/headerRenderer.ts
+    - packages/themes/src/default.css
+- [x] F-FILTER-010 server filter model
+  - Evidence:
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/rowModelOptions.ts
+    - apps/examples/src/features/filtering/data.ts
+    - tests/e2e/features/filtering.spec.ts
+- [x] F-FILTER-011 distinct values via dataSource
+  - Evidence:
+    - packages/core/src/types/data.ts
+    - packages/dom/src/grid/filterPanel.ts
+    - apps/examples/src/features/filtering/data.ts
+    - tests/e2e/features/filtering.spec.ts
+- [x] F-FILTER-012 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/filtering/vanilla.ts
+    - apps/examples/src/features/filtering/react.tsx
+    - apps/examples/src/features/filtering/vue.vue
+    - apps/examples/src/catalog.ts
+- [x] F-FILTER-013 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/filtering.spec.ts
+    - tests/a11y/filtering-a11y.spec.ts
+    - tests/e2e/visual/filtering.visual.spec.ts
+    - tests/e2e/visual/filtering.visual.spec.ts-snapshots/filtering-grid-chromium-darwin.png
+- [x] F-FILTER-014 docs
+  - Evidence:
+    - apps/docs/docs/features/filtering.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/column-def.mdx
+    - apps/docs/docs/api/datasource.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:e2e:visual
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - DOM custom scrollbar는 grid ARIA required-children 구조를 깨지 않도록 accessibility tree에서 숨겼다. 시각/포인터 스크롤 동작은 기존 E2E로 유지 검증했다.
+
+### F-EDIT Editing
+
+- [x] F-EDIT-001 editor lifecycle
+  - Evidence:
+    - packages/core/src/editing/editorLifecycle.ts
+    - packages/core/src/editing/index.ts
+    - packages/core/test/editing.test.ts
+    - packages/dom/src/grid/OneGrid.ts
+- [x] F-EDIT-002 text editor
+  - Evidence:
+    - packages/dom/src/grid/editorOverlay.ts
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-003 number editor
+  - Evidence:
+    - packages/core/src/editing/editorLifecycle.ts
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-004 date editor
+  - Evidence:
+    - packages/core/src/editing/editorLifecycle.ts
+    - apps/examples/src/features/editing/data.ts
+- [x] F-EDIT-005 datetime editor
+  - Evidence:
+    - packages/core/src/editing/editorLifecycle.ts
+    - apps/examples/src/features/editing/data.ts
+- [x] F-EDIT-006 checkbox editor
+  - Evidence:
+    - packages/dom/src/grid/editorOverlay.ts
+    - packages/themes/src/default.css
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+  - Notes:
+    - 2026-04-30: Checkbox editor를 native input 단독 렌더링에서 `og-grid__checkbox` 기반 label control로 교체해 Safari/Chrome/Edge 시각과 keyboard toggle 동작을 동일하게 검증했다.
+    - 2026-04-30: 체크박스 UI를 파란 박스형 강조 스타일에서 기본 폼 컨트롤에 가까운 회색 테두리/체크 표시 스타일로 낮췄다.
+    - 2026-04-30: AG Grid 공개 예제/문서의 기본 editor UX를 벤치마크해 checked 상태는 작고 일반적인 blue checkbox로, unchecked 상태는 얇은 회색 테두리로 정리했다. 구현/소스는 복제하지 않는다.
+    - 2026-04-30: Active 컬럼은 편집 전 셀 표시도 기본 checkbox로 보이도록 element renderer를 추가하고, checkbox editor는 별도 custom skin이 아닌 native input 경로로 분리했다.
+- [x] F-EDIT-007 select editor
+  - Evidence:
+    - packages/dom/src/grid/editorOverlay.ts
+    - packages/themes/src/default.css
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+  - Notes:
+    - 2026-04-30: Select editor 화살표를 기본적인 단일 chevron 아이콘으로 정리해 브라우저별 기본 select 차이를 줄이면서 과한 커스텀 UI를 제거했다.
+    - 2026-04-30: Select editor는 표준 HTML `select` 기반의 인라인 editor 톤을 유지하고, multi-select에는 단일 select chevron을 표시하지 않도록 분리했다.
+- [x] F-EDIT-008 multi-select editor
+  - Evidence:
+    - packages/dom/src/grid/editorOverlay.ts
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-009 radio editor
+  - Evidence:
+    - packages/dom/src/grid/editorOverlay.ts
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+  - Notes:
+    - 2026-04-30: Priority 컬럼 radio editor를 native radio input으로 렌더링하고, 기본 라디오 그룹이 눌리지 않도록 컬럼 폭을 조정했다.
+- [x] F-EDIT-010 textarea editor
+  - Evidence:
+    - packages/dom/src/grid/editorOverlay.ts
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-011 autocomplete editor
+  - Evidence:
+    - packages/dom/src/grid/editorOverlay.ts
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-012 custom editor
+  - Evidence:
+    - packages/core/src/editing/editorLifecycle.ts
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-013 validation sync
+  - Evidence:
+    - packages/core/src/editing/editorLifecycle.ts
+    - packages/core/test/editing.test.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-014 validation async
+  - Evidence:
+    - packages/core/src/editing/editorLifecycle.ts
+    - apps/examples/src/features/editing/data.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-015 commit/cancel policy
+  - Evidence:
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/types/grid-api.ts
+    - packages/core/src/types/events.ts
+    - packages/dom/src/grid/editorOverlay.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/virtualColumnWindow.ts
+    - packages/dom/src/grid/gridFocus.ts
+    - apps/examples/src/features/editing/vanilla.ts
+    - tests/e2e/features/editing.spec.ts
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=webkit
+  - Notes:
+    - 2026-04-30: toolbar `Cancel edit` 클릭 시 editor blur commit이 먼저 실행되지 않도록 blur commit delay와 example button pointerdown focus preservation을 추가했다.
+    - 2026-04-30: 정적 가로 스크롤 경로도 `scrollLeft`를 저장/복원하도록 보강해 select/checkbox 편집 commit 후 가로 스크롤 위치가 초기화되지 않게 했다.
+    - 2026-04-30: `editing.commitMode: "batch"`와 pending edit API(`getPendingEdits`, `commitPendingEdits`, `cancelPendingEdits`)를 추가해 Enter는 staged history만 만들고, 예제의 Commit changes 버튼에서만 최종 commit event가 발생하도록 변경했다.
+    - 2026-04-30: Cancel changes가 staged history 전체를 원본 row 값으로 복원하도록 Chromium/WebKit E2E로 검증했다.
+    - 2026-04-30: `GridPendingEdit.sourceIndex`와 editing 예제의 Pending detail 표시를 추가해 commit 전 변경 목록을 `row/field/previousValue/nextValue` 형식으로 조회할 수 있게 했다.
+- [x] F-EDIT-016 IME composition support
+  - Evidence:
+    - packages/dom/src/grid/editorOverlay.ts
+    - tests/e2e/features/editing.spec.ts
+- [x] F-EDIT-017 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/editing/vanilla.ts
+    - apps/examples/src/features/editing/react.tsx
+    - apps/examples/src/features/editing/vue.vue
+    - apps/examples/src/features/editing/vanilla.html
+    - apps/examples/src/catalog.ts
+- [x] F-EDIT-018 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/editing.spec.ts
+    - tests/a11y/editing-a11y.spec.ts
+    - tests/e2e/visual/editing.visual.spec.ts
+    - tests/e2e/visual/editing.visual.spec.ts-snapshots/editing-grid-chromium-darwin.png
+    - tests/e2e/visual/column-ui.visual.spec.ts-snapshots/column-ui-grid-chromium-darwin.png
+    - tests/e2e/visual/filtering.visual.spec.ts-snapshots/filtering-grid-chromium-darwin.png
+    - tests/e2e/visual/selection.visual.spec.ts-snapshots/selection-grid-chromium-darwin.png
+    - tests/e2e/visual/tree-row-model.visual.spec.ts-snapshots/tree-row-model-grid-chromium-darwin.png
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=webkit
+    - pnpm test:e2e
+    - pnpm test:e2e:visual
+  - Notes:
+    - 2026-04-30: Cancel toolbar, overlay cell-width fit, checkbox editor class/size/toggle, select/checkbox commit 후 horizontal scroll preservation 회귀를 E2E에 추가하고 WebKit에서 확인했다.
+    - 2026-04-30: AG Grid 기본 grid/editor UX 벤치마크에 맞춘 checkbox/select visual snapshot을 갱신했다.
+    - 2026-04-30: Active checkbox 표시/편집과 Priority radio editor가 native form control class를 사용하는지 Chromium/WebKit E2E로 검증했다.
+    - 2026-04-30: WebKit에서 checkbox/radio pointer click이 blur cancel 또는 native toggle 차이로 staged edit을 잃지 않도록 pointer-driven toggle 경로를 보강하고 Chromium/WebKit에서 확인했다.
+    - 2026-04-30: batch commit action 버튼과 Active checkbox inline alignment를 반영해 editing visual snapshot을 갱신하고 `pnpm test:e2e:visual`로 확인했다.
+- [x] F-EDIT-019 docs
+  - Evidence:
+    - apps/docs/docs/features/editing.mdx
+    - apps/examples/src/features/editing/README.md
+    - apps/docs/docs/api/column-def.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/docs/api/events.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:e2e:visual
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - DOM `OneGrid.ts` lifecycle split risk는 Risk Log `R-20260429-001`에 계속 추적한다.
+
+### F-SELECT Selection
+
+- [x] F-SELECT-001 cell selection
+  - Evidence:
+    - packages/core/src/selection/selectionModel.ts
+    - packages/dom/src/grid/selectionRuntime.ts
+    - tests/e2e/features/selection.spec.ts
+- [x] F-SELECT-002 row selection
+  - Evidence:
+    - packages/core/src/selection/selectionModel.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/selectionRuntime.ts
+    - packages/dom/src/grid/mergedSelectionOverlay.ts
+    - tests/e2e/features/selection.spec.ts
+  - Notes:
+    - 2026-04-30: Row checkbox로 covered row를 선택할 때 visible merged anchor가 선택되지 않은 것처럼 보이지 않도록 병합 셀 전체를 background overlay로 표시한다.
+- [x] F-SELECT-003 checkbox selection
+  - Evidence:
+    - packages/dom/src/grid/selectionRuntime.ts
+    - packages/themes/src/default.css
+    - tests/a11y/selection-a11y.spec.ts
+  - Notes:
+    - 2026-04-30: Row selection checkbox에 공통 `og-grid__checkbox` 스킨을 적용해 브라우저별 기본 checkbox UI를 사용하지 않는다.
+- [x] F-SELECT-004 range selection
+  - Evidence:
+    - packages/core/src/selection/selectionModel.ts
+    - packages/dom/src/grid/gridFocus.ts
+    - tests/e2e/features/selection.spec.ts
+- [x] F-SELECT-005 multi range selection
+  - Evidence:
+    - packages/core/src/selection/selectionModel.ts
+    - packages/dom/src/grid/selectionRuntime.ts
+    - tests/e2e/features/selection.spec.ts
+- [x] F-SELECT-006 keyboard selection
+  - Evidence:
+    - packages/dom/src/grid/gridFocus.ts
+    - packages/dom/src/grid/selectionRuntime.ts
+    - tests/e2e/features/selection.spec.ts
+- [x] F-SELECT-007 merge cell selection
+  - Evidence:
+    - packages/core/src/selection/selectionModel.ts
+    - packages/dom/src/grid/selectionRuntime.ts
+    - packages/dom/src/grid/mergedSelectionOverlay.ts
+    - packages/core/test/selection.test.ts
+    - tests/e2e/features/selection.spec.ts
+  - Notes:
+    - 2026-04-30: SEL-0002처럼 merged anchor 아래에 덮인 row를 선택해도 Region/Agency 병합 셀 전체에 `og-grid__cell--merged-row-selected`가 적용되는 E2E를 추가했다.
+- [x] F-SELECT-008 select all visible
+  - Evidence:
+    - packages/dom/src/grid/selectionToolbar.ts
+    - packages/dom/src/grid/selectionRuntime.ts
+    - tests/e2e/features/selection.spec.ts
+- [x] F-SELECT-009 select all server dataset token policy
+  - Evidence:
+    - packages/core/src/selection/selectionModel.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/core/test/selection.test.ts
+- [x] F-SELECT-010 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/selection/vanilla.ts
+    - apps/examples/src/features/selection/react.tsx
+    - apps/examples/src/features/selection/vue.vue
+    - apps/examples/src/features/selection/vanilla.html
+    - apps/examples/src/catalog.ts
+- [x] F-SELECT-011 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/selection.spec.ts
+    - tests/a11y/selection-a11y.spec.ts
+    - tests/e2e/visual/selection.visual.spec.ts
+    - tests/e2e/visual/selection.visual.spec.ts-snapshots/selection-grid-chromium-darwin.png
+- [x] F-SELECT-012 docs
+  - Evidence:
+    - apps/docs/docs/features/selection.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/docs/api/events.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/selection.spec.ts --project=chromium
+    - pnpm test:e2e
+    - pnpm build
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:e2e:visual
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - DOM `OneGrid.ts` lifecycle split risk는 Risk Log `R-20260429-001`에 계속 추적한다.
+
+### F-CLIP Clipboard
+
+- [x] F-CLIP-001 copy selected cells
+  - Evidence:
+    - packages/core/src/clipboard/clipboardModel.ts
+    - packages/dom/src/grid/clipboardData.ts
+    - packages/dom/src/grid/clipboardRuntime.ts
+    - packages/dom/src/grid/oneGridClipboard.ts
+    - tests/e2e/features/clipboard.spec.ts
+- [x] F-CLIP-002 copy selected rows
+  - Evidence:
+    - packages/dom/src/grid/clipboardData.ts
+    - apps/examples/src/features/clipboard/vanilla.ts
+    - tests/e2e/features/clipboard.spec.ts
+- [x] F-CLIP-003 copy with headers
+  - Evidence:
+    - packages/core/src/clipboard/clipboardModel.ts
+    - apps/docs/docs/api/grid-api.mdx
+    - tests/e2e/features/clipboard.spec.ts
+- [x] F-CLIP-004 paste range
+  - Evidence:
+    - packages/core/src/clipboard/clipboardModel.ts
+    - packages/dom/src/grid/oneGridClipboard.ts
+    - tests/e2e/features/clipboard.spec.ts
+- [x] F-CLIP-005 paste validation
+  - Evidence:
+    - packages/dom/src/grid/oneGridClipboard.ts
+    - apps/examples/src/features/clipboard/data.ts
+    - tests/e2e/features/clipboard.spec.ts
+- [x] F-CLIP-006 merge-aware copy/paste
+  - Evidence:
+    - packages/dom/src/grid/clipboardData.ts
+    - packages/dom/src/grid/oneGridClipboard.ts
+    - tests/e2e/features/clipboard.spec.ts
+- [x] F-CLIP-007 clipboard security policy
+  - Evidence:
+    - packages/core/src/clipboard/clipboardModel.ts
+    - packages/dom/src/grid/clipboardRuntime.ts
+    - apps/docs/docs/features/clipboard.mdx
+- [x] F-CLIP-008 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/clipboard/vanilla.ts
+    - apps/examples/src/features/clipboard/vanilla.html
+    - apps/examples/src/features/clipboard/react.tsx
+    - apps/examples/src/features/clipboard/vue.vue
+    - apps/examples/src/features/clipboard/data.ts
+    - apps/examples/src/features/clipboard/README.md
+    - apps/examples/src/catalog.ts
+- [x] F-CLIP-009 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/clipboard.spec.ts
+    - tests/a11y/clipboard-a11y.spec.ts
+- [x] F-CLIP-010 docs
+  - Evidence:
+    - apps/docs/docs/features/clipboard.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/clipboard.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/clipboard-a11y.spec.ts --project=chromium
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - Clipboard는 `text/plain` TSV만 처리하고 HTML renderer output을 clipboard HTML로 노출하지 않는다.
+    - `LAY-004-009 merge + copy/export 연동` 중 clipboard 연동은 완료, export 연동은 F-EXPORT 이후 완료 처리한다.
+
+### F-MENU Menus
+
+- [x] F-MENU-001 overlay positioning
+  - Evidence:
+    - packages/dom/src/grid/overlayPosition.ts
+    - packages/dom/src/grid/columnMenu.ts
+    - packages/dom/src/grid/filterPanel.ts
+    - tests/e2e/features/menus.spec.ts
+- [x] F-MENU-002 header menu
+  - Evidence:
+    - packages/dom/src/grid/columnMenu.ts
+    - packages/dom/src/grid/columnControls.ts
+    - apps/examples/src/features/menus/vanilla.ts
+    - tests/e2e/features/menus.spec.ts
+- [x] F-MENU-003 column menu
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnMenu.ts
+    - apps/examples/src/features/menus/data.ts
+    - tests/e2e/features/menus.spec.ts
+- [x] F-MENU-004 filter menu
+  - Evidence:
+    - packages/dom/src/grid/filterPanel.ts
+    - apps/examples/src/features/menus/data.ts
+    - tests/e2e/features/menus.spec.ts
+- [x] F-MENU-005 context menu
+  - Evidence:
+    - packages/core/src/menu/contextMenuModel.ts
+    - packages/core/test/context-menu.test.ts
+    - packages/dom/src/grid/contextMenuRuntime.ts
+    - packages/dom/src/grid/oneGridMenu.ts
+    - packages/themes/src/default.css
+- [x] F-MENU-006 row context menu
+  - Evidence:
+    - packages/core/src/menu/contextMenuModel.ts
+    - apps/examples/src/features/menus/data.ts
+    - tests/e2e/features/menus.spec.ts
+- [x] F-MENU-007 cell context menu
+  - Evidence:
+    - packages/core/src/menu/contextMenuModel.ts
+    - packages/dom/src/grid/contextMenuRuntime.ts
+    - tests/e2e/features/menus.spec.ts
+- [x] F-MENU-008 custom menu item
+  - Evidence:
+    - packages/core/src/menu/contextMenuModel.ts
+    - apps/examples/src/features/menus/data.ts
+    - tests/e2e/features/menus.spec.ts
+- [x] F-MENU-009 keyboard accessible menu
+  - Evidence:
+    - packages/dom/src/grid/contextMenuRuntime.ts
+    - tests/e2e/features/menus.spec.ts
+    - tests/a11y/menus-a11y.spec.ts
+- [x] F-MENU-010 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/menus/vanilla.ts
+    - apps/examples/src/features/menus/vanilla.html
+    - apps/examples/src/features/menus/react.tsx
+    - apps/examples/src/features/menus/vue.vue
+    - apps/examples/src/features/menus/data.ts
+    - apps/examples/src/features/menus/README.md
+    - apps/examples/src/catalog.ts
+- [x] F-MENU-011 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/menus.spec.ts
+    - tests/a11y/menus-a11y.spec.ts
+- [x] F-MENU-012 docs
+  - Evidence:
+    - apps/docs/docs/features/menus.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/menus.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/menus-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/menus.spec.ts tests/a11y/menus-a11y.spec.ts --project=webkit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - Context menu는 `GridOptions.contextMenu.enabled`로 opt-in이며 cell context에서 row-scoped custom item도 함께 노출한다.
+    - Header menu와 filter panel은 공통 `positionOverlay()`를 사용하고, context menu는 우클릭과 `Shift+F10`/Context Menu 키를 지원한다.
+
+### F-SUMMARY Summary / Aggregation
+
+- [x] F-SUMMARY-001 sum
+  - Evidence:
+    - packages/core/src/layout/summaryModel.ts
+    - packages/core/test/layout-model.test.ts
+    - apps/examples/src/features/summary/data.ts
+    - tests/e2e/features/summary.spec.ts
+- [x] F-SUMMARY-002 avg
+  - Evidence:
+    - packages/core/src/layout/summaryModel.ts
+    - packages/core/test/layout-model.test.ts
+    - apps/examples/src/features/summary/data.ts
+    - tests/e2e/features/summary.spec.ts
+- [x] F-SUMMARY-003 min/max
+  - Evidence:
+    - packages/core/src/layout/summaryModel.ts
+    - packages/core/test/layout-model.test.ts
+    - apps/examples/src/features/summary/data.ts
+    - tests/e2e/features/summary.spec.ts
+- [x] F-SUMMARY-004 count
+  - Evidence:
+    - packages/core/src/layout/summaryModel.ts
+    - packages/core/test/layout-model.test.ts
+    - apps/examples/src/features/summary/data.ts
+    - tests/e2e/features/summary.spec.ts
+- [x] F-SUMMARY-005 distinct count
+  - Evidence:
+    - packages/core/src/layout/summaryModel.ts
+    - packages/core/test/layout-model.test.ts
+    - apps/examples/src/features/summary/data.ts
+    - tests/e2e/features/summary.spec.ts
+- [x] F-SUMMARY-006 custom summary
+  - Evidence:
+    - packages/core/src/layout/summaryModel.ts
+    - packages/core/test/layout-model.test.ts
+    - apps/examples/src/features/summary/data.ts
+    - tests/e2e/features/summary.spec.ts
+- [x] F-SUMMARY-007 footer summary
+  - Evidence:
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/summaryRenderer.ts
+    - tests/e2e/features/summary.spec.ts
+    - tests/a11y/summary-a11y.spec.ts
+- [x] F-SUMMARY-008 top summary
+  - Evidence:
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/summaryRenderer.ts
+    - tests/e2e/features/summary.spec.ts
+    - tests/a11y/summary-a11y.spec.ts
+- [x] F-SUMMARY-009 group summary
+  - Evidence:
+    - packages/core/src/row/clientAggregate.ts
+    - packages/core/src/row/clientGroup.ts
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - apps/examples/src/features/summary/data.ts
+    - tests/e2e/features/summary.spec.ts
+- [x] F-SUMMARY-010 server aggregate
+  - Evidence:
+    - packages/core/src/types/column.ts
+    - packages/dom/src/grid/oneGridRows.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/rowRenderStateFactory.ts
+    - apps/examples/src/features/summary/data.ts
+    - tests/e2e/features/summary.spec.ts
+- [x] F-SUMMARY-011 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/summary/vanilla.html
+    - apps/examples/src/features/summary/vanilla.ts
+    - apps/examples/src/features/summary/react.tsx
+    - apps/examples/src/features/summary/vue.vue
+    - apps/examples/src/features/summary/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+- [x] F-SUMMARY-012 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/summary.spec.ts
+    - tests/a11y/summary-a11y.spec.ts
+- [x] F-SUMMARY-013 docs
+  - Evidence:
+    - apps/docs/docs/features/summary.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/summary.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/summary-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/summary.spec.ts tests/a11y/summary-a11y.spec.ts --project=webkit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/summary.spec.ts tests/e2e/features/client-row-model.spec.ts tests/a11y/summary-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/summary.spec.ts tests/e2e/features/client-row-model.spec.ts tests/a11y/summary-a11y.spec.ts --project=webkit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-04-30: Client summary는 filtered row set 기준으로 계산하고 `summary.position`의 `top`/`bottom`/`both` 배치를 지원한다.
+    - 2026-04-30: Server summary는 `GetRowsResult.aggregate.values`와 `SummaryDef.aggregateKey`를 통해 전체 서버 집계값을 footer summary에 매핑한다.
+    - 2026-04-30: Group summary는 기존 client grouping aggregate row와 함께 동작하도록 예제와 E2E에서 검증했다.
+    - 2026-04-30: Summary cell에 `SummaryDef.label` 기반 label/value 표시를 추가하고, 예제의 중복 top/bottom summary를 client top + server bottom 구조로 분리했다.
+    - 2026-04-30: Group aggregate label은 좁은 left pinned ID 셀 대신 center pane merged group cell에 표시해 긴 aggregate 텍스트가 즉시 잘리지 않도록 수정했다.
+
+### F-GROUP Row Grouping
+
+- [x] F-GROUP-001 group model
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/row/clientGroup.ts
+    - packages/core/test/client-row-model.test.ts
+- [x] F-GROUP-002 group expand/collapse
+  - Evidence:
+    - packages/core/src/types/grid-api.ts
+    - packages/dom/src/grid/oneGridRows.ts
+    - packages/dom/src/grid/groupRowRenderer.ts
+    - packages/vue/src/OneGrid.ts
+- [x] F-GROUP-003 group sorting
+  - Evidence:
+    - packages/core/src/row/clientRowModel.ts
+    - apps/examples/src/features/grouping/data.ts
+    - tests/e2e/features/grouping.spec.ts
+- [x] F-GROUP-004 group filtering
+  - Evidence:
+    - packages/core/src/row/clientRowModel.ts
+    - apps/examples/src/features/grouping/data.ts
+    - tests/e2e/features/grouping.spec.ts
+- [x] F-GROUP-005 group aggregate
+  - Evidence:
+    - packages/core/src/row/clientGroup.ts
+    - packages/dom/src/grid/groupRowRenderer.ts
+    - packages/core/test/client-row-model.test.ts
+- [x] F-GROUP-006 group footer
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/dom/src/grid/groupRowRenderer.ts
+    - packages/themes/src/default.css
+    - tests/e2e/features/grouping.spec.ts
+- [x] F-GROUP-007 server grouping
+  - Evidence:
+    - packages/core/src/row/serverTypes.ts
+    - packages/core/src/row/serverRowModel.ts
+    - packages/core/test/server-row-model.test.ts
+    - tests/e2e/features/grouping.spec.ts
+- [x] F-GROUP-008 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/grouping/vanilla.ts
+    - apps/examples/src/features/grouping/react.tsx
+    - apps/examples/src/features/grouping/vue.vue
+    - apps/examples/src/features/grouping/README.md
+- [x] F-GROUP-009 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/grouping.spec.ts
+    - tests/a11y/grouping-a11y.spec.ts
+- [x] F-GROUP-010 docs
+  - Evidence:
+    - apps/docs/docs/features/grouping.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit -- --run packages/core/test/client-row-model.test.ts packages/core/test/server-row-model.test.ts packages/core/test/public-types.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/grouping.spec.ts tests/a11y/grouping-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/grouping.spec.ts tests/a11y/grouping-a11y.spec.ts --project=webkit
+    - pnpm test:e2e
+    - pnpm test:a11y -- tests/a11y/grouping-a11y.spec.ts
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-04-30: Client grouping은 sort/filter 이후 group model을 적용하고 `GroupingOptions.footer = "bottom"`일 때 aggregate footer row를 생성한다.
+    - 2026-04-30: Server grouping은 `GetRowsRequest.groupKeys`와 `GetRowsResult.groupMeta`로 root group row와 expanded group body/footer를 렌더링한다.
+    - 2026-04-30: Group row/footer는 DOM에서 merged row로 렌더링하되 pinned pane 침범 없이 center/left pane label ownership을 분리했다.
+
+### F-TREE Tree
+
+- [x] F-TREE-001 tree column
+  - Evidence:
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/row/treeTypes.ts
+    - packages/dom/src/grid/treeRowRenderer.ts
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - apps/examples/src/features/tree/data.ts
+- [x] F-TREE-002 expand/collapse
+  - Evidence:
+    - packages/core/src/types/grid-api.ts
+    - packages/dom/src/grid/oneGridRows.ts
+    - packages/vue/src/OneGrid.ts
+    - tests/e2e/features/tree.spec.ts
+- [x] F-TREE-003 lazy children
+  - Evidence:
+    - packages/core/src/row/treeRowModel.ts
+    - packages/core/src/types/data.ts
+    - apps/examples/src/features/tree/data.ts
+    - tests/e2e/features/tree.spec.ts
+- [x] F-TREE-004 checkbox cascade option
+  - Evidence:
+    - packages/core/src/row/treeSelection.ts
+    - packages/core/src/row/treeRowModel.ts
+    - packages/dom/src/grid/treeRowRenderer.ts
+    - tests/a11y/tree-a11y.spec.ts
+- [x] F-TREE-005 tree filtering policy
+  - Evidence:
+    - packages/core/src/row/treeTypes.ts
+    - packages/core/src/row/treeRowModel.ts
+    - packages/core/test/tree-row-model.test.ts
+    - apps/docs/docs/features/tree.mdx
+- [x] F-TREE-006 tree sorting policy
+  - Evidence:
+    - packages/core/src/row/treeTypes.ts
+    - packages/core/src/row/treeRowModel.ts
+    - packages/core/test/tree-row-model.test.ts
+    - apps/examples/src/features/tree/data.ts
+- [x] F-TREE-007 server tree
+  - Evidence:
+    - packages/core/src/types/data.ts
+    - packages/dom/src/grid/rowModelOptions.ts
+    - apps/examples/src/features/tree/data.ts
+    - tests/e2e/features/tree.spec.ts
+- [x] F-TREE-008 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/tree/vanilla.ts
+    - apps/examples/src/features/tree/react.tsx
+    - apps/examples/src/features/tree/vue.vue
+    - apps/examples/src/features/tree/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+- [x] F-TREE-009 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/tree.spec.ts
+    - tests/a11y/tree-a11y.spec.ts
+    - tests/e2e/features/tree-row-model.spec.ts
+    - tests/a11y/tree-row-model-a11y.spec.ts
+- [x] F-TREE-010 docs
+  - Evidence:
+    - apps/docs/docs/features/tree.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec vitest run --config vitest.config.ts packages/core/test/tree-row-model.test.ts packages/core/test/public-types.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/tree.spec.ts tests/a11y/tree-a11y.spec.ts --project=webkit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-04-30: Tree grid는 ARIA `treegrid` role을 사용하고 `tree.treeColumnField`로 expand/collapse, indent, cascade checkbox가 표시될 컬럼을 선택한다.
+    - 2026-04-30: `tree.serverOnly`는 client filter/sort projection을 생략하고 lazy child request에 `filterModel`/`sortModel`을 전달한다.
+    - 2026-04-30: 기본 tree filter는 ancestor context를 보존하고, sort는 sibling 단위 정렬로 flatten 순서를 깨지 않는다.
+
+### F-PIVOT Pivot
+
+- [x] F-PIVOT-001 pivot model
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/pivot/clientPivot.ts
+    - packages/core/test/client-pivot.test.ts
+- [x] F-PIVOT-002 row fields
+  - Evidence:
+    - packages/core/src/pivot/clientPivot.ts
+    - packages/dom/src/grid/pivotRenderData.ts
+    - apps/examples/src/features/pivot/data.ts
+    - tests/e2e/features/pivot.spec.ts
+- [x] F-PIVOT-003 column fields
+  - Evidence:
+    - packages/core/src/pivot/clientPivot.ts
+    - packages/core/test/client-pivot.test.ts
+    - apps/examples/src/features/pivot/data.ts
+    - tests/e2e/features/pivot.spec.ts
+- [x] F-PIVOT-004 value fields
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/core/src/pivot/pivotAggregate.ts
+    - packages/core/src/pivot/clientPivot.ts
+    - packages/core/test/client-pivot.test.ts
+- [x] F-PIVOT-005 totals/subtotals
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/core/src/pivot/clientPivot.ts
+    - packages/core/test/client-pivot.test.ts
+    - tests/e2e/features/pivot.spec.ts
+- [x] F-PIVOT-006 server pivot
+  - Evidence:
+    - packages/core/src/row/serverRequest.ts
+    - packages/core/test/server-row-model.test.ts
+    - apps/examples/src/features/pivot/data.ts
+    - tests/e2e/features/pivot.spec.ts
+- [x] F-PIVOT-007 pivot panel foundation
+  - Evidence:
+    - packages/dom/src/grid/pivotPanel.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/themes/src/default.css
+    - tests/a11y/pivot-a11y.spec.ts
+- [x] F-PIVOT-008 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/pivot/vanilla.ts
+    - apps/examples/src/features/pivot/react.tsx
+    - apps/examples/src/features/pivot/vue.vue
+    - apps/examples/src/features/pivot/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+- [x] F-PIVOT-009 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/pivot.spec.ts
+    - tests/a11y/pivot-a11y.spec.ts
+- [x] F-PIVOT-010 docs
+  - Evidence:
+    - apps/docs/docs/features/pivot.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec vitest run --config vitest.config.ts packages/core/test/client-pivot.test.ts packages/core/test/server-row-model.test.ts packages/core/test/public-types.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pivot.spec.ts tests/a11y/pivot-a11y.spec.ts --project=webkit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-04-30: Client pivot는 filtered/sorted client rows를 core `createClientPivotModel()`로 동적 grouped columns와 pivot rows로 변환한 뒤 기존 DOM renderer로 렌더링한다.
+    - 2026-04-30: `PivotModel.values`는 기존 string shorthand와 descriptor(`field`, `function`, `alias`, `label`)를 모두 지원한다.
+    - 2026-04-30: Server pivot는 브라우저 계산 없이 `DataSource.getRows()`에 `pivotModel`을 전달하고 서버가 반환한 result columns/rows를 렌더링한다.
+
+### F-PAGE Pagination
+
+- [x] F-PAGE-001 client pagination
+  - Evidence:
+    - packages/pagination/src/index.ts
+    - packages/pagination/test/pagination.test.ts
+    - packages/dom/src/grid/renderGridData.ts
+    - apps/examples/src/features/pagination/data.ts
+- [x] F-PAGE-002 server pagination
+  - Evidence:
+    - packages/core/src/row/serverRowModel.ts
+    - packages/core/src/row/serverRequest.ts
+    - packages/core/src/row/serverSerialization.ts
+    - packages/core/test/server-row-model.test.ts
+    - apps/examples/src/features/pagination/data.ts
+- [x] F-PAGE-003 cursor pagination
+  - Evidence:
+    - packages/core/src/row/serverTypes.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/dom/src/grid/rowModelOptions.ts
+    - apps/examples/src/features/pagination/data.ts
+- [x] F-PAGE-004 bottom pagination UI
+  - Evidence:
+    - packages/dom/src/grid/paginationRenderer.ts
+    - packages/dom/src/grid/gridToolbarRenderer.ts
+    - packages/themes/src/default.css
+    - tests/e2e/features/pagination.spec.ts
+- [x] F-PAGE-005 top pagination UI
+  - Evidence:
+    - packages/dom/src/grid/paginationRenderer.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - apps/examples/src/features/pagination/data.ts
+    - tests/e2e/features/pagination.spec.ts
+- [x] F-PAGE-006 page size selector
+  - Evidence:
+    - packages/pagination/src/index.ts
+    - packages/dom/src/grid/paginationRenderer.ts
+    - tests/e2e/features/pagination.spec.ts
+- [x] F-PAGE-007 page group navigation
+  - Evidence:
+    - packages/pagination/src/index.ts
+    - packages/dom/src/grid/paginationRenderer.ts
+    - tests/e2e/features/pagination.spec.ts
+- [x] F-PAGE-008 scroll pagination
+  - Evidence:
+    - packages/dom/src/grid/paginationRenderer.ts
+    - apps/examples/src/features/pagination/data.ts
+    - tests/e2e/features/pagination.spec.ts
+- [x] F-PAGE-009 append scroll
+  - Evidence:
+    - packages/dom/src/grid/paginationRenderer.ts
+    - packages/dom/src/grid/oneGridBase.ts
+    - apps/examples/src/features/pagination/vanilla.ts
+    - tests/e2e/features/pagination.spec.ts
+- [x] F-PAGE-010 pagination accessibility
+  - Evidence:
+    - packages/dom/src/grid/paginationRenderer.ts
+    - tests/a11y/pagination-a11y.spec.ts
+- [x] F-PAGE-011 JS/React/Vue examples
+  - Evidence:
+    - apps/examples/src/features/pagination/vanilla.html
+    - apps/examples/src/features/pagination/vanilla.ts
+    - apps/examples/src/features/pagination/react.tsx
+    - apps/examples/src/features/pagination/vue.vue
+    - apps/examples/src/features/pagination/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+- [x] F-PAGE-012 Playwright E2E
+  - Evidence:
+    - tests/e2e/features/pagination.spec.ts
+    - tests/a11y/pagination-a11y.spec.ts
+    - tests/e2e/visual/pagination.visual.spec.ts
+    - tests/e2e/visual/pagination.visual.spec.ts-snapshots/pagination-grid-chromium-darwin.png
+- [x] F-PAGE-013 docs
+  - Evidence:
+    - apps/docs/docs/features/pagination.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/docs/api/datasource.mdx
+    - apps/docs/docs/api/events.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec vitest run --config vitest.config.ts packages/pagination/test/pagination.test.ts packages/core/test/server-row-model.test.ts packages/core/test/public-types.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pagination.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/pagination-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pagination.spec.ts --project=webkit
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/pagination-a11y.spec.ts --project=webkit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/visual/pagination.visual.spec.ts --project=chromium
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-04-30: Client pagination은 filtered/sorted client rows를 `@onegrid/pagination`의 `paginateRows()`로 slice하고 DOM renderer에 전달한다.
+    - 2026-04-30: Server pagination은 page/pageSize, cursor pagination은 cursor/nextCursor/hasMore를 `DataSource.getRows()` request/result contract에 포함한다.
+    - 2026-04-30: Append scroll은 public API 확장 없이 pagination UI mode로 구현했으며, server/cursor mode에서 다음 page 또는 cursor를 명시적으로 요청한다.
+    - 2026-04-30: F-PAGE 예제는 기본 배치를 하단 pagination으로 통일했고, 각 grid section이 독립 pagination/inspector와 매칭되도록 보정했다.
+    - 2026-04-30: Server pagination은 초기 load 중 page 전환이 들어와도 마지막 요청을 pending load로 보존해 grid/page state 불일치를 방지한다.
+    - 2026-04-30: 전체 visual suite(`pnpm test:e2e:visual`)는 pagination spec은 통과했지만 기존 non-pagination snapshot 5건에서 baseline drift가 남아 별도 정리가 필요하다.
+
+### F-FROZEN Frozen Rows / Columns
+
+- [ ] F-FROZEN-001 left pinned columns
+  - Evidence:
+- [ ] F-FROZEN-002 right pinned columns
+  - Evidence:
+- [ ] F-FROZEN-003 frozen top rows
+  - Evidence:
+- [ ] F-FROZEN-004 frozen bottom rows
+  - Evidence:
+- [ ] F-FROZEN-005 frozen + virtual scroll
+  - Evidence:
+- [ ] F-FROZEN-006 frozen + merge
+  - Evidence:
+- [ ] F-FROZEN-007 frozen + keyboard navigation
+  - Evidence:
+- [ ] F-FROZEN-008 JS/React/Vue examples
+  - Evidence:
+- [ ] F-FROZEN-009 Playwright E2E
+  - Evidence:
+- [ ] F-FROZEN-010 docs
+  - Evidence:
+
+### F-EXPORT Export / Import
+
+- [ ] F-EXPORT-001 CSV export
+  - Evidence:
+- [ ] F-EXPORT-002 CSV import
+  - Evidence:
+- [ ] F-EXPORT-003 XLSX export
+  - Evidence:
+- [ ] F-EXPORT-004 XLSX import
+  - Evidence:
+- [ ] F-EXPORT-005 PDF export
+  - Evidence:
+- [ ] F-EXPORT-006 print layout
+  - Evidence:
+- [ ] F-EXPORT-007 export with header merge
+  - Evidence:
+- [ ] F-EXPORT-008 export with cell merge
+  - Evidence:
+- [ ] F-EXPORT-009 export selected range
+  - Evidence:
+- [ ] F-EXPORT-010 JS/React/Vue examples
+  - Evidence:
+- [ ] F-EXPORT-011 Playwright E2E
+  - Evidence:
+- [ ] F-EXPORT-012 docs
+  - Evidence:
+
+### F-I18N Localization
+
+- [ ] F-I18N-001 locale registry
+  - Evidence:
+- [ ] F-I18N-002 Korean locale
+  - Evidence:
+- [ ] F-I18N-003 English locale
+  - Evidence:
+- [ ] F-I18N-004 date/number formatter bridge
+  - Evidence:
+- [ ] F-I18N-005 runtime locale switch
+  - Evidence:
+- [ ] F-I18N-006 docs
+  - Evidence:
+
+---
+
+## 9. Phase 8 — Security / CSP
+
+### SEC-001 CSP
+
+- [ ] SEC-001-001 no eval / no new Function 검증
+  - Evidence:
+- [ ] SEC-001-002 inline event handler 미사용 검증
+  - Evidence:
+- [ ] SEC-001-003 style nonce option 구현
+  - Evidence:
+- [ ] SEC-001-004 disableStyleInjection option 구현
+  - Evidence:
+- [ ] SEC-001-005 CSP example page
+  - Evidence:
+- [ ] SEC-001-006 CSP Playwright test
+  - Evidence:
+- [ ] SEC-001-007 docs/security/csp 작성
+  - Evidence:
+
+### SEC-002 XSS Defense
+
+- [ ] SEC-002-001 default text escape
+  - Evidence:
+- [ ] SEC-002-002 html renderer opt-in
+  - Evidence:
+- [ ] SEC-002-003 sanitizer interface
+  - Evidence:
+- [ ] SEC-002-004 Trusted Types option
+  - Evidence:
+- [ ] SEC-002-005 URL protocol allowlist
+  - Evidence:
+- [ ] SEC-002-006 malicious data E2E
+  - Evidence:
+- [ ] SEC-002-007 docs/security/xss 작성
+  - Evidence:
+
+---
+
+## 10. Phase 9 — Themes / Design Customization
+
+### THEME-001 Theme Foundation
+
+- [ ] THEME-001-001 CSS variables token 정의
+  - Evidence:
+- [ ] THEME-001-002 default theme
+  - Evidence:
+- [ ] THEME-001-003 clean theme
+  - Evidence:
+- [ ] THEME-001-004 compact theme
+  - Evidence:
+- [ ] THEME-001-005 dark theme
+  - Evidence:
+- [ ] THEME-001-006 high contrast theme
+  - Evidence:
+- [ ] THEME-001-007 density switch
+  - Evidence:
+- [ ] THEME-001-008 runtime theme switch
+  - Evidence:
+- [ ] THEME-001-009 scoped theme
+  - Evidence:
+
+### THEME-002 SI Customization
+
+- [ ] THEME-002-001 design token mapping guide
+  - Evidence:
+- [ ] THEME-002-002 theme builder example
+  - Evidence:
+- [ ] THEME-002-003 CSS override recipe
+  - Evidence:
+- [ ] THEME-002-004 visual regression per theme
+  - Evidence:
+- [ ] THEME-002-005 docs
+  - Evidence:
+
+---
+
+## 11. Phase 10 — Framework Wrappers
+
+### WRAP-001 React
+
+- [ ] WRAP-001-001 `<OneGrid />` component
+  - Evidence:
+- [ ] WRAP-001-002 ref GridApi bridge
+  - Evidence:
+- [ ] WRAP-001-003 event props bridge
+  - Evidence:
+- [ ] WRAP-001-004 React cell renderer
+  - Evidence:
+- [ ] WRAP-001-005 React header renderer
+  - Evidence:
+- [ ] WRAP-001-006 React editor renderer
+  - Evidence:
+- [ ] WRAP-001-007 controlled options update
+  - Evidence:
+- [ ] WRAP-001-008 unmount cleanup
+  - Evidence:
+- [ ] WRAP-001-009 React examples all core features
+  - Evidence:
+- [ ] WRAP-001-010 React E2E
+  - Evidence:
+- [ ] WRAP-001-011 React docs
+  - Evidence:
+
+### WRAP-002 Vue
+
+- [ ] WRAP-002-001 `<OneGrid />` component
+  - Evidence:
+- [ ] WRAP-002-002 expose GridApi bridge
+  - Evidence:
+- [ ] WRAP-002-003 event emit bridge
+  - Evidence:
+- [ ] WRAP-002-004 Vue cell slot renderer
+  - Evidence:
+- [ ] WRAP-002-005 Vue header slot renderer
+  - Evidence:
+- [ ] WRAP-002-006 Vue editor slot renderer
+  - Evidence:
+- [ ] WRAP-002-007 reactive options update
+  - Evidence:
+- [ ] WRAP-002-008 unmount cleanup
+  - Evidence:
+- [ ] WRAP-002-009 Vue examples all core features
+  - Evidence:
+- [ ] WRAP-002-010 Vue E2E
+  - Evidence:
+- [ ] WRAP-002-011 Vue docs
+  - Evidence:
+
+### WRAP-003 API Parity
+
+- [ ] WRAP-003-001 JS/React/Vue option parity matrix
+  - Evidence:
+- [ ] WRAP-003-002 JS/React/Vue event parity matrix
+  - Evidence:
+- [ ] WRAP-003-003 JS/React/Vue method parity matrix
+  - Evidence:
+- [ ] WRAP-003-004 parity automated test
+  - Evidence:
+
+---
+
+## 12. Phase 11 — Examples Catalog
+
+각 기능은 `vanilla`, `react`, `vue` 예제가 있어야 한다.
+
+### EX-001 Basic / Setup
+
+- [ ] EX-001-001 basic grid
+  - Evidence:
+- [ ] EX-001-002 column types
+  - Evidence:
+- [ ] EX-001-003 row data update
+  - Evidence:
+- [ ] EX-001-004 grid api methods
+  - Evidence:
+
+### EX-002 Layout / Header / Merge
+
+- [ ] EX-002-001 group header
+  - Evidence:
+- [ ] EX-002-002 header merge
+  - Evidence:
+- [ ] EX-002-003 cell merge vertical
+  - Evidence:
+- [ ] EX-002-004 cell merge horizontal
+  - Evidence:
+- [ ] EX-002-005 cell merge block
+  - Evidence:
+- [ ] EX-002-006 frozen columns
+  - Evidence:
+- [ ] EX-002-007 frozen rows
+  - Evidence:
+- [ ] EX-002-008 variable row height
+  - Evidence:
+
+### EX-003 Data Modes
+
+- [ ] EX-003-001 client row model
+  - Evidence:
+- [ ] EX-003-002 infinite row model
+  - Evidence:
+- [ ] EX-003-003 server row model
+  - Evidence:
+- [ ] EX-003-004 viewport row model
+  - Evidence:
+- [ ] EX-003-005 tree row model
+  - Evidence:
+
+### EX-004 Enterprise Features
+
+- [ ] EX-004-001 sorting
+  - Evidence:
+- [ ] EX-004-002 filtering
+  - Evidence:
+- [ ] EX-004-003 editing
+  - Evidence:
+- [ ] EX-004-004 selection
+  - Evidence:
+- [ ] EX-004-005 clipboard
+  - Evidence:
+- [ ] EX-004-006 summary
+  - Evidence:
+- [ ] EX-004-007 grouping
+  - Evidence:
+- [ ] EX-004-008 tree
+  - Evidence:
+- [ ] EX-004-009 pivot
+  - Evidence:
+- [ ] EX-004-010 pagination
+  - Evidence:
+- [ ] EX-004-011 context menu
+  - Evidence:
+- [ ] EX-004-012 header menu
+  - Evidence:
+- [ ] EX-004-013 export/import
+  - Evidence:
+
+### EX-005 Quality / Security / Performance
+
+- [ ] EX-005-001 CSP nonce example
+  - Evidence:
+- [ ] EX-005-002 XSS-safe renderer example
+  - Evidence:
+- [ ] EX-005-003 theme customization example
+  - Evidence:
+- [ ] EX-005-004 accessibility keyboard example
+  - Evidence:
+- [ ] EX-005-005 10M server rows example
+  - Evidence:
+- [ ] EX-005-006 100M viewport rows example
+  - Evidence:
+- [ ] EX-005-007 financial SI scenario
+  - Evidence:
+- [ ] EX-005-008 public-sector SI scenario
+  - Evidence:
+
+### EX-006 Catalog Integrity
+
+- [ ] EX-006-001 every example registered in catalog
+  - Evidence:
+- [ ] EX-006-002 every example has vanilla variant
+  - Evidence:
+- [ ] EX-006-003 every example has React variant
+  - Evidence:
+- [ ] EX-006-004 every example has Vue variant
+  - Evidence:
+- [ ] EX-006-005 every example has README
+  - Evidence:
+- [ ] EX-006-006 every example has E2E spec
+  - Evidence:
+
+---
+
+## 13. Phase 12 — Playwright E2E / Visual / A11y
+
+### TEST-001 Playwright Setup
+
+- [ ] TEST-001-001 Playwright config
+  - Evidence:
+- [ ] TEST-001-002 Chromium project
+  - Evidence:
+- [ ] TEST-001-003 Firefox project
+  - Evidence:
+- [ ] TEST-001-004 WebKit project
+  - Evidence:
+- [ ] TEST-001-005 trace/video/screenshot policy
+  - Evidence:
+- [ ] TEST-001-006 local dev server integration
+  - Evidence:
+
+### TEST-002 User-Visible Feature Tests
+
+- [ ] TEST-002-001 sorting user test
+  - Evidence:
+- [ ] TEST-002-002 filtering user test
+  - Evidence:
+- [ ] TEST-002-003 editing user test
+  - Evidence:
+- [ ] TEST-002-004 selection user test
+  - Evidence:
+- [ ] TEST-002-005 clipboard user test
+  - Evidence:
+- [ ] TEST-002-006 pagination user test
+  - Evidence:
+- [ ] TEST-002-007 context menu user test
+  - Evidence:
+- [ ] TEST-002-008 header menu user test
+  - Evidence:
+- [ ] TEST-002-009 virtual scroll user test
+  - Evidence:
+- [ ] TEST-002-010 server mode user test
+  - Evidence:
+- [ ] TEST-002-011 merge user test
+  - Evidence:
+- [ ] TEST-002-012 theme switch user test
+  - Evidence:
+- [ ] TEST-002-013 export user test
+  - Evidence:
+
+### TEST-003 Visual Regression
+
+- [ ] TEST-003-001 basic grid snapshot
+  - Evidence:
+- [ ] TEST-003-002 header group snapshot
+  - Evidence:
+- [ ] TEST-003-003 header merge snapshot
+  - Evidence:
+- [ ] TEST-003-004 cell merge snapshot
+  - Evidence:
+- [ ] TEST-003-005 frozen columns snapshot
+  - Evidence:
+- [ ] TEST-003-006 filter menu snapshot
+  - Evidence:
+- [ ] TEST-003-007 editor snapshot
+  - Evidence:
+- [ ] TEST-003-008 context menu snapshot
+  - Evidence:
+- [ ] TEST-003-009 pagination snapshot
+  - Evidence:
+- [ ] TEST-003-010 themes snapshot
+  - Evidence:
+
+### TEST-004 Accessibility
+
+- [ ] TEST-004-001 axe scan basic
+  - Evidence:
+- [ ] TEST-004-002 keyboard-only navigation
+  - Evidence:
+- [ ] TEST-004-003 screen-reader labels smoke
+  - Evidence:
+- [ ] TEST-004-004 menu accessibility
+  - Evidence:
+- [ ] TEST-004-005 editor accessibility
+  - Evidence:
+- [ ] TEST-004-006 pagination accessibility
+  - Evidence:
+
+---
+
+## 14. Phase 13 — Performance / Memory
+
+### PERF-001 Benchmark Harness
+
+- [ ] PERF-001-001 benchmark app route 구성
+  - Evidence:
+- [ ] PERF-001-002 performance marker utility
+  - Evidence:
+- [ ] PERF-001-003 dataset generator
+  - Evidence:
+- [ ] PERF-001-004 mock server generator
+  - Evidence:
+- [ ] PERF-001-005 benchmark report format
+  - Evidence:
+
+### PERF-002 Rendering Performance
+
+- [ ] PERF-002-001 100K client rows smoke
+  - Evidence:
+- [ ] PERF-002-002 1M infinite rows mock
+  - Evidence:
+- [ ] PERF-002-003 10M server rows mock
+  - Evidence:
+- [ ] PERF-002-004 100M viewport rows mock
+  - Evidence:
+- [ ] PERF-002-005 horizontal virtualization 1K columns
+  - Evidence:
+- [ ] PERF-002-006 frozen + virtual scroll benchmark
+  - Evidence:
+- [ ] PERF-002-007 merge + virtual scroll benchmark
+  - Evidence:
+- [ ] PERF-002-008 scroll frame budget report
+  - Evidence:
+
+### PERF-003 Memory
+
+- [ ] PERF-003-001 mount/destroy 100 cycles leak test
+  - Evidence:
+- [ ] PERF-003-002 scroll 10,000 operations memory test
+  - Evidence:
+- [ ] PERF-003-003 server cache eviction memory test
+  - Evidence:
+- [ ] PERF-003-004 editor open/close memory test
+  - Evidence:
+- [ ] PERF-003-005 menu open/close memory test
+  - Evidence:
+
+---
+
+## 15. Phase 14 — Documentation
+
+### DOC-001 Intro / Getting Started
+
+- [ ] DOC-001-001 What is OneGrid
+  - Evidence:
+- [ ] DOC-001-002 Architecture overview
+  - Evidence:
+- [ ] DOC-001-003 Installation npm
+  - Evidence:
+- [ ] DOC-001-004 Installation CDN
+  - Evidence:
+- [ ] DOC-001-005 TypeScript setup
+  - Evidence:
+- [ ] DOC-001-006 Quick start vanilla
+  - Evidence:
+- [ ] DOC-001-007 Quick start React
+  - Evidence:
+- [ ] DOC-001-008 Quick start Vue
+  - Evidence:
+
+### DOC-002 API / Methods
+
+- [ ] DOC-002-001 GridOptions
+  - Evidence:
+- [ ] DOC-002-002 ColumnDef
+  - Evidence:
+- [ ] DOC-002-003 DataSource
+  - Evidence:
+- [ ] DOC-002-004 GridApi methods
+  - Evidence:
+- [ ] DOC-002-005 Events
+  - Evidence:
+- [ ] DOC-002-006 Plugins
+  - Evidence:
+- [ ] DOC-002-007 Theme API
+  - Evidence:
+- [ ] DOC-002-008 Security API
+  - Evidence:
+
+### DOC-003 Feature Docs
+
+- [ ] DOC-003-001 virtual scroll
+  - Evidence:
+- [ ] DOC-003-002 server mode
+  - Evidence:
+- [ ] DOC-003-003 pagination
+  - Evidence:
+- [ ] DOC-003-004 header group/merge
+  - Evidence:
+- [ ] DOC-003-005 cell merge
+  - Evidence:
+- [ ] DOC-003-006 filtering
+  - Evidence:
+- [ ] DOC-003-007 sorting
+  - Evidence:
+- [ ] DOC-003-008 editing
+  - Evidence:
+- [ ] DOC-003-009 selection
+  - Evidence:
+- [ ] DOC-003-010 summary
+  - Evidence:
+- [ ] DOC-003-011 grouping
+  - Evidence:
+- [ ] DOC-003-012 tree
+  - Evidence:
+- [ ] DOC-003-013 pivot
+  - Evidence:
+- [ ] DOC-003-014 export/import
+  - Evidence:
+- [ ] DOC-003-015 themes
+  - Evidence:
+- [ ] DOC-003-016 CSP/security
+  - Evidence:
+- [ ] DOC-003-017 performance
+  - Evidence:
+
+### DOC-004 Samples
+
+- [ ] DOC-004-001 example catalog page
+  - Evidence:
+- [ ] DOC-004-002 feature sample index
+  - Evidence:
+- [ ] DOC-004-003 enterprise scenario samples
+  - Evidence:
+- [ ] DOC-004-004 benchmark result page
+  - Evidence:
+
+---
+
+## 16. Phase 15 — Packaging / Distribution
+
+### PKG-001 Build Outputs
+
+- [ ] PKG-001-001 ESM build
+  - Evidence:
+- [ ] PKG-001-002 CJS build
+  - Evidence:
+- [ ] PKG-001-003 UMD build for CDN
+  - Evidence:
+- [ ] PKG-001-004 declaration files
+  - Evidence:
+- [ ] PKG-001-005 CSS build
+  - Evidence:
+- [ ] PKG-001-006 source maps
+  - Evidence:
+
+### PKG-002 Package Metadata
+
+- [ ] PKG-002-001 package exports field
+  - Evidence:
+- [ ] PKG-002-002 sideEffects field
+  - Evidence:
+- [ ] PKG-002-003 peerDependencies React
+  - Evidence:
+- [ ] PKG-002-004 peerDependencies Vue
+  - Evidence:
+- [ ] PKG-002-005 files whitelist
+  - Evidence:
+- [ ] PKG-002-006 license metadata
+  - Evidence:
+
+### PKG-003 CDN
+
+- [ ] PKG-003-001 CDN UMD smoke page
+  - Evidence:
+- [ ] PKG-003-002 CDN CSS smoke page
+  - Evidence:
+- [ ] PKG-003-003 CDN SRI guide
+  - Evidence:
+- [ ] PKG-003-004 CDN CSP guide
+  - Evidence:
+
+---
+
+## 17. Phase 16 — Release Hardening
+
+### REL-001 API Freeze
+
+- [ ] REL-001-001 public API inventory
+  - Evidence:
+- [ ] REL-001-002 API breaking risk review
+  - Evidence:
+- [ ] REL-001-003 API_CHANGELOG 정리
+  - Evidence:
+- [ ] REL-001-004 semver policy 확정
+  - Evidence:
+
+### REL-002 Compatibility
+
+- [ ] REL-002-001 browser compatibility matrix
+  - Evidence:
+- [ ] REL-002-002 React version compatibility
+  - Evidence:
+- [ ] REL-002-003 Vue version compatibility
+  - Evidence:
+- [ ] REL-002-004 TypeScript version compatibility
+  - Evidence:
+- [ ] REL-002-005 npm/CDN install test
+  - Evidence:
+
+### REL-003 Enterprise Scenario Acceptance
+
+- [ ] REL-003-001 financial transaction grid scenario
+  - Evidence:
+- [ ] REL-003-002 public procurement list scenario
+  - Evidence:
+- [ ] REL-003-003 large audit log scenario
+  - Evidence:
+- [ ] REL-003-004 editable approval workflow scenario
+  - Evidence:
+- [ ] REL-003-005 tree organization scenario
+  - Evidence:
+- [ ] REL-003-006 pivot/reporting scenario
+  - Evidence:
+
+### REL-004 Final Gates
+
+- [ ] REL-004-001 full lint pass
+  - Evidence:
+- [ ] REL-004-002 full typecheck pass
+  - Evidence:
+- [ ] REL-004-003 full unit test pass
+  - Evidence:
+- [ ] REL-004-004 full E2E pass
+  - Evidence:
+- [ ] REL-004-005 full visual pass
+  - Evidence:
+- [ ] REL-004-006 full a11y pass
+  - Evidence:
+- [ ] REL-004-007 full performance pass
+  - Evidence:
+- [ ] REL-004-008 docs build pass
+  - Evidence:
+- [ ] REL-004-009 examples catalog complete
+  - Evidence:
+- [ ] REL-004-010 release notes complete
+  - Evidence:
+
+---
+
+## 18. Risk / Decision Log
+
+작업 중 방향이 흔들릴 수 있는 결정은 여기에 기록한다.
+
+#### D-20260427-001 Core GridOptions에서 DOM mount target 분리
+
+- Date: 2026-04-27
+- Status: accepted
+- Context: ARCHITECT.md의 public API 초안은 `GridOptions.el?: HTMLElement`를 예시로 포함하지만, 같은 문서와 AGENTS.md는 `@onegrid/core`가 DOM API에 직접 의존하지 않아야 한다고 규정한다.
+- Decision: `@onegrid/core`의 `GridOptions<TData>`에는 DOM 타입을 두지 않고, `@onegrid/dom`에서 `DomGridOptions<TData> extends GridOptions<TData>`로 `el: HTMLElement`를 소유한다.
+- Alternatives: core `GridOptions`에 `HTMLElement` 유지 | core package가 DOM lib에 의존하게 되어 headless core 원칙과 충돌
+- Impact: Vanilla DOM mount API는 `@onegrid/dom`이 소유하고, React/Vue wrapper는 DOM mount target을 내부 bridge로만 전달한다.
+- Follow-up checklist items:
+  - C-001 Public Types
+  - DOM-001 Renderer Foundation
+  - WRAP-003 API Parity
+
+#### D-20260427-002 Docusaurus 3.10 / Node 23 build 호환 shim
+
+- Date: 2026-04-27
+- Status: accepted
+- Context: 현재 로컬 Node v23.10.0과 Docusaurus 3.10 조합에서 webpackbar progress plugin validation, generated registry의 `require.resolveWeak`, SSG CSS require 문제가 발생했다.
+- Decision: docs build에서 persistent webpack cache를 끄고, progress bar는 no-op `webpackbar` override로 대체하며, `.docusaurus` generated registry/client-modules에 한정한 loader로 weak preload id와 CSS require를 SSR-safe하게 치환한다.
+- Alternatives: Docusaurus build 실패를 허용 | `pnpm docs:build` 품질 명령을 만족하지 못함
+- Alternatives: Docusaurus를 제거하고 정적 문서만 생성 | Docusaurus 기반 문서 shell 요구와 충돌
+- Impact: 문서 shell build는 통과하지만, Docusaurus 업그레이드 시 shim 제거 가능성을 재검토해야 한다.
+- Follow-up: 2026-04-27 `onBrokenMarkdownLinks`를 `markdown.hooks.onBrokenMarkdownLinks`로 이동해 Docusaurus v4 대비 deprecation warning을 제거했다.
+- Follow-up checklist items:
+  - DOC-001 Intro / Getting Started
+  - DOC-002 API / Methods
+  - REL-002 Compatibility
+
+#### R-20260429-001 DOM OneGrid lifecycle file split 필요
+
+- Date: 2026-04-29
+- Status: mitigated
+- Context: F-SORT 구현으로 `packages/dom/src/grid/OneGrid.ts`가 정렬 상태, 원격 row model reset, scroll runtime, render commit lifecycle을 함께 보유하면서 577 LOC가 되었다. F-FILTER 구현으로 filter runtime, quick filter focus restoration, distinct value request bridge가 같은 lifecycle에 연결되어 737 LOC가 되었다. F-EDIT 구현은 editor overlay를 별도 파일로 분리했지만 active edit state, client row commit, API start/stop bridge가 동일 lifecycle에 연결되어 `OneGrid.ts`가 1029 LOC가 되었다. F-SELECT 구현은 selection runtime을 별도 파일로 분리했지만 selection state, public API bridge, event emission이 동일 lifecycle에 연결되어 `OneGrid.ts`가 1238 LOC가 되었다. F-EDIT batch commit/pending history API 추가 후 staged row restore, final commit emission, pending edit query까지 같은 lifecycle 경계에 머물러 `OneGrid.ts`가 1548 LOC가 되었다. 파일은 이미 이전 단계에서 권장 LOC를 초과한 상태였고, 이번 변경은 정렬/필터/편집/선택/원격 row model reset 동작을 안정화하기 위해 동일 lifecycle 경계 안에서 최소 변경으로 연결했다.
+- Risk: DOM renderer lifecycle이 계속 커지면 sort/filter/pagination/editing 추가 시 유지보수성과 리뷰 가능성이 낮아진다.
+- Mitigation: 다음 DOM renderer 정리 단계에서 row model lifecycle, scroll runtime, feature runtime(sort/filter/editing/selection)를 별도 controller 모듈로 분리한다. public API는 바꾸지 않는다.
+- Mitigation update: 2026-04-30 LOC 정리 패스에서 keyboard focus navigation, render shell data helpers, batch edit pending state를 분리했다. `packages/dom/src/grid/OneGrid.ts`는 1549 LOC에서 1459 LOC로 낮아졌지만 여전히 기준 초과이므로 row model lifecycle, feature runtime factory, public API bridge 분리를 다음 전용 정리 작업으로 유지한다.
+- Mitigation update: 2026-04-30 후속 LOC 정리 패스에서 `OneGrid.ts`를 public export entry로 축소하고 DOM lifecycle을 `oneGridBase`, `oneGridRows`, `oneGridSortingFiltering`, `oneGridSelection`, `oneGridEditStore`, `oneGridEditing`, `oneGridTypes`로 분리했다. renderer source 파일은 모두 400 LOC 이하로 내려갔고 public API 이름은 유지했다.
+- Evidence:
+  - packages/dom/src/grid/OneGrid.ts
+  - packages/dom/src/grid/oneGridBase.ts
+  - packages/dom/src/grid/oneGridRows.ts
+  - packages/dom/src/grid/oneGridSortingFiltering.ts
+  - packages/dom/src/grid/oneGridSelection.ts
+  - packages/dom/src/grid/oneGridEditStore.ts
+  - packages/dom/src/grid/oneGridEditing.ts
+  - packages/dom/src/grid/oneGridTypes.ts
+  - packages/dom/src/grid/gridFocus.ts
+  - packages/dom/src/grid/gridFocusNavigation.ts
+  - packages/dom/src/grid/renderGridShell.ts
+  - packages/dom/src/grid/renderGridData.ts
+  - packages/dom/src/grid/renderGridTypes.ts
+  - packages/dom/src/grid/editBatchRuntime.ts
+  - apps/examples/src/features/basic/vanilla.ts
+  - apps/examples/src/features/client-row-model/vanilla.ts
+  - apps/examples/src/features/column-model/vanilla.ts
+  - apps/examples/src/features/column-ui/vanilla.ts
+  - apps/examples/src/features/filtering/vanilla.ts
+  - apps/examples/src/features/group-header/vanilla.ts
+  - apps/examples/src/features/infinite-row-model/vanilla.ts
+  - apps/examples/src/features/sorting/vanilla.ts
+- Verified:
+  - pnpm typecheck
+  - pnpm lint
+  - pnpm test:unit
+  - pnpm test:e2e
+  - pnpm test:a11y
+  - pnpm test:perf:smoke
+  - pnpm build
+  - pnpm docs:build
+- Follow-up checklist items:
+  - 향후 DOM 기능 추가 시 같은 controller 경계를 유지한다.
+
+#### R-20260429-002 Vue wrapper bridge file split 필요
+
+- Date: 2026-04-29
+- Status: mitigated
+- Context: F-SELECT에서 Vue wrapper에 shared `selection` prop과 selection API expose를 추가하면서 `packages/vue/src/OneGrid.ts`가 397 LOC가 되었다. wrapper는 core 기능을 재구현하지 않고 DOM bridge만 보유하지만, prop/expose/toGridOptions mapping이 한 파일에 누적되고 있다.
+- Risk: wrapper prop bridge가 계속 커지면 React/Vue API parity 검토와 wrapper lifecycle 리뷰가 어려워진다.
+- Mitigation: 2026-04-30 LOC 정리 패스에서 option normalization을 `packages/vue/src/gridOptions.ts`로 분리해 `packages/vue/src/OneGrid.ts`를 264 LOC로 낮췄다. public wrapper API 의미는 유지한다.
+- Evidence:
+  - packages/vue/src/OneGrid.ts
+  - packages/vue/src/gridOptions.ts
+- Verified:
+  - pnpm typecheck
+  - pnpm lint
+  - pnpm test:unit
+  - pnpm test:e2e
+  - pnpm test:a11y
+  - pnpm build
+  - pnpm docs:build
+- Follow-up checklist items:
+  - WRAP-002 Vue Wrapper
+  - WRAP-003 API Parity
+
+### Decision Template
+
+```md
+#### D-YYYYMMDD-001 제목
+
+- Date:
+- Status: proposed | accepted | rejected | superseded
+- Context:
+- Decision:
+- Alternatives:
+- Impact:
+- Follow-up checklist items:
+```
+
+### Risk Template
+
+```md
+#### R-YYYYMMDD-001 제목
+
+- Date:
+- Severity: low | medium | high | critical
+- Area:
+- Description:
+- Impact:
+- Mitigation:
+- Owner:
+- Status:
+```
+
+---
+
+## 19. Feature Completion Template
+
+기능 완료 시 아래 형식으로 추가 기록한다.
+
+```md
+### Completed Feature: F-XXXX
+
+- Date:
+- Implemented by:
+- Evidence:
+  - Core:
+  - DOM:
+  - React:
+  - Vue:
+  - Example:
+  - E2E:
+  - Visual:
+  - Docs:
+- Commands verified:
+  - pnpm lint
+  - pnpm typecheck
+  - pnpm test:unit -- ...
+  - pnpm test:e2e -- ...
+- Notes:
+```
+
+---
+
+## 20. 1.0 Release Definition
+
+OneGrid 1.0은 아래가 모두 체크된 후에만 릴리즈한다.
+
+- [ ] Governance 문서 완료
+- [ ] 패키지 구조 완료
+- [ ] core contracts 완료
+- [ ] row models 완료
+- [ ] layout/virtualization 완료
+- [ ] header/cell merge 완료
+- [ ] enterprise feature set 완료
+- [ ] pagination modes 완료
+- [ ] security/CSP 완료
+- [ ] themes/customization 완료
+- [ ] React/Vue wrappers 완료
+- [ ] examples 전체 완료
+- [ ] Playwright E2E 완료
+- [ ] visual regression 완료
+- [ ] accessibility 완료
+- [ ] performance/memory 완료
+- [ ] Docusaurus docs 완료
+- [ ] npm/CDN packaging 완료
+- [ ] release hardening 완료

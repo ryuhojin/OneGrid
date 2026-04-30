@@ -1,0 +1,460 @@
+# GridOptions
+
+`GridOptions<TData>` is exported from `@onegrid/core` and contains shared grid configuration for
+core, DOM, React, and Vue. DOM mount targets are intentionally kept in `@onegrid/dom` as
+`DomGridOptions<TData>` so core remains browser-independent.
+
+Column UI options are shared across DOM, React, and Vue:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  columnUi: {
+    resize: true,
+    autoSize: true,
+    reorder: true,
+    menu: true,
+    toolPanel: true
+  }
+};
+```
+
+`columnState` can be supplied by renderers or persisted application state when column width,
+visibility, order, or pinning should be restored.
+
+Client row model inputs are supplied through the existing row options:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  filtering: { model: filterModel },
+  sorting: { model: sortModel },
+  grouping: { model: groupModel },
+  aggregation: { model: aggregateModel }
+};
+```
+
+When `serverOnly` is enabled on a row option, the DOM renderer does not apply that client-side model.
+
+Sorting options control the shared `SortModel[]` used by client, infinite, server, and viewport row
+models:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowModel: "client",
+  sorting: {
+    enabled: true,
+    multiSort: true,
+    sortOrder: ["asc", "desc", null],
+    model: [{ field: "amount", direction: "desc" }]
+  }
+};
+```
+
+`multiSort` enables Shift-click additive sorting in the DOM renderer. `serverOnly` prevents client
+row sorting while preserving the model for data-source requests.
+
+Filtering options control the shared `FilterModel` used by quick filter, column menu filters, and
+row model requests:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowModel: "client",
+  filtering: {
+    enabled: true,
+    quickFilter: true,
+    model: {
+      quickText: "office",
+      conditions: [{ field: "status", kind: "set", operator: "in", value: ["Approved"] }]
+    }
+  }
+};
+```
+
+`serverOnly` prevents client filtering while preserving the model for `DataSource.getRows`.
+
+Grouping options control the shared `GroupModel` used by client and server row models:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  grouping: {
+    enabled: true,
+    footer: "bottom",
+    model: {
+      fields: ["region"],
+      expandedKeys: ["group:region=Seoul"]
+    }
+  },
+  aggregation: { model: aggregateModel }
+};
+```
+
+`footer: "bottom"` renders group footer rows with aggregate values. `api.expandGroup()`,
+`api.collapseGroup()`, and `api.toggleGroup()` update the same group model at runtime. In server
+row models, expanding a group updates `server.groupKeys` for the next data-source request.
+
+Editing options control lifecycle policy while column definitions own individual editor kinds,
+parsers, validators, and value setters:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  editing: {
+    enabled: true,
+    commitMode: "batch",
+    blurAction: "cancel",
+    validateOnCommit: true
+  }
+};
+```
+
+The DOM renderer starts editing from Enter, F2, printable keys, double click, or
+`GridApi.startEdit()`. `blurAction` controls whether focus loss commits or cancels the editor.
+`commitMode: "batch"` stores accepted values in pending edit history until
+`GridApi.commitPendingEdits()` finalizes them; `GridApi.cancelPendingEdits()` restores the previous
+values.
+`commitOnBlur` remains supported as a legacy boolean alias, but `blurAction` is preferred for new
+code. React and Vue pass the same `editing` option through to the DOM renderer.
+
+Selection options control the shared `GridSelectionState` used by pointer, checkbox, keyboard, and
+API-driven selection:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  selection: {
+    mode: "range",
+    multiple: true,
+    checkbox: true,
+    selectAll: "server",
+    serverSelectionToken: "orders"
+  }
+};
+```
+
+`selectAll: "visible"` selects only rendered row keys. `selectAll: "server"` creates a token from
+the current row model, filter model, sort model, and snapshot version without loading the whole
+dataset into the client.
+
+Clipboard options enable browser text/plain copy/paste without exposing HTML from renderers:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  selection: { mode: "range", multiple: true },
+  editing: { enabled: true, validateOnCommit: true },
+  clipboard: {
+    enabled: true,
+    includeHeaders: true,
+    preserveMerge: true
+  }
+};
+```
+
+`includeHeaders` controls the default header row for copy operations. `preserveMerge` writes merge
+anchor values once and blank cells for covered coordinates.
+
+Menu options control row and cell context menu items while header menu availability remains under
+`columnUi.menu`:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  columnUi: { menu: true, resize: true, autoSize: true },
+  filtering: { enabled: true },
+  clipboard: { enabled: true },
+  contextMenu: {
+    enabled: true,
+    defaultItems: ["copyCell", "copyRow", "copyWithHeaders", "startEdit"],
+    items: ({ row }) => [
+      { id: "flag", label: `Flag ${row.id}`, scope: "row" }
+    ]
+  }
+};
+```
+
+Context menus open from body cells through right click, `Shift+F10`, or the Context Menu key.
+Custom items receive `ContextMenuContext<TData>` with row, row key, field, column, and value data.
+
+Infinite row model options are configured separately from `data` because rows are requested through
+`DataSource.getRows` blocks:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  rowModel: "infinite",
+  dataSource,
+  infinite: {
+    blockSize: 100,
+    maxBlocksInCache: 10,
+    initialRowCount: 1_000_000
+  }
+};
+```
+
+Server row model options keep browser execution separate from server execution. Sort, filter,
+group, aggregate, and pivot models are sent to `DataSource.getRows`:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  rowKey: "id",
+  rowModel: "server",
+  dataSource,
+  server: { pageSize: 100, initialPage: 0 },
+  sorting: { serverOnly: true, model: sortModel },
+  filtering: { serverOnly: true, model: filterModel },
+  grouping: { serverOnly: true, model: groupModel },
+  aggregation: { serverOnly: true, model: aggregateModel },
+  pivot: { serverOnly: true, model: pivotModel }
+};
+```
+
+Client pivot uses the same model but executes in `@onegrid/core` against the filtered client row
+set:
+
+```ts
+const pivotModel = {
+  rows: ["region", "agency"],
+  columns: ["quarter"],
+  values: [
+    { field: "amount", function: "sum", alias: "amountTotal", label: "Amount" },
+    { field: "budget", function: "avg", alias: "avgBudget", label: "Avg budget" }
+  ],
+  totals: "both",
+  subtotals: true
+};
+
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowModel: "client",
+  pivot: {
+    enabled: true,
+    panel: true,
+    model: pivotModel
+  }
+};
+```
+
+Pagination options keep UI state one-based while server requests remain zero-based:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  rowKey: "id",
+  rowModel: "server",
+  dataSource,
+  pagination: {
+    mode: "server",
+    position: "bottom",
+    page: 1,
+    pageSize: 100,
+    pageSizeOptions: [50, 100, 250],
+    pageGroupSize: 5
+  }
+};
+```
+
+For cursor pagination, set `pagination.mode: "cursor"` and optionally provide the first
+`cursor`. `DataSource.getRows` receives `request.cursor`, and `nextCursor` from the result is
+stored for the next page.
+
+Viewport row model options describe the synchronized row window. The browser renders only the
+current viewport entries while the data source owns the full row count:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  rowKey: "id",
+  rowModel: "viewport",
+  dataSource,
+  viewport: {
+    rowHeight: 30,
+    viewportSize: 20,
+    overscan: 2,
+    prefetchRows: 40,
+    maxCachedRanges: 4,
+    initialRowCount: 10_000_000
+  }
+};
+```
+
+Tree row model options define the hierarchy contract and selection policy:
+
+```ts
+const options: GridOptions<TreeRow> = {
+  columns,
+  data,
+  dataSource,
+  rowKey: "id",
+  rowModel: "tree",
+  tree: {
+    treeColumnField: "name",
+    childrenField: "children",
+    hasChildrenField: "hasChildren",
+    indentSize: 22,
+    expandedKeys: ["FIN"],
+    filterPolicy: "withAncestors",
+    sortPolicy: "siblings",
+    selection: { policy: "descendants" }
+  }
+};
+```
+
+Use `tree.serverOnly: true` when `DataSource.getChildren()` owns child filtering and
+sibling sorting. Lazy child requests receive the current `filtering.model` and
+`sorting.model`.
+
+Base layout options define renderer sizing and summary/footer layout without adding DOM
+dependencies to core:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  layout: {
+    width: "100%",
+    height: 360,
+    bodyHeight: 360
+  },
+  summary: {
+    enabled: true,
+    position: "bottom",
+    sticky: true
+  }
+};
+```
+
+Pinned panes are driven by column definitions or `columnState`:
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  { field: "id", pinned: "left" },
+  { field: "amount", summary: "sum" },
+  { field: "status", pinned: "right" }
+];
+```
+
+Summary rows are driven by `ColumnDef.summary` and can be rendered at the top, bottom, or both
+positions:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns: [
+    { field: "id", summary: { kind: "count", label: "Rows" } },
+    { field: "amount", summary: { kind: "sum", aggregateKey: "amountTotal", label: "Total" } },
+    { field: "region", summary: { kind: "distinct-count", label: "Regions" } }
+  ],
+  data,
+  rowKey: "id",
+  summary: { enabled: true, position: "both", sticky: true },
+  aggregation: {
+    model: {
+      fields: [{ field: "amount", function: "sum", alias: "amountTotal" }]
+    }
+  }
+};
+```
+
+`SummaryDef.aggregateKey` maps a summary cell to `DataSource.getRows().aggregate.values` in server
+row models. `SummaryDef.label` sets the visible label inside the summary cell. Client summaries are
+calculated from the filtered row set.
+
+Row virtualization options bound rendered DOM rows to viewport size plus overscan. `segmented`
+scroll configuration is used by large logical row ranges and does not imply that client mode should
+hold 10M to 100M rows in memory:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  rowHeight: 32,
+  virtualization: {
+    enabled: true,
+    rowHeight: 32,
+    overscan: { before: 3, after: 5 },
+    maxDomRows: 64,
+    segmented: true,
+    maxScrollHeight: 24_000_000
+  }
+};
+```
+
+Column virtualization is nested under `virtualization.columns` and applies to the center pane.
+Pinned left and right columns remain outside the horizontal virtual window:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  virtualization: {
+    enabled: true,
+    columns: {
+      enabled: true,
+      overscan: { before: 1, after: 2 },
+      maxDomColumns: 10
+    }
+  }
+};
+```
+
+Cell merge layout is enabled through `merge`. Individual columns opt into value/custom merge, and
+server row models can return `mergeMeta` from `DataSource.getRows`:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  rowKey: "id",
+  rowModel: "server",
+  dataSource,
+  merge: {
+    enabled: true,
+    getSpan: ({ row, field }) =>
+      field === "memo" && row.memoSpan ? { rowSpan: 1, colSpan: 2 } : undefined
+  }
+};
+```
+
+Accessibility options are shared across DOM, React, and Vue. They provide the grid label,
+optional description, and live region politeness without requiring wrapper-specific APIs:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  accessibility: {
+    label: "Orders grid",
+    description: "Keyboard navigable order status data.",
+    liveRegion: "polite"
+  }
+};
+```

@@ -1,0 +1,12 @@
+# Vanilla Quick Start
+
+```ts
+import { OneGrid } from "@onegrid/dom";
+import "@onegrid/themes/default.css";
+
+new OneGrid({
+  el: document.getElementById("grid")!,
+  columns: [{ field: "id", headerName: "ID" }],
+  data: [{ id: "ORD-1001" }]
+});
+```

@@ -1,0 +1,40 @@
+# Base Layout
+
+`LAY-001` establishes the DOM layout contract used by later virtualization, merge, editor,
+selection, and overlay features. The renderer splits the grid into stable sections and panes:
+
+- `header`, `body`, `summary`, `footer`, and `overlay`
+- pinned `left`, scrollable `center`, and pinned `right` panes
+- a dedicated `body` viewport that owns vertical row scrolling while header/footer remain grid chrome
+- summary cells calculated from column `summary` definitions
+- a host `ResizeObserver` that updates layout size metadata without exposing DOM dependencies in core
+
+```ts
+import { OneGrid } from "@onegrid/dom";
+
+new OneGrid({
+  el,
+  columns: [
+    { field: "id", pinned: "left", width: 104 },
+    { field: "amount", summary: "sum", width: 140 },
+    { field: "tax", summary: "sum", width: 120 },
+    { field: "status", pinned: "right", width: 132 }
+  ],
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  layout: {
+    width: "100%",
+    height: 360,
+    bodyHeight: 360
+  },
+  summary: {
+    enabled: true,
+    position: "bottom",
+    sticky: true
+  }
+});
+```
+
+The base layout intentionally does not implement row or column virtualization. Those are layered on
+top of this contract in `LAY-002` and `LAY-003`.

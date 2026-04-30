@@ -1,0 +1,44 @@
+---
+title: Infinite Row Model
+---
+
+# Infinite Row Model
+
+`ROW-002` introduces the block-based `InfiniteRowModel` foundation. It never requires a full client
+array for large datasets. The model requests row blocks from a `DataSource`, caches loaded blocks,
+deduplicates concurrent requests, cancels stale requests, evicts old blocks, and exposes skeleton
+entries while rows are loading.
+
+```ts
+import { InfiniteRowModel } from "@onegrid/core";
+
+const model = new InfiniteRowModel({
+  dataSource,
+  blockSize: 100,
+  maxBlocksInCache: 10,
+  initialRowCount: 1_000_000
+});
+
+await model.loadNextAppendBlock();
+model.getAppendRows();
+```
+
+DOM, React, and Vue use the same `GridOptions` contract:
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  rowModel: "infinite",
+  dataSource,
+  infinite: {
+    blockSize: 100,
+    maxBlocksInCache: 10,
+    initialRowCount: 1_000_000
+  }
+});
+```
+
+The `DataSource.getRows` request uses `rowModel: "infinite"` with `startRow`, `endRow`, and a
+cancellable `signal`. The example route `ROW-002` renders a million logical rows through generated
+server blocks and loading skeleton rows.

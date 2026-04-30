@@ -1,0 +1,11 @@
+<div id="client-row-model-example"></div>
+<script type="module">
+  import { mountClientRowModelExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#client-row-model-example");
+  if (!host) {
+    throw new Error("Client row model example host was not found.");
+  }
+
+  mountClientRowModelExample(host);
+</script>

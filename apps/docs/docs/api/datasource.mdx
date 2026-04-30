@@ -1,0 +1,61 @@
+# DataSource
+
+`DataSource<TData>` provides `getRows(request)` for server, infinite, and viewport row models.
+Requests carry sort, filter, group, pivot, aggregate, viewport, and cancellation metadata.
+Pagination requests also carry `page`, `pageSize`, and optionally `cursor`.
+
+`getDistinctValues(request)` is optional and powers set filters for remote row models:
+
+```ts
+const dataSource: DataSource<OrderRow> = {
+  async getRows(request) {
+    return fetchRows({
+      startRow: request.startRow,
+      endRow: request.endRow,
+      sortModel: request.sortModel,
+      filterModel: request.filterModel
+    });
+  },
+  async getDistinctValues(request) {
+    return {
+      values: await fetchDistinctValues(request.field, request.filterModel)
+    };
+  }
+};
+```
+
+Cursor pagination stores `nextCursor` from each result and sends it on the next page request:
+
+```ts
+const dataSource: DataSource<OrderRow> = {
+  async getRows(request) {
+    const result = await fetchCursorPage({
+      cursor: request.cursor,
+      limit: request.pageSize ?? 100
+    });
+    return {
+      rows: result.rows,
+      rowCount: result.totalCount,
+      nextCursor: result.nextCursor,
+      hasMore: result.nextCursor !== undefined
+    };
+  }
+};
+```
+
+Server responses can include `mergeMeta` when the backend owns merge calculation:
+
+```ts
+return {
+  rows,
+  rowCount,
+  mergeMeta: [
+    {
+      anchor: { rowIndex: 4, rowKey: "ORD-0005", field: "status" },
+      rowSpan: 2,
+      colSpan: 1,
+      value: "Server hold"
+    }
+  ]
+};
+```

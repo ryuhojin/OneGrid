@@ -1,0 +1,51 @@
+---
+title: Client Row Model
+---
+
+# Client Row Model
+
+`ROW-001` introduces the client-side row pipeline in `@onegrid/core`. It is DOM-independent and
+normalizes row identity before applying filter, sort, group, and aggregate models.
+
+```ts
+import { createClientRowModel } from "@onegrid/core";
+
+const model = createClientRowModel(rows, {
+  rowKey: "id",
+  filterModel: {
+    conditions: [{ field: "status", kind: "set", operator: "in", value: ["Approved"] }]
+  },
+  sortModel: [{ field: "amount", direction: "desc" }],
+  groupModel: { fields: ["region"], expandedKeys: ["group:region=Seoul"] },
+  aggregateModel: {
+    fields: [{ field: "amount", function: "sum", alias: "amountTotal" }]
+  }
+});
+```
+
+The DOM, React, and Vue integrations receive the same model through `GridOptions`:
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data: rows,
+  rowKey: "id",
+  rowModel: "client",
+  filtering: { model: filterModel },
+  sorting: { model: sortModel },
+  grouping: { model: groupModel },
+  aggregation: { model: aggregateModel }
+});
+```
+
+The foundation supports:
+
+- stable row identity from `rowKey`
+- `setClientRows`, `appendClientRows`, `updateClientRows`, and `removeClientRows`
+- client filter conditions and quick text
+- multi-column sort model
+- expanded grouped row entries
+- aggregate values for the filtered set and each group
+
+The executable example is available as `ROW-001` in the examples app.

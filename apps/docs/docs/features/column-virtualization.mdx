@@ -1,0 +1,38 @@
+# Column Virtualization
+
+`LAY-003` adds the horizontal virtualization baseline for wide enterprise grids. The DOM renderer
+keeps pinned left and right panes mounted, while the center pane renders only the visible column
+window plus overscan.
+
+```ts
+import { OneGrid } from "@onegrid/dom";
+
+const grid = new OneGrid({
+  el,
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  layout: { width: "100%", height: 392, bodyHeight: 392 },
+  virtualization: {
+    enabled: true,
+    columns: {
+      enabled: true,
+      overscan: { before: 1, after: 2 },
+      maxDomColumns: 10
+    }
+  }
+});
+```
+
+The public DOM instance exposes `scrollToColumn(field, align)` for controlled horizontal
+navigation:
+
+```ts
+await grid.scrollToColumn("metric32", "start");
+```
+
+Group headers are clipped in `@onegrid/core` before DOM rendering, so a group that spans outside
+the current virtual range keeps a correct local `aria-colspan` and visual width. Column
+virtualization does not move pinned columns into the center pane; left and right panes stay
+separate so pinned borders, shadows, and accessibility column indexes remain stable.

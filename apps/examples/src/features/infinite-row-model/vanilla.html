@@ -1,0 +1,11 @@
+<div id="infinite-row-model-example"></div>
+<script type="module">
+  import { mountInfiniteRowModelExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#infinite-row-model-example");
+  if (!host) {
+    throw new Error("Infinite row model example host was not found.");
+  }
+
+  mountInfiniteRowModelExample(host);
+</script>

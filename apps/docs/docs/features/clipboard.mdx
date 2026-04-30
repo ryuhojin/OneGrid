@@ -1,0 +1,34 @@
+# Clipboard
+
+`F-CLIP` adds text/plain clipboard support for selected cells, selected rows, optional headers,
+paste validation, and merge-aware copy/paste. Core owns TSV serialization and paste planning; the
+DOM renderer owns browser `copy`/`paste` events, current selection mapping, and editor validation.
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  selection: { mode: "range", multiple: true, checkbox: true },
+  editing: { enabled: true, validateOnCommit: true },
+  merge: { enabled: true },
+  clipboard: {
+    enabled: true,
+    includeHeaders: false,
+    preserveMerge: true
+  }
+});
+```
+
+Users can copy with keyboard shortcuts when a grid cell is focused. Applications can also call
+`api.copyToClipboard({ includeHeaders: true })`. Paste uses plain text only and routes through the
+same editor parser and validator used by normal editing.
+
+When `preserveMerge` is enabled, merge anchors are copied once and covered cells are emitted as
+blank TSV cells. Pasting into a covered merged cell routes the value back to the merge anchor so
+selection, editing, and merge layout use the same coordinate contract.
+
+The executable example is available as `F-CLIP` in the examples app and includes vanilla, React,
+and Vue variants.

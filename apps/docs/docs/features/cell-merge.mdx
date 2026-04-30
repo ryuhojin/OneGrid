@@ -1,0 +1,41 @@
+# Cell Merge Layout
+
+`LAY-004` introduces the first body cell merge layout contract. Merge calculation lives in
+`@onegrid/core`; the DOM renderer consumes the resulting span map and renders anchors plus
+covered-cell placeholders.
+
+```ts
+import { OneGrid } from "@onegrid/dom";
+
+const grid = new OneGrid({
+  el,
+  columns: [
+    { field: "region", merge: { mode: "value" } },
+    {
+      field: "memo",
+      merge: {
+        mode: "custom",
+        colSpan: ({ row }) => row.memoSpan ? 2 : 1
+      }
+    }
+  ],
+  rowKey: "id",
+  rowModel: "server",
+  dataSource,
+  merge: { enabled: true }
+});
+```
+
+Supported merge sources:
+
+- value merge for contiguous equal values in opt-in columns
+- custom merge callbacks through `ColumnDef.merge` or `GridOptions.merge.getSpan`
+- server supplied `GetRowsResult.mergeMeta`
+
+The span model also exposes anchor resolution and range expansion helpers so later selection,
+editing, clipboard, and export work can route covered cells back to their anchor without
+duplicating renderer logic.
+
+Pinned panes and virtual windows receive clipped span cells. A span that begins outside the
+current visible row or column window is rendered from the first visible covered cell with
+`aria-rowspan` and `aria-colspan` adjusted to the clipped window.

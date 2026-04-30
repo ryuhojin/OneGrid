@@ -1,0 +1,27 @@
+{
+  "name": "@onegrid/examples",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --host 127.0.0.1",
+    "typecheck": "tsc -b tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@onegrid/core": "workspace:*",
+    "@onegrid/dom": "workspace:*",
+    "@onegrid/pagination": "workspace:*",
+    "@onegrid/react": "workspace:*",
+    "@onegrid/themes": "workspace:*",
+    "@onegrid/vue": "workspace:*",
+    "react": "latest",
+    "react-dom": "latest",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "@vitejs/plugin-vue": "latest",
+    "vite": "latest"
+  }
+}

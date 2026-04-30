@@ -1,0 +1,60 @@
+# Summary And Aggregation
+
+`F-SUMMARY` renders summary rows from `ColumnDef.summary` and sends aggregate requests through
+`GridOptions.aggregation`. Core owns summary calculation; the DOM renderer owns placement in the
+grid layout.
+
+```ts
+new OneGrid({
+  el,
+  columns: [
+    { field: "id", headerName: "ID", summary: { kind: "count", label: "Rows" } },
+    {
+      field: "amount",
+      headerName: "Amount",
+      summary: { kind: "sum", aggregateKey: "amountTotal", label: "Total" }
+    },
+    { field: "spent", headerName: "Avg spent", summary: { kind: "avg", label: "Avg" } },
+    { field: "riskScore", headerName: "Min risk", summary: { kind: "min", label: "Min" } },
+    { id: "max-risk", field: "riskScore", headerName: "Max risk", summary: { kind: "max", label: "Max" } },
+    { field: "region", headerName: "Regions", summary: { kind: "distinct-count", label: "Regions" } },
+    {
+      field: "status",
+      headerName: "Status",
+      summary: {
+        kind: "custom",
+        label: "Reviews",
+        calculate: (rows) => rows.filter((row) => row.status === "Review").length
+      }
+    }
+  ],
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  summary: { enabled: true, position: "top", sticky: true }
+});
+```
+
+Built-in summary kinds are:
+
+- `sum`
+- `avg`
+- `min`
+- `max`
+- `count`
+- `distinct-count`
+
+For client row models, summaries are calculated from the filtered row set, not only from the
+currently rendered DOM window. For grouped client rows, `aggregation.model` supplies group
+aggregate values rendered in group row labels.
+
+For server row models, `DataSource.getRows()` can return `aggregate.values`. `SummaryDef.aggregateKey`
+maps a summary cell to a server-supplied value so the browser does not need to scan the complete
+remote dataset.
+
+`SummaryDef.label` controls the visible label rendered inside the summary cell. Use it when the
+column header alone does not make the aggregate intent clear, for example `Rows 8`, `Total 5690`,
+or `Reviews 3`.
+
+The executable example is available as `F-SUMMARY` in the examples app and includes vanilla,
+React, and Vue variants.

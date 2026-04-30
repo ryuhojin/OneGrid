@@ -1,0 +1,44 @@
+{
+  "name": "onegrid",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Enterprise-grade frontend data grid monorepo.",
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "turbo run typecheck",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:e2e": "playwright test --config playwright.config.ts tests/e2e/features --project=chromium",
+    "test:e2e:visual": "playwright test --config playwright.config.ts tests/e2e/visual --project=chromium",
+    "test:a11y": "playwright test --config playwright.config.ts tests/a11y --project=chromium",
+    "test:perf:smoke": "vitest run --config vitest.config.ts tests/perf",
+    "build": "turbo run build",
+    "docs:build": "pnpm --filter @onegrid/docs build"
+  },
+  "devDependencies": {
+    "@changesets/cli": "latest",
+    "@eslint/js": "latest",
+    "@playwright/test": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "@vitejs/plugin-vue": "latest",
+    "axe-core": "^4.11.3",
+    "eslint": "latest",
+    "globals": "latest",
+    "jsdom": "latest",
+    "prettier": "latest",
+    "turbo": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "latest",
+    "vite": "latest",
+    "vitest": "latest"
+  },
+  "pnpm": {
+    "overrides": {
+      "webpackbar": "file:tools/webpackbar-noop"
+    }
+  }
+}
