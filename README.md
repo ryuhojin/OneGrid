@@ -1,32 +1,70 @@
-# OneGrid
+<div align="center">
 
-Enterprise-grade data grid foundation for high-volume business applications.
+# ⚡ OneGrid
 
-OneGrid is a TypeScript-first frontend data grid platform designed for financial,
-public-sector, and SI environments where large data, security policy, accessibility,
-and long-term maintainability matter as much as the initial UI.
+### Enterprise-grade data grid foundation for high-volume business applications
 
-> Status: pre-1.0 development. The repository is building toward a commercial
-> OneGrid 1.0 release with vanilla JavaScript, React, Vue, npm, and CDN targets.
+OneGrid is a TypeScript-first frontend grid platform for financial, public-sector,
+and SI environments where scale, security, accessibility, and long-term
+maintainability are first-class requirements.
 
-## Why OneGrid
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Monorepo](https://img.shields.io/badge/Monorepo-pnpm-0B1220?style=for-the-badge&logo=pnpm&logoColor=F69220)
+![React](https://img.shields.io/badge/React-wrapper-61DAFB?style=for-the-badge&logo=react&logoColor=0B1220)
+![Vue](https://img.shields.io/badge/Vue-wrapper-42B883?style=for-the-badge&logo=vuedotjs&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-tested-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)
+![Status](https://img.shields.io/badge/Status-pre--1.0-FFB020?style=for-the-badge)
+
+**Vanilla JS · TypeScript · React · Vue · npm/CDN-ready architecture**
+
+</div>
+
+> 🚧 **Status:** pre-1.0 development. The repository is building toward a
+> commercial OneGrid 1.0 release.
+
+---
+
+## ✨ Preview
+
+| Column Virtualization | Pivot | Pagination |
+| --- | --- | --- |
+| ![Column virtualization](docs/assets/readme/onegrid-column-virtualization.png) | ![Pivot](docs/assets/readme/onegrid-pivot.png) | ![Pagination](docs/assets/readme/onegrid-pagination.png) |
+
+---
+
+## 🧭 Why OneGrid
 
 OneGrid is not a table widget. It is a layered grid engine with separated core
 logic, DOM rendering, framework wrappers, examples, documentation, and verification
 assets.
 
-- Headless `@onegrid/core` for row, column, state, event, merge, sort, filter,
-  selection, editing, grouping, aggregation, tree, pivot, and server contracts.
-- DOM renderer in `@onegrid/dom` with pinned panes, virtualized body and columns,
-  keyboard focus, overlays, menus, editors, scrollbars, and ARIA semantics.
-- First-class wrappers for React and Vue without reimplementing core behavior.
-- Large-data row models for client, infinite, server, viewport, and tree use cases.
-- Security-oriented rendering defaults: escaped text, sanitizer-ready HTML paths,
-  CSP-conscious styling, and no `eval`/`new Function` design.
-- Real browser validation through Playwright E2E, accessibility, visual, and
-  performance smoke tests.
+| Area | What OneGrid Provides |
+| --- | --- |
+| 🧠 Core engine | DOM-free row, column, state, event, merge, sort, filter, selection, editing, grouping, aggregation, tree, pivot, and server contracts |
+| 🖥 DOM renderer | Pinned panes, virtualized body/columns, keyboard focus, overlays, menus, editors, scrollbars, and ARIA semantics |
+| ⚛ React | Lifecycle, prop, event, and ref bridge without reimplementing core behavior |
+| 🟢 Vue | Component and expose bridge aligned with the same core API model |
+| 🛡 Security | Escaped text defaults, sanitizer-ready HTML paths, CSP-conscious styling, and no `eval`/`new Function` design |
+| 🧪 Quality | Unit, E2E, a11y, visual, and performance smoke test coverage |
 
-## Packages
+---
+
+## 🚀 Feature Coverage
+
+| Category | Features |
+| --- | --- |
+| 📊 Columns | Column model, grouped headers, header merge, column menu, resize, reorder, visibility, left/right pinning |
+| 🧱 Layout | Base layout, pinned panes, row virtualization, column virtualization, cell merge layout |
+| 🌊 Row Models | Client, Infinite, Server, Viewport, Tree |
+| 🧩 Core Features | Sorting, filtering, editing, selection, clipboard, menus, summary, grouping, tree, pivot, pagination |
+| ♿ Accessibility | ARIA grid/treegrid semantics, keyboard focus, focus trap, screen-reader status regions |
+| 🧪 Examples | Vanilla, React, and Vue variants for roadmap features |
+
+Roadmap status and implementation evidence are tracked in [`CHECKLIST.md`](CHECKLIST.md).
+
+---
+
+## 📦 Packages
 
 | Package | Purpose |
 | --- | --- |
@@ -39,38 +77,23 @@ assets.
 | `@onegrid/adapters` | Server adapter foundations |
 | `@onegrid/testing` | Test and benchmark helper foundation |
 
-## Feature Coverage
+```text
+apps/examples, apps/docs
+  -> @onegrid/react, @onegrid/vue, @onegrid/dom
+    -> @onegrid/dom
+      -> @onegrid/core, @onegrid/pagination
+```
 
-OneGrid currently includes working examples for:
+Core does not depend on DOM APIs. Framework wrappers delegate to the DOM renderer
+and core contracts rather than duplicating feature logic.
 
-- Column model, grouped headers, column menus, pinning, resize, reorder, and visibility.
-- Client, infinite, server, viewport, and tree row models.
-- Base layout, pinned panes, row virtualization, column virtualization, and cell merge layout.
-- Keyboard focus, accessibility, renderer foundation, menus, clipboard, and selection.
-- Sorting, filtering, editing, summary/aggregation, row grouping, tree, pivot, and pagination.
-- Vanilla JavaScript, React, and Vue example variants for each roadmap feature.
+---
 
-The roadmap and completion evidence are tracked in `CHECKLIST.md`.
-
-## Install
+## ⚡ Quick Start
 
 ```bash
 pnpm add @onegrid/core @onegrid/dom @onegrid/themes
 ```
-
-React:
-
-```bash
-pnpm add @onegrid/react @onegrid/core @onegrid/dom @onegrid/themes
-```
-
-Vue:
-
-```bash
-pnpm add @onegrid/vue @onegrid/core @onegrid/dom @onegrid/themes
-```
-
-## Quick Start
 
 ```ts
 import { OneGrid } from "@onegrid/dom";
@@ -100,10 +123,12 @@ const grid = new OneGrid<OrderRow>({
   accessibility: { label: "Orders grid" }
 });
 
-grid.setPage?.(1);
+grid.setPage(1);
 ```
 
-## Server Row Model
+---
+
+## 🛰 Server Row Model
 
 Large datasets stay outside the browser. Server, infinite, and viewport row models
 request only the current page, block, or viewport window.
@@ -136,7 +161,13 @@ const grid = new OneGrid<OrderRow>({
 });
 ```
 
-## React
+---
+
+## ⚛ React
+
+```bash
+pnpm add @onegrid/react @onegrid/core @onegrid/dom @onegrid/themes
+```
 
 ```tsx
 import { OneGrid } from "@onegrid/react";
@@ -155,7 +186,13 @@ export function OrdersGrid() {
 }
 ```
 
-## Vue
+---
+
+## 🟢 Vue
+
+```bash
+pnpm add @onegrid/vue @onegrid/core @onegrid/dom @onegrid/themes
+```
 
 ```vue
 <template>
@@ -174,7 +211,9 @@ import "@onegrid/themes/default.css";
 </script>
 ```
 
-## Local Development
+---
+
+## 🛠 Local Development
 
 ```bash
 pnpm install
@@ -187,9 +226,9 @@ Open:
 http://127.0.0.1:4174
 ```
 
-## Verification
+---
 
-The baseline quality gate is:
+## ✅ Verification
 
 ```bash
 pnpm lint
@@ -202,35 +241,27 @@ pnpm build
 pnpm docs:build
 ```
 
-Visual regression smoke tests are available through:
+Visual regression smoke tests:
 
 ```bash
 pnpm test:e2e:visual
 ```
 
-## Architecture
+---
 
-OneGrid keeps feature logic and rendering boundaries explicit:
+## 🗂 Documentation Map
 
-```text
-apps/examples, apps/docs
-  -> @onegrid/react, @onegrid/vue, @onegrid/dom
-    -> @onegrid/dom
-      -> @onegrid/core, @onegrid/pagination
-```
+| Document | Purpose |
+| --- | --- |
+| [`ARCHITECT.md`](ARCHITECT.md) | Architecture goals, package boundaries, row model strategy |
+| [`CHECKLIST.md`](CHECKLIST.md) | Roadmap, completion evidence, verification notes |
+| [`API_CHANGELOG.md`](API_CHANGELOG.md) | API contract changes |
+| [`SECURITY.md`](SECURITY.md) | Security policy notes |
+| [`apps/docs/docs`](apps/docs/docs) | Docusaurus documentation source |
 
-Core does not depend on DOM APIs. Framework wrappers delegate to the DOM renderer
-and core contracts rather than duplicating feature logic.
+---
 
-## Documentation
-
-- Product and architecture rules: `AGENTS.md`, `ARCHITECT.md`
-- Roadmap and evidence: `CHECKLIST.md`
-- API changes: `API_CHANGELOG.md`
-- Security policy notes: `SECURITY.md`
-- Docusaurus docs: `apps/docs/docs`
-
-## License
+## 📜 License
 
 License information is not finalized in this workspace. Add the project license
 before publishing packages or distributing builds.
