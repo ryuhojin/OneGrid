@@ -1,0 +1,50 @@
+# Frozen Rows / Columns
+
+Frozen rows and columns keep high-value context visible while the center body scrolls and
+virtualizes. The DOM renderer treats top and bottom frozen rows as separate rowgroup sections, so
+pinned columns, cell merge clipping, keyboard focus, and custom scrollbars stay aligned.
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  rowHeight: 32,
+  frozenRows: { top: 2, bottom: 2 },
+  frozenColumns: {
+    left: ["id", "region"],
+    right: ["status"]
+  },
+  virtualization: {
+    enabled: true,
+    rowHeight: 32,
+    maxDomRows: 60
+  },
+  merge: {
+    enabled: true,
+    strategy: "value",
+    fields: ["region", "agency"]
+  }
+};
+```
+
+`frozenColumns` uses the same column identifiers as `columnState` and column menu pinning. The
+option initializes the left/right pinned panes, while runtime column state can still be persisted
+by the host application.
+
+Top and bottom frozen rows are removed from the scrollable body window. Row virtualization applies
+only to the remaining body rows, and merged cells are clipped per visible section rather than
+allowed to spill over pinned panes or scrollbar gutters.
+
+Examples:
+
+- `apps/examples/src/features/frozen/vanilla.ts`
+- `apps/examples/src/features/frozen/react.tsx`
+- `apps/examples/src/features/frozen/vue.vue`
+
+Verification:
+
+- `tests/e2e/features/frozen.spec.ts`
+- `tests/a11y/frozen-a11y.spec.ts`
+- `tests/e2e/visual/frozen.visual.spec.ts`

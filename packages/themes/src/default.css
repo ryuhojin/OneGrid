@@ -165,6 +165,17 @@
   z-index: 6;
 }
 
+.og-grid__section--frozen {
+  background: var(--og-color-bg);
+  border-block-start: 1px solid var(--og-color-border);
+  flex: 0 0 auto;
+  z-index: 5;
+}
+
+.og-grid__section--frozen[data-frozen-position="bottom"] {
+  border-block-end: 1px solid var(--og-color-border);
+}
+
 .og-grid__section--body {
   align-items: start;
 }
@@ -215,6 +226,7 @@
 }
 
 .og-grid__section--header .og-grid__pane--right,
+.og-grid__section--frozen .og-grid__pane--right,
 .og-grid__section--summary .og-grid__pane--right {
   inset-inline-end: var(--og-scrollbar-inline-gutter);
   z-index: 8;
@@ -230,6 +242,10 @@
 
 .og-grid__section--summary .og-grid__pane--scrollbar-gutter {
   background: #f7fafc;
+}
+
+.og-grid__section--frozen .og-grid__pane--scrollbar-gutter {
+  background: var(--og-color-bg);
 }
 
 .og-grid__pane--center {
@@ -1123,6 +1139,16 @@
 
 .og-grid__body {
   overflow: visible;
+}
+
+.og-grid__section--frozen .og-grid__cell {
+  background: #fbfcff;
+  font-weight: 650;
+}
+
+.og-grid__section--frozen .og-grid__pane--left .og-grid__cell,
+.og-grid__section--frozen .og-grid__pane--right .og-grid__cell {
+  background: var(--og-color-pinned-bg);
 }
 
 .og-grid__cell--merged {

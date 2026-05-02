@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createColumnModel, createGridLayoutModel, createSummaryRow } from "../src/index.js";
+import {
+  createColumnModel,
+  createFrozenRowSlices,
+  createGridLayoutModel,
+  createSummaryRow
+} from "../src/index.js";
 
 interface OrderRow {
   readonly id: string;
@@ -32,7 +37,20 @@ describe("grid layout model", () => {
     expect(layout.panes.right.ariaColumnOffset).toBe(3);
     expect(layout.sections.summary).toBe(true);
     expect(layout.sections.footer).toBe(true);
+    expect(layout.sections.frozen).toBe(true);
     expect(layout.totalColumnWidth).toBe(450);
+  });
+
+  it("splits frozen top and bottom rows without changing total row count", () => {
+    const slices = createFrozenRowSlices(rows, { top: 1, bottom: 1, totalRowCount: 10 });
+
+    expect(slices.topRows).toEqual([rows[0]]);
+    expect(slices.bodyRows).toEqual([]);
+    expect(slices.bottomRows).toEqual([rows[1]]);
+    expect(slices.bodyOffset).toBe(1);
+    expect(slices.bottomOffset).toBe(9);
+    expect(slices.scrollableRowCount).toBe(8);
+    expect(slices.totalRowCount).toBe(10);
   });
 
   it("calculates summary cells from all built-in and custom summary definitions", () => {

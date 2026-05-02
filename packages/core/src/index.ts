@@ -3,6 +3,7 @@ export * from "./clipboard/index.js";
 export * from "./commands/index.js";
 export * from "./editing/index.js";
 export * from "./events/index.js";
+export * from "./export/index.js";
 export * from "./filtering/index.js";
 export * from "./header/index.js";
 export * from "./layout/index.js";

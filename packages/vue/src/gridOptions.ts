@@ -8,10 +8,14 @@ import type {
   ContextMenuOptions,
   DataSource,
   EditingOptions,
+  ExportOptions,
   FilteringOptions,
+  FrozenColumnOptions,
+  FrozenRowOptions,
   GridOptions,
   GroupingOptions,
   HeaderMergeOptions,
+  ImportOptions,
   InfiniteRowOptions,
   LayoutOptions,
   MergeOptions,
@@ -46,8 +50,12 @@ export interface OneGridProps {
   readonly tree?: TreeOptions | undefined;
   readonly layout?: LayoutOptions | undefined;
   readonly virtualization?: VirtualizationOptions | undefined;
+  readonly frozenRows?: FrozenRowOptions | undefined;
+  readonly frozenColumns?: FrozenColumnOptions | undefined;
   readonly editing?: EditingOptions | undefined;
   readonly clipboard?: ClipboardOptions | undefined;
+  readonly export?: ExportOptions | undefined;
+  readonly import?: ImportOptions<unknown> | undefined;
   readonly contextMenu?: ContextMenuOptions<unknown> | undefined;
   readonly filtering?: FilteringOptions | undefined;
   readonly sorting?: SortingOptions | undefined;
@@ -80,8 +88,12 @@ export function toGridOptions(props: OneGridProps): GridOptions<unknown> {
     tree?: TreeOptions;
     layout?: LayoutOptions;
     virtualization?: VirtualizationOptions;
+    frozenRows?: FrozenRowOptions;
+    frozenColumns?: FrozenColumnOptions;
     editing?: EditingOptions;
     clipboard?: ClipboardOptions;
+    export?: ExportOptions;
+    import?: ImportOptions<unknown>;
     contextMenu?: ContextMenuOptions<unknown>;
     filtering?: FilteringOptions;
     sorting?: SortingOptions;
@@ -141,11 +153,23 @@ export function toGridOptions(props: OneGridProps): GridOptions<unknown> {
   if (props.virtualization !== undefined) {
     options.virtualization = props.virtualization;
   }
+  if (props.frozenRows !== undefined) {
+    options.frozenRows = props.frozenRows;
+  }
+  if (props.frozenColumns !== undefined) {
+    options.frozenColumns = props.frozenColumns;
+  }
   if (props.editing !== undefined) {
     options.editing = props.editing;
   }
   if (props.clipboard !== undefined) {
     options.clipboard = props.clipboard;
+  }
+  if (props.export !== undefined) {
+    options.export = props.export;
+  }
+  if (props.import !== undefined) {
+    options.import = props.import;
   }
   if (props.contextMenu !== undefined) {
     options.contextMenu = props.contextMenu;

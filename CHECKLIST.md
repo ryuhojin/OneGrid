@@ -2542,57 +2542,170 @@
     - 2026-04-30: Append scroll은 public API 확장 없이 pagination UI mode로 구현했으며, server/cursor mode에서 다음 page 또는 cursor를 명시적으로 요청한다.
     - 2026-04-30: F-PAGE 예제는 기본 배치를 하단 pagination으로 통일했고, 각 grid section이 독립 pagination/inspector와 매칭되도록 보정했다.
     - 2026-04-30: Server pagination은 초기 load 중 page 전환이 들어와도 마지막 요청을 pending load로 보존해 grid/page state 불일치를 방지한다.
-    - 2026-04-30: 전체 visual suite(`pnpm test:e2e:visual`)는 pagination spec은 통과했지만 기존 non-pagination snapshot 5건에서 baseline drift가 남아 별도 정리가 필요하다.
+    - 2026-04-30: 전체 visual suite(`pnpm test:e2e:visual`)는 pagination spec은 통과했지만 기존 non-pagination snapshot 5건에서 baseline drift가 남아 별도 정리가 필요했다.
+    - 2026-05-02: base-layout/client-row-model/server-row-model visual baseline을 현재 summary/group row contract에 맞춰 갱신하고, editing/filtering visual spec은 전체 페이지가 아닌 기능 영역과 dialog 단위 스냅샷으로 분리해 drift 리스크를 정리했다.
 
 ### F-FROZEN Frozen Rows / Columns
 
-- [ ] F-FROZEN-001 left pinned columns
+- [x] F-FROZEN-001 left pinned columns
   - Evidence:
-- [ ] F-FROZEN-002 right pinned columns
+    - packages/dom/src/grid/frozenColumns.ts
+    - packages/dom/src/grid/oneGridBase.ts
+    - apps/examples/src/features/frozen/data.ts
+- [x] F-FROZEN-002 right pinned columns
   - Evidence:
-- [ ] F-FROZEN-003 frozen top rows
+    - packages/dom/src/grid/frozenColumns.ts
+    - packages/themes/src/default.css
+    - tests/e2e/features/frozen.spec.ts
+- [x] F-FROZEN-003 frozen top rows
   - Evidence:
-- [ ] F-FROZEN-004 frozen bottom rows
+    - packages/core/src/layout/frozenRows.ts
+    - packages/dom/src/grid/frozenRowRenderer.ts
+    - tests/e2e/features/frozen.spec.ts
+- [x] F-FROZEN-004 frozen bottom rows
   - Evidence:
-- [ ] F-FROZEN-005 frozen + virtual scroll
+    - packages/core/src/layout/frozenRows.ts
+    - packages/dom/src/grid/frozenRowRenderer.ts
+    - tests/e2e/features/frozen.spec.ts
+- [x] F-FROZEN-005 frozen + virtual scroll
   - Evidence:
-- [ ] F-FROZEN-006 frozen + merge
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - tests/e2e/features/frozen.spec.ts
+- [x] F-FROZEN-006 frozen + merge
   - Evidence:
-- [ ] F-FROZEN-007 frozen + keyboard navigation
+    - packages/dom/src/grid/bodyPaneRenderer.ts
+    - packages/dom/src/grid/frozenColumnVirtualization.ts
+    - tests/e2e/visual/frozen.visual.spec.ts-snapshots/frozen-grid-chromium-darwin.png
+- [x] F-FROZEN-007 frozen + keyboard navigation
   - Evidence:
-- [ ] F-FROZEN-008 JS/React/Vue examples
+    - packages/dom/src/grid/gridFocusNavigation.ts
+    - tests/e2e/features/frozen.spec.ts
+- [x] F-FROZEN-008 JS/React/Vue examples
   - Evidence:
-- [ ] F-FROZEN-009 Playwright E2E
+    - apps/examples/src/features/frozen/vanilla.ts
+    - apps/examples/src/features/frozen/react.tsx
+    - apps/examples/src/features/frozen/vue.vue
+    - apps/examples/src/catalog.ts
+- [x] F-FROZEN-009 Playwright E2E
   - Evidence:
-- [ ] F-FROZEN-010 docs
+    - tests/e2e/features/frozen.spec.ts
+    - tests/a11y/frozen-a11y.spec.ts
+    - tests/e2e/visual/frozen.visual.spec.ts
+- [x] F-FROZEN-010 docs
   - Evidence:
+    - apps/docs/docs/features/frozen.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/frozen.spec.ts --project=chromium --project=webkit
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/frozen-a11y.spec.ts --project=chromium --project=webkit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/visual/frozen.visual.spec.ts --project=chromium
+    - pnpm test:e2e:visual
+  - Notes:
+    - 2026-05-02: `frozenRows.top/bottom`은 scrollable body에서 분리된 rowgroup section으로 렌더링하고, body row virtualization은 `scrollableRowCount` 기준으로 계산한다.
+    - 2026-05-02: `frozenColumns.left/right`는 초기 column state pinned pane으로 적용하며, 기존 column menu/state 경로와 동일한 layout pane을 사용한다.
+    - 2026-05-02: frozen row + merge는 section별 `CellSpanWindow` clipping으로 처리해 top/body/bottom 경계와 pinned pane을 침범하지 않도록 했다.
+    - 2026-05-02: 전체 visual suite(`pnpm test:e2e:visual`)의 기존 base-layout/client-row-model/editing/filtering/server-row-model snapshot drift 5건을 정리했고, 전체 visual suite가 통과한다.
+    - 2026-05-02: editing/filtering visual spec은 카탈로그 링크 추가에 흔들리지 않도록 전체 페이지 스냅샷을 제거하고 기능 섹션 및 dialog 스냅샷으로 분리했다.
 
 ### F-EXPORT Export / Import
 
-- [ ] F-EXPORT-001 CSV export
+- [x] F-EXPORT-001 CSV export
   - Evidence:
-- [ ] F-EXPORT-002 CSV import
+    - packages/core/src/export/csvExport.ts
+    - packages/core/src/export/gridExport.ts
+    - packages/dom/src/grid/exportData.ts
+    - apps/examples/src/features/export/vanilla.ts
+- [x] F-EXPORT-002 CSV import
   - Evidence:
-- [ ] F-EXPORT-003 XLSX export
+    - packages/core/src/export/csvExport.ts
+    - packages/core/src/export/importBuild.ts
+    - packages/dom/src/grid/oneGridExport.ts
+    - tests/e2e/features/export.spec.ts
+- [x] F-EXPORT-003 XLSX export
   - Evidence:
-- [ ] F-EXPORT-004 XLSX import
+    - packages/core/src/export/xlsxExport.ts
+    - packages/core/src/export/xlsxZip.ts
+    - packages/core/test/export-import.test.ts
+- [x] F-EXPORT-004 XLSX import
   - Evidence:
-- [ ] F-EXPORT-005 PDF export
+    - packages/core/src/export/xlsxExport.ts
+    - packages/core/src/export/xlsxZip.ts
+    - tests/e2e/features/export.spec.ts
+- [x] F-EXPORT-005 PDF export
   - Evidence:
-- [ ] F-EXPORT-006 print layout
+    - packages/core/src/export/pdfExport.ts
+    - apps/examples/src/features/export/vanilla.ts
+    - tests/e2e/features/export.spec.ts
+- [x] F-EXPORT-006 print layout
   - Evidence:
-- [ ] F-EXPORT-007 export with header merge
+    - packages/core/src/export/printExport.ts
+    - apps/docs/docs/features/export.mdx
+    - tests/e2e/features/export.spec.ts
+- [x] F-EXPORT-007 export with header merge
   - Evidence:
-- [ ] F-EXPORT-008 export with cell merge
+    - packages/dom/src/grid/exportData.ts
+    - packages/core/src/export/xlsxExport.ts
+    - apps/examples/src/features/export/data.ts
+    - tests/e2e/visual/export.visual.spec.ts
+- [x] F-EXPORT-008 export with cell merge
   - Evidence:
-- [ ] F-EXPORT-009 export selected range
+    - packages/dom/src/grid/exportData.ts
+    - packages/core/src/export/printExport.ts
+    - apps/examples/src/features/export/data.ts
+- [x] F-EXPORT-009 export selected range
   - Evidence:
-- [ ] F-EXPORT-010 JS/React/Vue examples
+    - packages/dom/src/grid/exportData.ts
+    - packages/dom/src/grid/oneGridExport.ts
+    - tests/e2e/features/export.spec.ts
+- [x] F-EXPORT-010 JS/React/Vue examples
   - Evidence:
-- [ ] F-EXPORT-011 Playwright E2E
+    - apps/examples/src/features/export/vanilla.html
+    - apps/examples/src/features/export/vanilla.ts
+    - apps/examples/src/features/export/react.tsx
+    - apps/examples/src/features/export/vue.vue
+    - apps/examples/src/features/export/README.md
+- [x] F-EXPORT-011 Playwright E2E
   - Evidence:
-- [ ] F-EXPORT-012 docs
+    - tests/e2e/features/export.spec.ts
+    - tests/a11y/export-a11y.spec.ts
+    - tests/e2e/visual/export.visual.spec.ts
+- [x] F-EXPORT-012 docs
   - Evidence:
+    - apps/docs/docs/features/export.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:e2e:visual
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/export.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/export-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/visual/export.visual.spec.ts tests/e2e/visual/selection.visual.spec.ts --project=chromium --update-snapshots
+  - Notes:
+    - 2026-05-02: `GridApi.exportData()` / `GridApi.importData()`와 `GridOptions.export/import` public contract를 core 타입으로 추가했고 React/Vue wrapper는 동일 옵션과 method bridge를 사용한다.
+    - 2026-05-02: DOM export matrix는 header model, cell span model, selection range/row state를 한 경로로 수집해 CSV/XLSX/PDF/print에서 header merge, cell merge, selected range를 유지한다.
+    - 2026-05-02: F-EXPORT vanilla example은 `exportData()` 결과를 preview만 하지 않고 CSV/XLSX/PDF/print HTML `Blob`으로 실제 다운로드하며 E2E에서 `download` 이벤트와 파일명을 검증한다.
+    - 2026-05-02: PDF writer는 페이지 안쪽 좌표에 표를 렌더링하도록 수정했고, header/body 배경과 셀 경계선을 포함한다. XLSX writer는 `styles.xml`, 셀 style id, 컬럼 폭, header/body/merged-cell fill/border를 포함한다.
+    - 2026-05-02: PDF rowSpan 셀의 y 좌표를 span 높이 기준으로 보정해 병합 셀이 표 위로 튀는 문제를 수정했다. XLSX는 merge covered cell도 빈 값과 스타일을 기록해 header/body 병합 범위의 오른쪽/아래쪽 경계선이 Excel에서 유지되도록 했다.
+    - 2026-05-02: Import UI는 실제 파일 입력 방식으로 변경했고 `/export-testFile.csv`, `/export-testFile.xlsx` 예제 fixture를 추가했다. 기본 import는 기존 rows를 replace하며 append는 `ImportOptions.mode: "append"`에서만 수행한다.
+    - 2026-05-02: XLSX는 추가 런타임 의존성 없이 OneGrid 생성 workbook을 export/import하는 OpenXML 최소 호환 구현이다. 압축 XLSX, sharedStrings 기반 외부 workbook 호환성 확대는 이후 hardening 항목으로 분리한다.
 
 ### F-I18N Localization
 

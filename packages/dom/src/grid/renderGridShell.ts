@@ -1,21 +1,19 @@
 import {
   createCellSpanModel,
   createColumnModel,
+  createFrozenRowSlices,
   createGridLayoutModel,
   createHeaderModel,
   createSummaryRow
 } from "@onegrid/core";
-import type {
-  CellSpanModel,
-  LayoutPane,
-  SummaryRow
-} from "@onegrid/core";
+import type { CellSpanModel } from "@onegrid/core";
 import { createBodyPane } from "./bodyPaneRenderer.js";
 import type { ColumnVirtualScrollRuntime } from "./columnVirtualScrollRuntime.js";
 import { resolveColumnUiOptions } from "./columnControls.js";
 import type { ColumnUiRuntime } from "./columnControls.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
 import { createFooterSection, createOverlayLayer } from "./footerRenderer.js";
+import { appendFrozenRowsSections } from "./frozenRowRenderer.js";
 import { applyGridAccessibility } from "./gridAccessibility.js";
 import { attachGridFocusForHost, disposeGridFocus } from "./gridFocus.js";
 import { attachGridScrollbarsForHost, disposeGridScrollbars } from "./gridScrollbars.js";
@@ -41,7 +39,7 @@ import type { RowRenderState } from "./renderGridTypes.js";
 import { attachGridSelectionForHost, disposeGridSelection } from "./selectionRuntime.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
 import type { HeaderSortRuntime } from "./sortRuntime.js";
-import { createSummaryPane } from "./summaryRenderer.js";
+import { createSummarySection, getSummaryPlacements } from "./summarySections.js";
 import {
   attachColumnVirtualScroll,
   createColumnVirtualWindow,
@@ -97,6 +95,10 @@ export function renderGridShell<TData>(
   const rowData = getGridRowData(renderOptions, rowRenderState);
   const allRows = rowData.rows;
   const rowCount = rowRenderState?.rowCount ?? allRows.length;
+  const frozenRows = createFrozenRowSlices(allRows, {
+    ...(renderOptions.frozenRows === undefined ? {} : renderOptions.frozenRows),
+    totalRowCount: rowCount
+  });
   const paginationModel = createPaginationRenderModel(
     renderOptions,
     rowData.totalRowCount,
@@ -104,12 +106,12 @@ export function renderGridShell<TData>(
   );
   const virtualWindow = createVirtualWindow(
     renderOptions,
-    rowCount,
+    frozenRows.scrollableRowCount,
     rowRenderState,
     virtualScrollRuntime
   );
   const rowWindowState: { window: typeof virtualWindow } = { window: virtualWindow };
-  const rows = getRenderedRows(allRows, virtualWindow);
+  const rows = getRenderedRows(frozenRows.bodyRows, virtualWindow);
   const cellSpanModel = createCellSpanModel({
     rows: createCellSpanRows(allRows),
     columns: columnModel.visibleLeafColumns,
@@ -166,17 +168,20 @@ export function renderGridShell<TData>(
   });
   const bodyViewport = createBodyViewport();
   const bodyShell = createBodyShell(bodyViewport);
+  const bodyRuntime = createBodyPaneRuntime(renderOptions, rowRenderState, cellSpanModel, groupRuntime);
+  const centerOwnsTreeControls = paneState.panes.left.columns.length === 0;
   attachWheelBoundaryGuard(bodyViewport);
   attachInfiniteScroll(bodyViewport, rowRenderState);
   attachVirtualScroll({
     scrollElement: bodyViewport,
     options: renderOptions,
-    rowCount,
-    allRows,
+    rowCount: frozenRows.scrollableRowCount,
+    allRows: frozenRows.bodyRows,
     panes: paneState.panes,
     rowRenderState,
     cellSpanModel,
-    centerOwnsTreeControls: paneState.panes.left.columns.length === 0,
+    rowIndexOffset: frozenRows.bodyOffset,
+    centerOwnsTreeControls,
     virtualScrollRuntime,
     virtualWindow,
     getPanes: () => paneState.panes,
@@ -188,8 +193,8 @@ export function renderGridShell<TData>(
       createBodyPane(
         pane,
         rows,
-        createBodyPaneRuntime(renderOptions, rowRenderState, cellSpanModel, groupRuntime),
-      paneState.panes.left.columns.length === 0,
+        { ...bodyRuntime, rowIndexOffset: frozenRows.bodyOffset },
+      centerOwnsTreeControls,
       virtualWindow
     )
   ));
@@ -218,7 +223,27 @@ export function renderGridShell<TData>(
     grid.append(createSummarySection(paneState.panes, summary, "top", headerModel.depth + 1));
   }
 
+  appendFrozenRowsSections({
+    grid,
+    panes: paneState.panes,
+    topRows: frozenRows.topRows,
+    bottomRows: [],
+    bottomOffset: frozenRows.bottomOffset,
+    runtime: bodyRuntime,
+    centerOwnsTreeControls
+  });
+
   grid.append(bodyShell);
+
+  appendFrozenRowsSections({
+    grid,
+    panes: paneState.panes,
+    topRows: [],
+    bottomRows: frozenRows.bottomRows,
+    bottomOffset: frozenRows.bottomOffset,
+    runtime: bodyRuntime,
+    centerOwnsTreeControls
+  });
 
   if (summaryPlacements.includes("bottom")) {
     grid.append(createSummarySection(
@@ -240,7 +265,7 @@ export function renderGridShell<TData>(
 
   grid.append(createOverlayLayer({
     rowCount,
-    renderedRowCount: rows.length,
+    renderedRowCount: frozenRows.topRows.length + rows.length + frozenRows.bottomRows.length,
     loading: rowRenderState?.loading ?? false,
     ...(rowRenderState?.error === undefined ? {} : { error: rowRenderState.error })
   }));
@@ -252,11 +277,13 @@ export function renderGridShell<TData>(
     headerModel,
     panes: layout.panes,
     paneState,
-    allRows,
+    allRows: frozenRows.bodyRows,
+    frozenRows,
     summary,
     rowRenderState,
     cellSpanModel,
-    centerOwnsTreeControls: paneState.panes.left.columns.length === 0,
+    rowIndexOffset: frozenRows.bodyOffset,
+    centerOwnsTreeControls,
     getRowWindow: () => rowWindowState.window,
     columnState: renderOptions.columnState ?? {},
     columnUi,
@@ -340,38 +367,6 @@ function setGridRowHeight<TData>(grid: HTMLElement, options: DomGridOptions<TDat
   if (rowHeight !== undefined && Number.isFinite(rowHeight) && rowHeight > 0) {
     grid.style.setProperty("--og-row-height", `${rowHeight}px`);
   }
-}
-
-function shouldRenderSummary<TData>(
-  options: DomGridOptions<TData>,
-  summary: SummaryRow | undefined
-): boolean {
-  return summary !== undefined && options.summary?.enabled !== false;
-}
-
-function getSummaryPlacements<TData>(
-  options: DomGridOptions<TData>,
-  summary: SummaryRow | undefined
-): readonly ("top" | "bottom")[] {
-  if (!shouldRenderSummary(options, summary)) {
-    return [];
-  }
-
-  const position = options.summary?.position ?? "bottom";
-  return position === "both" ? ["top", "bottom"] : [position];
-}
-
-function createSummarySection<TData>(
-  panes: Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>,
-  summary: SummaryRow | undefined,
-  position: "top" | "bottom",
-  ariaRowIndex: number
-): HTMLElement {
-  const section = createSection("summary", panes, (pane) =>
-    createSummaryPane(pane, summary, ariaRowIndex)
-  );
-  section.dataset.summaryPosition = position;
-  return section;
 }
 
 function setSize(

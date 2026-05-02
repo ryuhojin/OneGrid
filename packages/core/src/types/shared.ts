@@ -149,6 +149,18 @@ export interface GridExportResult {
   readonly filename?: string;
 }
 
+export interface GridImportResult<TData = unknown> {
+  readonly rows: readonly TData[];
+  readonly rowCount: number;
+  readonly rejected: readonly GridImportRejectedRow[];
+}
+
+export interface GridImportRejectedRow {
+  readonly rowIndex: number;
+  readonly reason: string;
+  readonly values: readonly unknown[];
+}
+
 export interface CancellationSignal {
   readonly aborted: boolean;
   readonly reason?: unknown;

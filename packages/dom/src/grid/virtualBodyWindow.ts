@@ -55,6 +55,7 @@ export interface VirtualScrollAttachInput<TData> {
   readonly panes: Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>;
   readonly rowRenderState: RowRenderState<TData> | undefined;
   readonly cellSpanModel: CellSpanModel;
+  readonly rowIndexOffset?: number;
   readonly centerOwnsTreeControls: boolean;
   readonly virtualScrollRuntime: VirtualScrollRuntime | undefined;
   readonly virtualWindow: FixedRowVirtualWindow | undefined;
@@ -71,6 +72,7 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
     panes,
     rowRenderState,
     centerOwnsTreeControls,
+    rowIndexOffset,
     virtualScrollRuntime,
     virtualWindow,
     getPanes,
@@ -95,6 +97,7 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
       panes: getPanes?.() ?? panes,
       rowRenderState,
       cellSpanModel: input.cellSpanModel,
+      ...(rowIndexOffset === undefined ? {} : { rowIndexOffset }),
       centerOwnsTreeControls,
       virtualWindow: nextWindow
     });
@@ -166,6 +169,7 @@ function replaceBodyRows<TData>(input: {
   readonly panes: Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>;
   readonly rowRenderState: RowRenderState<TData> | undefined;
   readonly cellSpanModel: CellSpanModel;
+  readonly rowIndexOffset?: number;
   readonly centerOwnsTreeControls: boolean;
   readonly virtualWindow: FixedRowVirtualWindow;
 }): void {
@@ -190,7 +194,8 @@ function replaceBodyRows<TData>(input: {
         ...(input.rowRenderState?.treeRuntime?.treeColumnField === undefined
           ? {}
           : { treeColumnField: input.rowRenderState.treeRuntime.treeColumnField }),
-        cellSpanModel: input.cellSpanModel
+        cellSpanModel: input.cellSpanModel,
+        ...(input.rowIndexOffset === undefined ? {} : { rowIndexOffset: input.rowIndexOffset })
       },
       input.centerOwnsTreeControls,
       input.virtualWindow

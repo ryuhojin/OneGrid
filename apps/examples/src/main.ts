@@ -11,7 +11,9 @@ import { mountColumnModelExample } from "./features/column-model/vanilla.js";
 import { mountColumnVirtualizationExample } from "./features/column-virtualization/vanilla.js";
 import { mountColumnUiExample } from "./features/column-ui/vanilla.js";
 import { mountEditingExample } from "./features/editing/vanilla.js";
+import { mountExportExample } from "./features/export/vanilla.js";
 import { mountFilteringExample } from "./features/filtering/vanilla.js";
+import { mountFrozenExample } from "./features/frozen/vanilla.js";
 import { mountGroupHeaderExample } from "./features/group-header/vanilla.js";
 import { mountGroupingExample } from "./features/grouping/vanilla.js";
 import { mountInfiniteRowModelExample } from "./features/infinite-row-model/vanilla.js";
@@ -62,7 +64,9 @@ const mounts: Readonly<Record<string, ExampleMount>> = {
   "F-GROUP": mountGroupingExample,
   "F-TREE": mountTreeExample,
   "F-PIVOT": mountPivotExample,
-  "F-PAGE": mountPaginationExample
+  "F-PAGE": mountPaginationExample,
+  "F-FROZEN": mountFrozenExample,
+  "F-EXPORT": mountExportExample
 };
 
 const app = document.querySelector<HTMLElement>("#app");

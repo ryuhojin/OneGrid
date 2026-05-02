@@ -1,12 +1,13 @@
 import type { ColumnDef } from "./column.js";
 import type { RowUpdate } from "./data.js";
 import type { GridEventHandler, GridEventMap } from "./events.js";
-import type { ExportOptions, ThemeInput } from "./grid-options.js";
+import type { ExportOptions, ImportOptions, ThemeInput } from "./grid-options.js";
 import type { GridSelectionState, SelectedCell } from "../selection/index.js";
 import type {
   CellPosition,
   FilterModel,
   GridExportResult,
+  GridImportResult,
   GroupModel,
   RowKey,
   ScrollAlign,
@@ -62,7 +63,8 @@ export interface GridApi<TData = unknown> {
   getPageSize(): number;
   scrollToRow(rowIndex: number, align?: ScrollAlign): void;
   scrollToColumn(field: string, align?: ScrollAlign): void;
-  exportData(options: ExportOptions): Promise<GridExportResult>;
+  exportData(options?: ExportOptions): Promise<GridExportResult>;
+  importData(content: string | Uint8Array, options?: ImportOptions<TData>): Promise<GridImportResult<TData>>;
   copyToClipboard(options?: ClipboardCopyOptions): Promise<void>;
   pasteFromClipboard(text: string): Promise<void>;
   applyTheme(theme: ThemeInput): void;

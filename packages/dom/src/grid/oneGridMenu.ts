@@ -14,9 +14,9 @@ import {
 import type { GridContextMenuRuntime } from "./contextMenuRuntime.js";
 import { readCellValue } from "./rendererHost.js";
 import { fullInvalidation } from "./renderInvalidation.js";
-import { OneGridClipboard } from "./oneGridClipboard.js";
+import { OneGridExport } from "./oneGridExport.js";
 
-export class OneGridMenu<TData = unknown> extends OneGridClipboard<TData> {
+export class OneGridMenu<TData = unknown> extends OneGridExport<TData> {
   protected override commitRender(invalidation = fullInvalidation("commit")): void {
     super.commitRender(invalidation);
     this.attachContextMenuRuntime();

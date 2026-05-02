@@ -47,6 +47,8 @@ module.exports = {
         "features/tree",
         "features/pivot",
         "features/pagination",
+        "features/frozen",
+        "features/export",
         "security/csp"
       ]
     }

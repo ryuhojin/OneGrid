@@ -167,5 +167,17 @@ export const examples: readonly ExampleCatalogItem[] = [
     title: "Pagination",
     feature: "pagination",
     variants: ["vanilla", "react", "vue"]
+  },
+  {
+    id: "F-FROZEN",
+    title: "Frozen rows and columns",
+    feature: "frozen",
+    variants: ["vanilla", "react", "vue"]
+  },
+  {
+    id: "F-EXPORT",
+    title: "Export / Import",
+    feature: "export",
+    variants: ["vanilla", "react", "vue"]
   }
 ];

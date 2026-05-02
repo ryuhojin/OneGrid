@@ -3,6 +3,8 @@ import {
   clipHeaderRowsToColumns
 } from "@onegrid/core";
 import { createBodyPane } from "./bodyPaneRenderer.js";
+import { syncColumnScroll } from "./columnScrollSync.js";
+import { replaceFrozenCenterPanes } from "./frozenColumnVirtualization.js";
 import { createHeaderPane } from "./headerRenderer.js";
 import { applyGridSelection } from "./selectionRuntime.js";
 import { createSummaryPane } from "./summaryRenderer.js";
@@ -19,6 +21,7 @@ import type {
   ColumnUiState,
   FixedColumnVirtualWindow,
   FixedRowVirtualWindow,
+  FrozenRowSlices,
   HeaderModel,
   HeaderRow,
   LayoutPane,
@@ -94,9 +97,11 @@ export interface ColumnVirtualScrollAttachInput<TData> {
   readonly panes: PaneRecord<TData>;
   readonly paneState: PaneRenderState<TData>;
   readonly allRows: readonly BodyRowEntry<TData>[];
+  readonly frozenRows: FrozenRowSlices<BodyRowEntry<TData>>;
   readonly summary: SummaryRow | undefined;
   readonly rowRenderState: RowRenderState<TData> | undefined;
   readonly cellSpanModel: CellSpanModel;
+  readonly rowIndexOffset: number;
   readonly centerOwnsTreeControls: boolean;
   getRowWindow(): FixedRowVirtualWindow | undefined;
   readonly columnState: ColumnUiState;
@@ -279,6 +284,7 @@ function replaceCenterPanes<TData>(
           : { treeColumnField: input.rowRenderState.treeRuntime.treeColumnField }),
         ...(input.groupRuntime === undefined ? {} : { groupRuntime: input.groupRuntime }),
         cellSpanModel: input.cellSpanModel,
+        rowIndexOffset: input.rowIndexOffset,
         ...(input.options.editing === undefined ? {} : { editing: input.options.editing }),
         ...(input.security === undefined ? {} : { security: input.security })
       },
@@ -290,6 +296,18 @@ function replaceCenterPanes<TData>(
   if (input.summary) {
     replaceSummaryPanes(input.grid, input.panes.center, input.summary);
   }
+  replaceFrozenCenterPanes({
+    grid: input.grid,
+    options: input.options,
+    pane: input.panes.center,
+    paneState: input.paneState,
+    frozenRows: input.frozenRows,
+    rowRenderState: input.rowRenderState,
+    cellSpanModel: input.cellSpanModel,
+    ...(input.groupRuntime === undefined ? {} : { groupRuntime: input.groupRuntime }),
+    centerOwnsTreeControls: input.centerOwnsTreeControls,
+    ...(input.security === undefined ? {} : { security: input.security })
+  });
   if (input.selectionRuntime) {
     applyGridSelection(input.grid, input.selectionRuntime);
   }
@@ -297,7 +315,7 @@ function replaceCenterPanes<TData>(
 
 function replacePane(
   grid: HTMLElement,
-  section: "header" | "body" | "summary",
+  section: "header" | "frozen" | "body" | "summary",
   content: HTMLElement
 ): void {
   const paneElement = grid.querySelector<HTMLElement>(
@@ -340,50 +358,4 @@ function resolveCenterViewportWidth<TData>(
   panes: PaneRecord<TData>
 ): number {
   return Math.max(0, viewport.clientWidth - panes.left.width - panes.right.width);
-}
-
-function syncColumnScroll(
-  grid: HTMLElement,
-  scrollElement: HTMLElement
-): void {
-  for (const sectionKey of ["header", "summary"] as const) {
-    syncSections(grid, sectionKey, scrollElement.scrollLeft);
-  }
-}
-
-function syncSections(
-  grid: HTMLElement,
-  sectionKey: "header" | "summary",
-  scrollLeft: number
-): void {
-  grid
-    .querySelectorAll<HTMLElement>(`[data-layout-section="${sectionKey}"]`)
-    .forEach((section) => syncSection(section, scrollLeft));
-}
-
-function syncSection(section: HTMLElement, scrollLeft: number): void {
-  section.style.transform = scrollLeft > 0
-    ? `translateX(${-scrollLeft}px)`
-    : "";
-
-  const leftPane = section.querySelector<HTMLElement>('[data-layout-pane="left"]');
-  if (leftPane) {
-    leftPane.style.transform = scrollLeft > 0
-      ? `translateX(${scrollLeft}px)`
-      : "";
-  }
-
-  const rightPane = section.querySelector<HTMLElement>('[data-layout-pane="right"]');
-  if (rightPane) {
-    rightPane.style.transform = scrollLeft > 0
-      ? `translateX(${scrollLeft}px)`
-      : "";
-  }
-
-  const gutterPane = section.querySelector<HTMLElement>(".og-grid__pane--scrollbar-gutter");
-  if (gutterPane) {
-    gutterPane.style.transform = scrollLeft > 0
-      ? `translateX(${scrollLeft}px)`
-      : "";
-  }
 }

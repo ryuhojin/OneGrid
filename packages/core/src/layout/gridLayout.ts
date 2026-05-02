@@ -29,6 +29,7 @@ export function createGridLayoutModel<TData>(
     paneOrder: PANE_ORDER,
     sections: Object.freeze({
       header: true,
+      frozen: true,
       body: true,
       summary: options.hasSummary === true,
       footer: options.hasFooter === true,

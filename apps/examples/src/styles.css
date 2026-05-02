@@ -60,6 +60,22 @@ section {
   padding: 6px 12px;
 }
 
+.example-action-link {
+  align-items: center;
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.example-file-input {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 .example-action-button:focus-visible,
 .example-action-button:hover {
   background: #334155;

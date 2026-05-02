@@ -15,7 +15,10 @@ interface FocusViewportInput {
   readonly viewport: HTMLElement;
 }
 
-const CELL_SELECTOR = '[data-layout-section="body"] [role="gridcell"]:not([aria-hidden="true"])';
+const CELL_SELECTOR = [
+  '[data-layout-section="frozen"] [role="gridcell"]:not([aria-hidden="true"])',
+  '[data-layout-section="body"] [role="gridcell"]:not([aria-hidden="true"])'
+].join(",");
 const ACTIVE_CELL_SELECTOR = '[data-focus-active="true"]';
 
 export function getCoordinateTarget(

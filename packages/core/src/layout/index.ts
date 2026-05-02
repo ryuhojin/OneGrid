@@ -1,5 +1,7 @@
 export { createGridLayoutModel } from "./gridLayout.js";
+export { createFrozenRowSlices } from "./frozenRows.js";
 export { createSummaryRow } from "./summaryModel.js";
+export type { FrozenRowSliceOptions, FrozenRowSlices } from "./frozenRows.js";
 export type {
   GridLayoutModel,
   GridLayoutModelOptions,

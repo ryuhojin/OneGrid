@@ -1,0 +1,48 @@
+# Export / Import
+
+`F-EXPORT` provides a shared export/import contract across vanilla JavaScript, React, and Vue.
+
+Supported formats:
+
+- CSV export and import
+- XLSX export and import through a dependency-free OpenXML workbook
+- PDF export for lightweight tabular documents
+- Print HTML export with table `rowspan` and `colspan`
+- JSON export and import for application handoff
+
+```ts
+const csv = await grid.exportData({
+  format: "csv",
+  includeHeaders: true,
+  includeHeaderMerges: true,
+  includeCellMerges: true
+});
+
+const imported = await grid.importData(csv.content as string, {
+  format: "csv",
+  mode: "replace",
+  hasHeaders: true,
+  columns: ["id", "region", "agency", "program", "memo", "owner", "amount", "status"]
+});
+```
+
+`selectedOnly` exports the current selected rows, cells, or range. When
+`preserveVisualLayout` is enabled, merged headers and merged body cells are represented by blank
+covered cells in CSV and merge ranges in XLSX/print HTML.
+
+XLSX export includes the visual basics needed for handoff files: header fills, bold headers,
+cell borders, merged-cell fills, and calculated column widths. PDF export renders a lightweight
+one-page table with the same header/body distinction and visible cell boundaries.
+
+`exportData()` returns the payload instead of forcing a browser download. This keeps the core API
+usable in server-side jobs, custom save flows, and audited enterprise workflows. Browser examples
+turn the returned payload into a `Blob` and trigger a normal file download from the button click.
+
+Import parsing is intentionally explicit. Use `ImportOptions.parseRow` when CSV/XLSX strings must be
+converted back into typed application rows.
+
+Import replaces the current client rows by default. Use `mode: "append"` only when imported rows
+should be added beneath the existing dataset.
+
+The vanilla example uses actual file inputs for CSV and XLSX import. Its downloadable test fixtures
+are available as `/export-testFile.csv` and `/export-testFile.xlsx` in the examples app.

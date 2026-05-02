@@ -3,11 +3,13 @@ import type {
   ColumnDef,
   ColumnUiState,
   DataSource,
+  ExportOptions,
   GetRowsRequest,
   GridApi,
   GridOptions,
   GridPendingEdit,
   GridPlugin,
+  ImportOptions,
   RowKey,
   VirtualizationOptions
 } from "../src/index.js";
@@ -113,11 +115,27 @@ describe("@onegrid/core public type skeleton", () => {
         commitMode: "batch",
         blurAction: "cancel",
         validateOnCommit: true
+      },
+      export: {
+        format: "xlsx",
+        includeHeaders: true,
+        includeHeaderMerges: true,
+        includeCellMerges: true
+      },
+      import: {
+        format: "csv",
+        mode: "replace",
+        hasHeaders: true,
+        columns: ["id", "amount", "status"]
       }
     };
 
     expectTypeOf<GridApi<OrderRow>["getPendingEdits"]>()
       .returns.toMatchTypeOf<readonly GridPendingEdit<OrderRow>[]>();
+    expectTypeOf<GridApi<OrderRow>["exportData"]>()
+      .parameter(0).toMatchTypeOf<ExportOptions | undefined>();
+    expectTypeOf<GridApi<OrderRow>["importData"]>()
+      .parameter(1).toMatchTypeOf<ImportOptions<OrderRow> | undefined>();
     expectTypeOf<GridApi<OrderRow>["getGroupModel"]>().returns.toMatchTypeOf<
       NonNullable<GridOptions<OrderRow>["grouping"]>["model"]
     >();

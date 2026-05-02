@@ -123,3 +123,30 @@ await api.pasteFromClipboard("Grant review\t410000");
 
 `copyToClipboard()` writes `text/plain` only. `pasteFromClipboard()` parses TSV, skips read-only or
 out-of-range targets, and emits normal edit commit or validation events for accepted cells.
+
+Export and import methods use the shared core converters. Export does not execute renderer HTML, so
+user data remains text unless the application explicitly consumes the returned file content:
+
+```ts
+const xlsx = await api.exportData({
+  format: "xlsx",
+  selectedOnly: true,
+  includeHeaders: true,
+  preserveVisualLayout: true
+});
+
+const imported = await api.importData(xlsx.content as Uint8Array, {
+  format: "xlsx",
+  mode: "replace",
+  hasHeaders: true,
+  parseRow: (record) => ({
+    id: String(record.id),
+    amount: Number(record.amount)
+  })
+});
+```
+
+`exportData()` returns `GridExportResult` with `content`, `mediaType`, and `filename`.
+`importData()` returns imported rows plus rejected parser rows. The default import mode is
+`"replace"`, so CSV/XLSX/JSON import clears existing client-side rows before applying imported rows.
+Use `mode: "append"` only when the imported rows should be added after the current client rows.

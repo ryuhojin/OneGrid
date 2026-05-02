@@ -13,12 +13,18 @@ import type {
   ContextMenuOptions,
   DataSource,
   EditingOptions,
+  ExportOptions,
   FilteringOptions,
+  FrozenColumnOptions,
+  FrozenRowOptions,
   GridOptions,
+  GridExportResult,
+  GridImportResult,
   GridPendingEdit,
   GridSelectionState,
   GroupingOptions,
   HeaderMergeOptions,
+  ImportOptions,
   InfiniteRowOptions,
   LayoutOptions,
   MergeOptions,
@@ -112,6 +118,14 @@ export const OneGrid = defineComponent({
       type: Object as PropType<VirtualizationOptions | undefined>,
       default: undefined
     },
+    frozenRows: {
+      type: Object as PropType<FrozenRowOptions | undefined>,
+      default: undefined
+    },
+    frozenColumns: {
+      type: Object as PropType<FrozenColumnOptions | undefined>,
+      default: undefined
+    },
     filtering: {
       type: Object as PropType<FilteringOptions | undefined>,
       default: undefined
@@ -122,6 +136,14 @@ export const OneGrid = defineComponent({
     },
     clipboard: {
       type: Object as PropType<ClipboardOptions | undefined>,
+      default: undefined
+    },
+    export: {
+      type: Object as PropType<ExportOptions | undefined>,
+      default: undefined
+    },
+    import: {
+      type: Object as PropType<ImportOptions<unknown> | undefined>,
       default: undefined
     },
     contextMenu: {
@@ -208,8 +230,12 @@ export const OneGrid = defineComponent({
         props.tree,
         props.layout,
         props.virtualization,
+        props.frozenRows,
+        props.frozenColumns,
         props.editing,
         props.clipboard,
+        props.export,
+        props.import,
         props.contextMenu,
         props.filtering,
         props.sorting,
@@ -257,6 +283,17 @@ export const OneGrid = defineComponent({
       },
       pasteFromClipboard(text: string) {
         return grid?.pasteFromClipboard(text) ?? Promise.resolve();
+      },
+      exportData(options?: ExportOptions): Promise<GridExportResult> {
+        return grid?.exportData(options)
+          ?? Promise.resolve({ content: "", mediaType: "text/plain" });
+      },
+      importData(
+        content: string | Uint8Array,
+        options?: ImportOptions<unknown>
+      ): Promise<GridImportResult<unknown>> {
+        return grid?.importData(content, options)
+          ?? Promise.resolve({ rows: [], rowCount: 0, rejected: [] });
       },
       setGroupModel(model: GroupingOptions["model"]) {
         if (model) {

@@ -30,14 +30,24 @@ export function resolveScrollTopForRow<TData>(input: {
   readonly viewportRowModel: ViewportRowModel<TData> | undefined;
   readonly treeRowModel: TreeRowModel<TData> | undefined;
 }): number {
+  const frozenTop = normalizeFrozenCount(input.options.frozenRows?.top);
+  const frozenBottom = normalizeFrozenCount(input.options.frozenRows?.bottom);
+  const rowCount = getCurrentRowCount(input);
+  const scrollableRowCount = Math.max(0, rowCount - frozenTop - frozenBottom);
+  const scrollableRowIndex = Math.max(0, Math.min(scrollableRowCount - 1, input.rowIndex - frozenTop));
+
   return getScrollTopForRow({
-    rowIndex: input.rowIndex,
-    rowCount: getCurrentRowCount(input),
+    rowIndex: scrollableRowIndex,
+    rowCount: scrollableRowCount,
     rowHeight: resolveVirtualRowHeight(input.options),
     viewportHeight: input.viewportHeight ?? resolveVirtualViewportHeight(input.options),
     currentScrollTop: input.currentScrollTop,
     align: input.align
   });
+}
+
+function normalizeFrozenCount(count: number | undefined): number {
+  return Number.isFinite(count) && count !== undefined ? Math.max(0, Math.floor(count)) : 0;
 }
 
 export function resolveScrollLeftForField<TData>(input: {

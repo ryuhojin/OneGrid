@@ -36,6 +36,7 @@ import type { ColumnUiRuntime } from "./columnControls.js";
 import { EditBatchRuntime } from "./editBatchRuntime.js";
 import type { GridEditRuntime } from "./editRuntime.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
+import { applyFrozenColumnState } from "./frozenColumns.js";
 import type { GroupRowRuntime } from "./groupRowRenderer.js";
 import type { GridPaginationRuntime } from "./paginationRenderer.js";
 import { disposeGridShell, renderGridShell } from "./renderGridShell.js";
@@ -98,7 +99,7 @@ export abstract class OneGridBase<TData = unknown> {
   constructor(options: DomGridOptions<TData>) {
     this.options = options;
     this.dataRows = Array.isArray(options.data) ? options.data : undefined;
-    this.columnState = options.columnState ?? {};
+    this.columnState = applyFrozenColumnState(options.columnState ?? {}, options.frozenColumns);
     this.sortModel = options.sorting?.enabled === false
       ? Object.freeze([])
       : createInitialSortModel(options.columns, options.sorting?.model);

@@ -1,0 +1,3 @@
+id,region,agency,program,memo,owner,amount,status
+FILE-CSV-0001,File Import,External Records,CSV file intake,Uploaded CSV,Kim,780,Review
+FILE-CSV-0002,File Import,External Records,CSV file approval,Uploaded CSV,Kim,960,Approved

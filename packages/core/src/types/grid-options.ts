@@ -55,8 +55,9 @@ export interface GridOptions<TData = unknown> {
   readonly merge?: MergeOptions<TData>;
   readonly pagination?: PaginationOptions;
   readonly clipboard?: ClipboardOptions;
-  readonly contextMenu?: ContextMenuOptions<TData>;
   readonly export?: ExportOptions;
+  readonly import?: ImportOptions<TData>;
+  readonly contextMenu?: ContextMenuOptions<TData>;
   readonly accessibility?: AccessibilityOptions;
   readonly security?: SecurityOptions;
   readonly theme?: ThemeOptions;
@@ -233,10 +234,23 @@ export interface ClipboardOptions {
 }
 
 export interface ExportOptions {
-  readonly format?: "csv" | "xlsx" | "pdf" | "json";
+  readonly format?: "csv" | "xlsx" | "pdf" | "json" | "print";
   readonly selectedOnly?: boolean;
   readonly includeHeaders?: boolean;
   readonly preserveVisualLayout?: boolean;
+  readonly filename?: string;
+  readonly sheetName?: string;
+  readonly title?: string;
+  readonly includeHeaderMerges?: boolean;
+  readonly includeCellMerges?: boolean;
+}
+
+export interface ImportOptions<TData = unknown> {
+  readonly format?: "csv" | "xlsx" | "json";
+  readonly mode?: "replace" | "append";
+  readonly hasHeaders?: boolean;
+  readonly columns?: readonly string[];
+  parseRow?(record: Readonly<Record<string, unknown>>, rowIndex: number): TData;
 }
 
 export interface SecurityOptions {

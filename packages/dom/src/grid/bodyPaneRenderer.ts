@@ -16,6 +16,7 @@ export interface BodyPaneRuntime {
   readonly treeRuntime?: TreeRowRuntime;
   readonly groupRuntime?: GroupRowRuntime;
   readonly cellSpanModel?: CellSpanModel;
+  readonly rowIndexOffset?: number;
   readonly treeColumnField?: string;
   readonly security?: SecurityOptions;
   readonly editing?: EditingOptions;
@@ -31,12 +32,13 @@ export function createBodyPane<TData>(
   const body = document.createElement("div");
   body.className = "og-grid__body";
   applyPaneVirtualInlineWindow(body, pane);
-  const cellSpanWindow = createPaneCellSpanWindow(pane, rows, virtualWindow);
+  const rowIndexOffset = runtime?.rowIndexOffset ?? 0;
+  const cellSpanWindow = createPaneCellSpanWindow(pane, rows, virtualWindow, rowIndexOffset);
 
   appendVirtualSpacer(body, "top", virtualWindow?.beforeHeight ?? 0);
 
   rows.forEach((row, rowIndex) => {
-    const absoluteRowIndex = (virtualWindow?.firstRow ?? 0) + rowIndex;
+    const absoluteRowIndex = rowIndexOffset + (virtualWindow?.firstRow ?? 0) + rowIndex;
     body.append(createBodyRow({
       entry: row,
       rowIndex: absoluteRowIndex,
@@ -81,15 +83,16 @@ function appendVirtualSpacer(
 function createPaneCellSpanWindow<TData>(
   pane: LayoutPane<TData>,
   rows: readonly BodyRowEntry<TData>[],
-  virtualWindow: FixedRowVirtualWindow | undefined
+  virtualWindow: FixedRowVirtualWindow | undefined,
+  rowIndexOffset = 0
 ): CellSpanWindow | undefined {
   if (rows.length === 0 || pane.columns.length === 0) {
     return undefined;
   }
 
   return {
-    firstRow: getFirstRenderedRowIndex(rows, virtualWindow),
-    lastRow: getLastRenderedRowIndex(rows, virtualWindow),
+    firstRow: getFirstRenderedRowIndex(rows, virtualWindow, rowIndexOffset),
+    lastRow: getLastRenderedRowIndex(rows, virtualWindow, rowIndexOffset),
     firstColumn: pane.ariaColumnOffset,
     lastColumn: pane.ariaColumnOffset + pane.columns.length - 1
   };
@@ -97,24 +100,26 @@ function createPaneCellSpanWindow<TData>(
 
 function getFirstRenderedRowIndex<TData>(
   rows: readonly BodyRowEntry<TData>[],
-  virtualWindow: FixedRowVirtualWindow | undefined
+  virtualWindow: FixedRowVirtualWindow | undefined,
+  rowIndexOffset: number
 ): number {
   const first = rows[0];
   if (first && "rowIndex" in first) {
     return first.rowIndex;
   }
 
-  return virtualWindow?.firstRow ?? 0;
+  return rowIndexOffset + (virtualWindow?.firstRow ?? 0);
 }
 
 function getLastRenderedRowIndex<TData>(
   rows: readonly BodyRowEntry<TData>[],
-  virtualWindow: FixedRowVirtualWindow | undefined
+  virtualWindow: FixedRowVirtualWindow | undefined,
+  rowIndexOffset: number
 ): number {
   const last = rows[rows.length - 1];
   if (last && "rowIndex" in last) {
     return last.rowIndex;
   }
 
-  return (virtualWindow?.firstRow ?? 0) + rows.length - 1;
+  return rowIndexOffset + (virtualWindow?.firstRow ?? 0) + rows.length - 1;
 }

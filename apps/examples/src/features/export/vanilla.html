@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneGrid Export Import</title>
+  </head>
+  <body>
+    <main>
+      <h1>Export / Import</h1>
+      <section id="example" aria-label="Export import example"></section>
+    </main>
+    <script type="module">
+      import { mountExportExample } from "./vanilla.ts";
+
+      const host = document.querySelector("#example");
+      if (host instanceof HTMLElement) {
+        mountExportExample(host);
+      }
+    </script>
+  </body>
+</html>

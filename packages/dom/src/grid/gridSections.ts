@@ -1,14 +1,14 @@
 import type { LayoutPane } from "@onegrid/core";
 
 export function createSection<TData>(
-  section: "header" | "body" | "summary",
+  section: "header" | "frozen" | "body" | "summary",
   panes: Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>,
   renderPane: (pane: LayoutPane<TData>) => HTMLElement
 ): HTMLElement {
   const element = document.createElement("div");
   element.className = `og-grid__section og-grid__section--${section}`;
   element.dataset.layoutSection = section;
-  element.setAttribute("role", section === "body" ? "rowgroup" : "presentation");
+  element.setAttribute("role", isRowGroupSection(section) ? "rowgroup" : "presentation");
   element.style.gridTemplateColumns = section === "body"
     ? `${panes.left.width}px minmax(0, 1fr) ${panes.right.width}px`
     : `${panes.left.width}px minmax(0, 1fr) ${panes.right.width}px var(--og-scrollbar-inline-gutter)`;
@@ -38,6 +38,10 @@ export function createSection<TData>(
   }
 
   return element;
+}
+
+function isRowGroupSection(section: "header" | "frozen" | "body" | "summary"): boolean {
+  return section === "body" || section === "frozen";
 }
 
 export function createBodyViewport(): HTMLElement {

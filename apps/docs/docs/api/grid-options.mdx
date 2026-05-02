@@ -174,6 +174,44 @@ const options: GridOptions<OrderRow> = {
 `includeHeaders` controls the default header row for copy operations. `preserveMerge` writes merge
 anchor values once and blank cells for covered coordinates.
 
+Export and import options configure file conversion defaults for `GridApi.exportData()` and
+`GridApi.importData()`:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  export: {
+    format: "xlsx",
+    includeHeaders: true,
+    includeHeaderMerges: true,
+    includeCellMerges: true,
+    preserveVisualLayout: true,
+    filename: "orders.xlsx"
+  },
+  import: {
+    format: "csv",
+    mode: "replace",
+    hasHeaders: true,
+    columns: ["id", "region", "amount"],
+    parseRow: (record) => ({
+      id: String(record.id),
+      region: String(record.region),
+      amount: Number(record.amount)
+    })
+  }
+};
+```
+
+CSV uses blank covered cells for visual merge preservation. XLSX and print HTML also preserve merge
+ranges. PDF export is a lightweight text-table document intended for quick review, while print HTML
+is the richer layout path for browser printing.
+
+Import uses `mode: "replace"` by default so a file import clears the current client rows before
+rendering imported rows. `mode: "append"` is opt-in for workflows that intentionally add imported
+rows beneath the current dataset.
+
 Menu options control row and cell context menu items while header menu availability remains under
 `columnUi.menu`:
 
@@ -359,6 +397,27 @@ const columns: ColumnDef<OrderRow>[] = [
   { field: "status", pinned: "right" }
 ];
 ```
+
+Frozen row and column options provide the same behavior from `GridOptions` without changing each
+column definition:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  frozenRows: { top: 2, bottom: 1 },
+  frozenColumns: {
+    left: ["id", "region"],
+    right: ["status"]
+  }
+};
+```
+
+`frozenRows.top` and `frozenRows.bottom` are counts from the rendered row model. They become
+separate non-scrolling rowgroups, while the center body keeps row virtualization and custom
+scrollbar behavior. `frozenColumns.left/right` use column ids, which default to `field` when a
+column does not define an explicit `id`.
 
 Summary rows are driven by `ColumnDef.summary` and can be rendered at the top, bottom, or both
 positions:

@@ -9,5 +9,5 @@ test("selection example visual smoke @visual", async ({ page }) => {
   await page.locator('[data-edit-row-key="SEL-0002"][data-field="memo"]').first().click();
   await page.keyboard.up("Shift");
 
-  await expect(page).toHaveScreenshot("selection-grid.png");
+  await expect(page.locator("#F-SELECT")).toHaveScreenshot("selection-grid.png");
 });

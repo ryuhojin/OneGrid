@@ -2,7 +2,7 @@ import type { NormalizedDataColumn } from "../column/index.js";
 
 export type LayoutPaneKey = "left" | "center" | "right";
 
-export type LayoutSectionKey = "header" | "body" | "summary" | "footer" | "overlay";
+export type LayoutSectionKey = "header" | "frozen" | "body" | "summary" | "footer" | "overlay";
 
 export interface LayoutPane<TData = unknown> {
   readonly key: LayoutPaneKey;

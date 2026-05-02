@@ -211,3 +211,30 @@
 - Reason: F-PAGE requires client, server, cursor, and append-scroll pagination to share one model and renderer contract.
 - Impact: No breaking change. Pagination is opt-in with `GridOptions.pagination`.
 - Migration: None.
+
+## 2026-05-02 — Frozen rows and columns layout contract
+
+- Status: accepted
+- Area: GridOptions | Wrapper | DOM
+- Change:
+  - `GridOptions.frozenRows.top` and `frozenRows.bottom` are now consumed by the DOM renderer.
+  - `GridOptions.frozenColumns.left/right` initialize the shared column state pinned panes.
+  - Vue wrapper accepts the shared `frozenRows` and `frozenColumns` props.
+  - DOM renders top and bottom frozen rows as separate rowgroup sections with merge clipping and keyboard focus participation.
+- Reason: F-FROZEN requires pinned columns, top/bottom frozen rows, virtualization, merge, and keyboard navigation to share one layout contract.
+- Impact: No breaking change. Frozen rows and columns are opt-in.
+- Migration: None.
+
+## 2026-05-02 — Export and import API contract
+
+- Status: accepted
+- Area: GridOptions | GridApi | Wrapper | DOM | Core
+- Change:
+  - `GridOptions.import` was added and `GridOptions.export` now includes CSV/XLSX/PDF/JSON/print options.
+  - `ImportOptions.mode` was added with default `"replace"` and opt-in `"append"`.
+  - `GridApi.importData(content, options)` was added alongside `GridApi.exportData(options)`.
+  - Core exports converters for CSV, dependency-free XLSX OpenXML, lightweight PDF, print HTML, JSON, and typed import row parsing.
+  - DOM export/import uses visible rows, header merge, cell merge, and selected range state without wrapper reimplementation.
+- Reason: F-EXPORT requires export/import behavior to be shared by core, DOM, React, and Vue.
+- Impact: No breaking change. Export and import are opt-in public methods. Import replaces existing client rows by default.
+- Migration: None.
