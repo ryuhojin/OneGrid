@@ -1,3 +1,5 @@
+import type { LocaleFormatterBridge } from "@onegrid/core";
+
 export interface FooterState {
   readonly rowCount: number;
   readonly loading: boolean;
@@ -12,7 +14,10 @@ export interface OverlayState {
   readonly error?: unknown;
 }
 
-export function createFooterSection(rowRenderState: FooterState | undefined): HTMLElement {
+export function createFooterSection(
+  rowRenderState: FooterState | undefined,
+  i18n: LocaleFormatterBridge
+): HTMLElement {
   const section = document.createElement("div");
   section.className = "og-grid__section og-grid__section--footer";
   section.dataset.layoutSection = "footer";
@@ -25,7 +30,7 @@ export function createFooterSection(rowRenderState: FooterState | undefined): HT
 
   const status = document.createElement("span");
   status.className = "og-grid__footer-status";
-  status.textContent = `Rows: ${formatRowCount(rowRenderState?.rowCount ?? 0)}`;
+  status.textContent = i18n.text.footerRows(rowRenderState?.rowCount ?? 0, i18n.formatNumber);
   footer.append(status);
 
   if (!rowRenderState || (!rowRenderState.hasMore && !rowRenderState.loading)) {
@@ -36,25 +41,22 @@ export function createFooterSection(rowRenderState: FooterState | undefined): HT
   button.type = "button";
   button.className = "og-grid__load-more";
   button.disabled = rowRenderState.loading;
-  button.textContent = rowRenderState.loading ? "Loading rows" : "Load more rows";
+  button.textContent = rowRenderState.loading ? i18n.text.loadingRows : i18n.text.loadMoreRows;
   button.addEventListener("click", () => rowRenderState.onLoadMore());
   footer.append(button);
   return section;
 }
 
-function formatRowCount(value: number): string {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
 export function createOverlayLayer(
-  rowRenderState: OverlayState | undefined
+  rowRenderState: OverlayState | undefined,
+  i18n: LocaleFormatterBridge
 ): HTMLElement {
   const overlay = document.createElement("div");
   overlay.className = "og-grid__overlay-layer";
   overlay.dataset.layoutSection = "overlay";
   overlay.setAttribute("role", "presentation");
 
-  const status = createOverlayStatus(rowRenderState);
+  const status = createOverlayStatus(rowRenderState, i18n);
   if (status) {
     overlay.append(status);
   }
@@ -62,21 +64,24 @@ export function createOverlayLayer(
   return overlay;
 }
 
-function createOverlayStatus(rowRenderState: OverlayState | undefined): HTMLElement | undefined {
+function createOverlayStatus(
+  rowRenderState: OverlayState | undefined,
+  i18n: LocaleFormatterBridge
+): HTMLElement | undefined {
   if (!rowRenderState) {
     return undefined;
   }
 
   if (rowRenderState.error !== undefined) {
-    return createStatus("alert", "Unable to load rows");
+    return createStatus("alert", i18n.text.unableToLoadRows);
   }
 
   if (rowRenderState.loading && rowRenderState.renderedRowCount === 0) {
-    return createStatus("status", "Loading rows");
+    return createStatus("status", i18n.text.loadingRows);
   }
 
   if (!rowRenderState.loading && rowRenderState.rowCount === 0) {
-    return createStatus("status", "No rows");
+    return createStatus("status", i18n.text.noRows);
   }
 
   return undefined;

@@ -1,0 +1,57 @@
+# Localization
+
+OneGrid localizes renderer chrome through `GridOptions.locale` and the core locale registry. The
+DOM renderer consumes the same locale bridge for footer text, loading overlays, pagination labels,
+ARIA live-region messages, and cell formatter helpers.
+
+```ts
+import { getLocale, registerLocale, type GridOptions } from "@onegrid/core";
+
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  locale: "ko-KR"
+};
+```
+
+Cells receive the active locale and formatter helpers through `CellContext`:
+
+```ts
+const columns = [
+  {
+    field: "amount",
+    headerName: "Amount",
+    formatter: ({ value, formatNumber }) =>
+      formatNumber(Number(value), { style: "currency", currency: "KRW" })
+  },
+  {
+    field: "requestedAt",
+    headerName: "Requested",
+    formatter: ({ value, formatDate }) => formatDate(String(value))
+  }
+];
+```
+
+Runtime switching is handled by the grid API:
+
+```ts
+api.setLocale("en-US");
+api.setLocale("ko-KR");
+const activeLocale = api.getLocale();
+```
+
+Custom locale definitions are registered in `@onegrid/core` and then selected by locale id:
+
+```ts
+registerLocale({
+  locale: "en-AU",
+  text: {
+    ...getLocale("en-US").text,
+    footerRows: (rowCount, formatNumber) => `Rows: ${formatNumber(rowCount)}`
+  }
+});
+```
+
+The built-in locales are `en-US` and `ko-KR`. Unknown locale ids fall back by language and then to
+`en-US`.

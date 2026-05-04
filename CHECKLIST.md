@@ -774,6 +774,15 @@
   - Verified:
     - pnpm test:unit
     - pnpm test:e2e
+  - Notes:
+    - 2026-05-04: ROW-003 예제 DataSource가 `groupKeys`별 leaf row를 반환하도록 수정하고,
+      그룹 expand E2E를 추가함.
+    - Evidence: apps/examples/src/features/server-row-model/data.ts,
+      tests/e2e/features/server-row-model.spec.ts,
+      apps/docs/docs/features/server-row-model.mdx
+    - Verified: pnpm typecheck, pnpm lint,
+      pnpm exec playwright test tests/e2e/features/server-row-model.spec.ts --project=chromium,
+      pnpm exec playwright test tests/a11y/server-row-model-a11y.spec.ts --project=chromium
 - [x] ROW-003-005 server aggregation request 구현
   - Evidence:
     - packages/core/src/row/serverRequest.ts
@@ -1687,6 +1696,7 @@
     - pnpm test:perf:smoke
     - pnpm build
     - pnpm docs:build
+    - git diff --check
   - Notes:
     - DOM custom scrollbar는 grid ARIA required-children 구조를 깨지 않도록 accessibility tree에서 숨겼다. 시각/포인터 스크롤 동작은 기존 E2E로 유지 검증했다.
 
@@ -2709,18 +2719,65 @@
 
 ### F-I18N Localization
 
-- [ ] F-I18N-001 locale registry
+- [x] F-I18N-001 locale registry
   - Evidence:
-- [ ] F-I18N-002 Korean locale
+    - packages/core/src/i18n/localeTypes.ts
+    - packages/core/src/i18n/localeRegistry.ts
+    - packages/core/src/i18n/index.ts
+    - packages/core/test/i18n.test.ts
+- [x] F-I18N-002 Korean locale
   - Evidence:
-- [ ] F-I18N-003 English locale
+    - packages/core/src/i18n/locales.ts
+    - tests/e2e/features/localization.spec.ts
+    - tests/a11y/localization-a11y.spec.ts
+- [x] F-I18N-003 English locale
   - Evidence:
-- [ ] F-I18N-004 date/number formatter bridge
+    - packages/core/src/i18n/locales.ts
+    - packages/dom/src/grid/footerRenderer.ts
+    - packages/dom/src/grid/paginationRenderer.ts
+    - packages/dom/src/grid/gridAccessibility.ts
+- [x] F-I18N-004 date/number formatter bridge
   - Evidence:
-- [ ] F-I18N-005 runtime locale switch
+    - packages/core/src/i18n/formatters.ts
+    - packages/core/src/types/column.ts
+    - packages/dom/src/grid/rendererHost.ts
+    - packages/dom/src/grid/clipboardData.ts
+    - apps/examples/src/features/localization/data.ts
+- [x] F-I18N-005 runtime locale switch
   - Evidence:
-- [ ] F-I18N-006 docs
+    - packages/core/src/types/grid-api.ts
+    - packages/dom/src/grid/oneGridBase.ts
+    - packages/vue/src/OneGrid.ts
+    - packages/vue/src/gridOptions.ts
+    - apps/examples/src/features/localization/vanilla.ts
+    - apps/examples/src/features/localization/react.tsx
+    - apps/examples/src/features/localization/vue.vue
+    - tests/e2e/visual/localization.visual.spec.ts
+    - tests/e2e/visual/localization.visual.spec.ts-snapshots/localization-grid-chromium-darwin.png
+- [x] F-I18N-006 docs
   - Evidence:
+    - apps/docs/docs/features/localization.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:e2e:visual
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/localization.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/localization-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/visual/localization.visual.spec.ts --project=chromium --update-snapshots
+  - Notes:
+    - 2026-05-04: Core locale registry는 `en-US`, `ko-KR`, language fallback, custom `registerLocale()`를 제공한다.
+    - 2026-05-04: `CellContext`에 `locale`, `formatNumber()`, `formatDate()`를 추가해 DOM renderer, clipboard formatter, merge/edit callback이 동일 formatter bridge를 사용한다.
+    - 2026-05-04: DOM footer, overlay, pagination, ARIA live-region text를 locale bridge로 전환했고 `GridApi.setLocale()` / `getLocale()` runtime switch를 추가했다.
+    - 2026-05-04: F-I18N vanilla/React/Vue example과 docs를 추가했다. 전체 visual 재검증 중 기존 export snapshot도 현재 export 화면 기준으로 갱신했다.
 
 ---
 
@@ -2728,37 +2785,110 @@
 
 ### SEC-001 CSP
 
-- [ ] SEC-001-001 no eval / no new Function 검증
+- [x] SEC-001-001 no eval / no new Function 검증
   - Evidence:
-- [ ] SEC-001-002 inline event handler 미사용 검증
+    - tests/security/csp-source.test.ts
+    - Verified: `pnpm test:unit`
+- [x] SEC-001-002 inline event handler 미사용 검증
   - Evidence:
-- [ ] SEC-001-003 style nonce option 구현
+    - tests/security/csp-source.test.ts
+    - Verified: `pnpm test:unit`
+- [x] SEC-001-003 style nonce option 구현
   - Evidence:
-- [ ] SEC-001-004 disableStyleInjection option 구현
+    - packages/dom/src/grid/cspStyle.ts
+    - packages/dom/src/grid/themeRuntime.ts
+    - packages/dom/src/grid/oneGridBase.ts
+    - packages/dom/test/csp.test.ts
+    - Verified: `pnpm test:unit`
+- [x] SEC-001-004 disableStyleInjection option 구현
   - Evidence:
-- [ ] SEC-001-005 CSP example page
+    - packages/dom/src/grid/cspStyle.ts
+    - packages/dom/src/grid/themeRuntime.ts
+    - packages/dom/test/csp.test.ts
+    - Verified: `pnpm test:unit`
+- [x] SEC-001-005 CSP example page
   - Evidence:
-- [ ] SEC-001-006 CSP Playwright test
+    - apps/examples/src/features/csp/data.ts
+    - apps/examples/src/features/csp/vanilla.ts
+    - apps/examples/src/features/csp/react.tsx
+    - apps/examples/src/features/csp/vue.vue
+    - apps/examples/csp.html
+    - apps/examples/src/features/csp/csp-theme.css
+    - apps/examples/src/catalog.ts
+    - Verified: `pnpm build`
+- [x] SEC-001-006 CSP Playwright test
   - Evidence:
-- [ ] SEC-001-007 docs/security/csp 작성
+    - tests/e2e/features/csp.spec.ts
+    - tests/a11y/csp-a11y.spec.ts
+    - Verified: `pnpm test:e2e`, `pnpm test:a11y`, `pnpm exec playwright test --config playwright.config.ts tests/e2e/features/csp.spec.ts --project=webkit`
+- [x] SEC-001-007 docs/security/csp 작성
   - Evidence:
+    - apps/docs/docs/security/csp.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+    - Verified: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:e2e`, `pnpm test:a11y`, `pnpm test:e2e:visual`, `pnpm test:perf:smoke`, `pnpm build`, `pnpm docs:build`
 
 ### SEC-002 XSS Defense
 
-- [ ] SEC-002-001 default text escape
+- [x] SEC-002-001 default text escape
   - Evidence:
-- [ ] SEC-002-002 html renderer opt-in
+    - packages/dom/src/grid/rendererHost.ts
+    - packages/dom/src/grid/htmlSecurity.ts
+    - packages/dom/test/xss.test.ts
+    - tests/e2e/features/xss-defense.spec.ts
+- [x] SEC-002-002 html renderer opt-in
   - Evidence:
-- [ ] SEC-002-003 sanitizer interface
+    - packages/core/src/types/column.ts
+    - packages/dom/src/grid/htmlSecurity.ts
+    - apps/examples/src/features/xss-defense/data.ts
+    - tests/e2e/features/xss-defense.spec.ts
+- [x] SEC-002-003 sanitizer interface
   - Evidence:
-- [ ] SEC-002-004 Trusted Types option
+    - packages/core/src/types/shared.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/core/test/public-types.test.ts
+    - packages/dom/test/xss.test.ts
+- [x] SEC-002-004 Trusted Types option
   - Evidence:
-- [ ] SEC-002-005 URL protocol allowlist
+    - packages/core/src/types/grid-options.ts
+    - packages/dom/src/grid/htmlSecurity.ts
+    - packages/dom/test/xss.test.ts
+    - apps/docs/docs/security/xss.mdx
+- [x] SEC-002-005 URL protocol allowlist
   - Evidence:
-- [ ] SEC-002-006 malicious data E2E
+    - packages/dom/src/grid/htmlSecurity.ts
+    - packages/dom/test/xss.test.ts
+    - tests/e2e/features/xss-defense.spec.ts
+- [x] SEC-002-006 malicious data E2E
   - Evidence:
-- [ ] SEC-002-007 docs/security/xss 작성
+    - apps/examples/src/features/xss-defense/data.ts
+    - apps/examples/src/features/xss-defense/vanilla.ts
+    - apps/examples/src/features/xss-defense/react.tsx
+    - apps/examples/src/features/xss-defense/vue.vue
+    - tests/e2e/features/xss-defense.spec.ts
+    - tests/a11y/xss-defense-a11y.spec.ts
+- [x] SEC-002-007 docs/security/xss 작성
   - Evidence:
+    - apps/docs/docs/security/xss.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/column-def.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts packages/dom/test/xss.test.ts tests/security/xss-source.test.ts packages/core/test/public-types.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/xss-defense.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/xss-defense-a11y.spec.ts --project=chromium
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:e2e:visual
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+    - git diff --check
 
 ---
 
@@ -2766,37 +2896,108 @@
 
 ### THEME-001 Theme Foundation
 
-- [ ] THEME-001-001 CSS variables token 정의
+- [x] THEME-001-001 CSS variables token 정의
   - Evidence:
-- [ ] THEME-001-002 default theme
+    - packages/themes/src/tokens.css
+    - packages/themes/src/index.ts
+    - packages/themes/test/tokens.test.ts
+- [x] THEME-001-002 default theme
   - Evidence:
-- [ ] THEME-001-003 clean theme
+    - packages/themes/src/default.css
+    - packages/themes/package.json
+- [x] THEME-001-003 clean theme
   - Evidence:
-- [ ] THEME-001-004 compact theme
+    - packages/themes/src/clean.css
+    - apps/examples/src/features/theme-foundation/data.ts
+- [x] THEME-001-004 compact theme
   - Evidence:
-- [ ] THEME-001-005 dark theme
+    - packages/themes/src/compact.css
+    - apps/examples/src/features/theme-foundation/data.ts
+- [x] THEME-001-005 dark theme
   - Evidence:
-- [ ] THEME-001-006 high contrast theme
+    - packages/themes/src/dark.css
+    - tests/e2e/features/theme-foundation.spec.ts
+- [x] THEME-001-006 high contrast theme
   - Evidence:
-- [ ] THEME-001-007 density switch
+    - packages/themes/src/high-contrast.css
+    - tests/a11y/theme-foundation-a11y.spec.ts
+- [x] THEME-001-007 density switch
   - Evidence:
-- [ ] THEME-001-008 runtime theme switch
+    - packages/dom/src/grid/themeRuntime.ts
+    - apps/examples/src/features/theme-foundation/vanilla.ts
+    - packages/dom/test/theme.test.ts
+- [x] THEME-001-008 runtime theme switch
   - Evidence:
-- [ ] THEME-001-009 scoped theme
+    - packages/dom/src/grid/themeRuntime.ts
+    - apps/examples/src/features/theme-foundation/vanilla.ts
+    - tests/e2e/features/theme-foundation.spec.ts
+- [x] THEME-001-009 scoped theme
   - Evidence:
+    - packages/dom/src/grid/cspStyle.ts
+    - apps/examples/src/features/theme-foundation
+    - apps/docs/docs/features/theme-foundation.mdx
+    - tests/e2e/visual/theme-foundation.visual.spec.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:e2e:visual
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+    - git diff --check
+  - Notes:
+    - `@onegrid/themes/default.css` now imports exported token CSS via package subpath so Vite/PostCSS resolves the theme package under `style` conditions.
+    - HTML sanitizer policy risk from SEC-002 is recorded in `D-20260504-001`.
 
 ### THEME-002 SI Customization
 
-- [ ] THEME-002-001 design token mapping guide
+- [x] THEME-002-001 design token mapping guide
   - Evidence:
-- [ ] THEME-002-002 theme builder example
+    - packages/themes/src/siTheme.ts
+    - apps/docs/docs/features/si-customization.mdx
+    - packages/themes/test/tokens.test.ts
+- [x] THEME-002-002 theme builder example
   - Evidence:
-- [ ] THEME-002-003 CSS override recipe
+    - packages/themes/src/siTheme.ts
+    - apps/examples/src/features/si-customization/data.ts
+    - apps/examples/src/features/si-customization/vanilla.ts
+    - apps/examples/src/features/si-customization/react.tsx
+    - apps/examples/src/features/si-customization/vue.vue
+- [x] THEME-002-003 CSS override recipe
   - Evidence:
-- [ ] THEME-002-004 visual regression per theme
+    - apps/docs/docs/features/si-customization.mdx
+    - apps/examples/src/styles.css
+- [x] THEME-002-004 visual regression per theme
   - Evidence:
-- [ ] THEME-002-005 docs
+    - tests/e2e/visual/si-customization.visual.spec.ts
+    - tests/e2e/visual/si-customization.visual.spec.ts-snapshots/si-customization-public-red-chromium-darwin.png
+    - tests/e2e/visual/si-customization.visual.spec.ts-snapshots/si-customization-civic-blue-chromium-darwin.png
+    - tests/e2e/visual/si-customization.visual.spec.ts-snapshots/si-customization-neutral-audit-chromium-darwin.png
+- [x] THEME-002-005 docs
   - Evidence:
+    - apps/docs/docs/features/si-customization.mdx
+    - apps/docs/sidebars.cjs
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:e2e:visual
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
+    - git diff --check
+  - Notes:
+    - SI 전용 token builder는 CSS variable만 생성하며 renderer/core 기능을 재구현하지 않는다.
+    - `packages/themes/src/default.css` structural split은 2026-05-04 cleanup에서 해결했다. 세부 증빙은 `R-20260504-002`를 참조한다.
+    - 2026-05-04: BNK CI RGB 기준 sample tenant palette `si-bnk-red`, `si-bnk-gold`, `si-bnk-gray`를 THEME-002 example/docs/visual snapshot에 추가했다. 고객사별 팔레트이므로 `@onegrid/themes` public preset으로 export하지 않는다.
 
 ---
 
@@ -2804,64 +3005,187 @@
 
 ### WRAP-001 React
 
-- [ ] WRAP-001-001 `<OneGrid />` component
+- [x] WRAP-001-001 `<OneGrid />` component
   - Evidence:
-- [ ] WRAP-001-002 ref GridApi bridge
+    - packages/react/src/OneGrid.tsx
+    - packages/react/src/gridOptions.ts
+    - packages/react/src/index.ts
+- [x] WRAP-001-002 ref GridApi bridge
   - Evidence:
-- [ ] WRAP-001-003 event props bridge
+    - packages/react/src/gridHandle.ts
+    - apps/examples/src/features/react-wrapper/react.tsx
+- [x] WRAP-001-003 event props bridge
   - Evidence:
-- [ ] WRAP-001-004 React cell renderer
+    - packages/react/src/gridEvents.ts
+    - tests/e2e/features/react-wrapper.spec.ts
+- [x] WRAP-001-004 React cell renderer
   - Evidence:
-- [ ] WRAP-001-005 React header renderer
+    - packages/react/src/reactRendererBridge.tsx
+    - apps/examples/src/features/react-wrapper/react.tsx
+- [x] WRAP-001-005 React header renderer
   - Evidence:
-- [ ] WRAP-001-006 React editor renderer
+    - packages/core/src/types/column.ts
+    - packages/dom/src/grid/rendererHost.ts
+    - packages/react/src/reactRendererBridge.tsx
+- [x] WRAP-001-006 React editor renderer
   - Evidence:
-- [ ] WRAP-001-007 controlled options update
+    - apps/examples/src/features/react-wrapper/react.tsx
+    - apps/docs/docs/frameworks/react.mdx
+  - Notes:
+    - React wrapper uses the shared core `EditorDef` and DOM editor overlay; wrapper does not reimplement editors.
+- [x] WRAP-001-007 controlled options update
   - Evidence:
-- [ ] WRAP-001-008 unmount cleanup
+    - packages/react/src/OneGrid.tsx
+    - tests/e2e/features/react-wrapper.spec.ts
+- [x] WRAP-001-008 unmount cleanup
   - Evidence:
-- [ ] WRAP-001-009 React examples all core features
+    - packages/react/src/OneGrid.tsx
+    - packages/react/src/reactRendererBridge.tsx
+- [x] WRAP-001-009 React examples all core features
   - Evidence:
-- [ ] WRAP-001-010 React E2E
+    - apps/examples/src/features/*/react.tsx
+    - apps/examples/src/features/react-wrapper/react.tsx
+    - apps/examples/react.html
+- [x] WRAP-001-010 React E2E
   - Evidence:
-- [ ] WRAP-001-011 React docs
+    - tests/e2e/features/react-wrapper.spec.ts
+    - tests/a11y/react-wrapper-a11y.spec.ts
+  - Verified:
+    - pnpm test:e2e
+    - pnpm test:a11y
+- [x] WRAP-001-011 React docs
   - Evidence:
+    - apps/docs/docs/frameworks/react.mdx
+    - apps/docs/docs/quick-start/react.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit -- packages/react/test/react-shell.test.tsx
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
 
 ### WRAP-002 Vue
 
-- [ ] WRAP-002-001 `<OneGrid />` component
+- [x] WRAP-002-001 `<OneGrid />` component
   - Evidence:
-- [ ] WRAP-002-002 expose GridApi bridge
+    - packages/vue/src/OneGrid.ts
+    - packages/vue/src/oneGridProps.ts
+    - packages/vue/src/gridOptions.ts
+    - packages/vue/src/index.ts
+- [x] WRAP-002-002 expose GridApi bridge
   - Evidence:
-- [ ] WRAP-002-003 event emit bridge
+    - packages/vue/src/gridExpose.ts
+    - apps/examples/src/features/vue-wrapper/vue.vue
+    - packages/vue/test/vue-shell.test.ts
+- [x] WRAP-002-003 event emit bridge
   - Evidence:
-- [ ] WRAP-002-004 Vue cell slot renderer
+    - packages/vue/src/vueEvents.ts
+    - packages/vue/src/OneGrid.ts
+    - tests/e2e/features/vue-wrapper.spec.ts
+- [x] WRAP-002-004 Vue cell slot renderer
   - Evidence:
-- [ ] WRAP-002-005 Vue header slot renderer
+    - packages/vue/src/vueRendererBridge.ts
+    - apps/examples/src/features/vue-wrapper/vue.vue
+    - packages/vue/test/vue-shell.test.ts
+- [x] WRAP-002-005 Vue header slot renderer
   - Evidence:
-- [ ] WRAP-002-006 Vue editor slot renderer
+    - packages/core/src/types/column.ts
+    - packages/dom/src/grid/rendererHost.ts
+    - packages/vue/src/vueRendererBridge.ts
+    - apps/examples/src/features/vue-wrapper/vue.vue
+- [x] WRAP-002-006 Vue editor slot renderer
   - Evidence:
-- [ ] WRAP-002-007 reactive options update
+    - apps/examples/src/features/vue-wrapper/data.ts
+    - apps/examples/src/features/vue-wrapper/vue.vue
+    - apps/docs/docs/frameworks/vue.mdx
+  - Notes:
+    - Vue wrapper uses the shared core `EditorDef` and DOM editor overlay; wrapper does not reimplement editors.
+- [x] WRAP-002-007 reactive options update
   - Evidence:
-- [ ] WRAP-002-008 unmount cleanup
+    - packages/vue/src/gridWatch.ts
+    - packages/vue/src/OneGrid.ts
+    - tests/e2e/features/vue-wrapper.spec.ts
+- [x] WRAP-002-008 unmount cleanup
   - Evidence:
-- [ ] WRAP-002-009 Vue examples all core features
+    - packages/vue/src/OneGrid.ts
+    - packages/vue/src/vueRendererBridge.ts
+    - packages/vue/test/vue-shell.test.ts
+- [x] WRAP-002-009 Vue examples all core features
   - Evidence:
-- [ ] WRAP-002-010 Vue E2E
+    - apps/examples/src/features/*/vue.vue
+    - apps/examples/src/features/vue-wrapper/vue.vue
+    - apps/examples/vue.html
+- [x] WRAP-002-010 Vue E2E
   - Evidence:
-- [ ] WRAP-002-011 Vue docs
+    - tests/e2e/features/vue-wrapper.spec.ts
+    - tests/a11y/vue-wrapper-a11y.spec.ts
+  - Verified:
+    - pnpm test:e2e
+    - pnpm test:a11y
+- [x] WRAP-002-011 Vue docs
   - Evidence:
+    - apps/docs/docs/frameworks/vue.mdx
+    - apps/docs/docs/quick-start/vue.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
 
 ### WRAP-003 API Parity
 
-- [ ] WRAP-003-001 JS/React/Vue option parity matrix
+- [x] WRAP-003-001 JS/React/Vue option parity matrix
   - Evidence:
-- [ ] WRAP-003-002 JS/React/Vue event parity matrix
+    - packages/core/src/wrapper/apiParity.ts
+    - apps/docs/docs/frameworks/api-parity.mdx
+    - packages/react/test/react-shell.test.tsx
+    - packages/vue/test/vue-shell.test.ts
+- [x] WRAP-003-002 JS/React/Vue event parity matrix
   - Evidence:
-- [ ] WRAP-003-003 JS/React/Vue method parity matrix
+    - packages/core/src/wrapper/apiParity.ts
+    - packages/react/src/gridEvents.ts
+    - packages/vue/src/vueEvents.ts
+    - apps/docs/docs/frameworks/api-parity.mdx
+    - packages/react/test/react-shell.test.tsx
+    - packages/vue/test/vue-shell.test.ts
+- [x] WRAP-003-003 JS/React/Vue method parity matrix
   - Evidence:
-- [ ] WRAP-003-004 parity automated test
+    - packages/core/src/wrapper/apiParity.ts
+    - packages/dom/src/grid/OneGrid.ts
+    - packages/dom/src/grid/oneGridApiBase.ts
+    - packages/dom/src/grid/oneGridBase.ts
+    - packages/dom/src/grid/oneGridRows.ts
+    - packages/react/src/gridHandle.ts
+    - packages/vue/src/gridExpose.ts
+    - apps/docs/docs/frameworks/api-parity.mdx
+- [x] WRAP-003-004 parity automated test
   - Evidence:
+    - packages/react/test/react-shell.test.tsx
+    - packages/vue/test/vue-shell.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm --filter @onegrid/dom typecheck
+    - pnpm --filter @onegrid/react typecheck
+    - pnpm --filter @onegrid/vue typecheck
+    - pnpm test:unit -- packages/react/test/react-shell.test.tsx packages/vue/test/vue-shell.test.ts
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
 
 ---
 
@@ -3317,6 +3641,51 @@
 
 작업 중 방향이 흔들릴 수 있는 결정은 여기에 기록한다.
 
+#### D-20260504-001 Markup-preserving sanitizer는 앱 주입 정책으로 유지
+
+- Date: 2026-05-04
+- Status: accepted
+- Context: SEC-002에서 기본 renderer와 `strictTextOnlySanitizer`는 HTML을 텍스트로 축소해 안전한 기본값을 제공한다. 다만 `<strong>`, `<a>` 같은 마크업을 보존하는 sanitizer는 allowlist, URL policy, Trusted Types, 조직별 보안 정책이 함께 묶이는 영역이다.
+- Decision: OneGrid 기본값은 text-only sanitizer로 유지하고, 마크업 보존이 필요한 앱은 외부 보안 검토를 거친 sanitizer를 `security.html.sanitizer`로 명시 주입한다.
+- Risk: 보존형 sanitizer를 아무 구현이나 주입하면 XSS 방어 품질이 앱 책임으로 이동한다.
+- Mitigation: docs/security/xss에 정책을 명시하고, 기본 API는 `allowHtmlRenderer: true`와 sanitizer opt-in 없이는 HTML sink를 열지 않는다.
+- Follow-up checklist items:
+  - SEC-002 XSS Defense
+  - SEC-003 sanitizer adapter hardening
+
+#### R-20260504-002 Theme structural CSS split 필요
+
+- Date: 2026-05-04
+- Status: resolved
+- Context: THEME-001에서 token/preset CSS는 `tokens.css`, `clean.css`, `compact.css`, `dark.css`, `high-contrast.css`로 분리했지만, 기존 `packages/themes/src/default.css`는 grid structural styles를 계속 한 파일에 보유한다.
+- Risk: renderer 스타일, editor 스타일, menu/style, virtual-scroll style이 같은 CSS 파일에 누적되면 review와 theme regression 추적이 어려워진다.
+- Mitigation: 2026-05-04 style cleanup에서 `layout.css`, `scrollbars.css`, `controls.css`, `body.css`, `header.css`, `menus.css`, `editors.css`, `summary.css`, `overlays.css`로 분리하고 `default.css`를 import entry로 축소했다.
+- Evidence:
+  - packages/themes/src/default.css
+  - packages/themes/src/layout.css
+  - packages/themes/src/scrollbars.css
+  - packages/themes/src/controls.css
+  - packages/themes/src/body.css
+  - packages/themes/src/header.css
+  - packages/themes/src/menus.css
+  - packages/themes/src/editors.css
+  - packages/themes/src/summary.css
+  - packages/themes/src/overlays.css
+- Verified:
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/theme-foundation.spec.ts tests/e2e/features/si-customization.spec.ts tests/e2e/visual/theme-foundation.visual.spec.ts tests/e2e/visual/si-customization.visual.spec.ts --project=chromium
+  - pnpm lint
+  - pnpm typecheck
+  - pnpm test:unit
+  - pnpm test:e2e:visual
+  - pnpm build
+  - pnpm docs:build
+  - pnpm test:e2e
+  - pnpm test:a11y
+  - git diff --check
+- Follow-up checklist items:
+  - resolved in THEME cleanup
+  - REL-004 Final Gates
+
 #### D-20260427-001 Core GridOptions에서 DOM mount target 분리
 
 - Date: 2026-04-27
@@ -3354,9 +3723,15 @@
 - Mitigation: 다음 DOM renderer 정리 단계에서 row model lifecycle, scroll runtime, feature runtime(sort/filter/editing/selection)를 별도 controller 모듈로 분리한다. public API는 바꾸지 않는다.
 - Mitigation update: 2026-04-30 LOC 정리 패스에서 keyboard focus navigation, render shell data helpers, batch edit pending state를 분리했다. `packages/dom/src/grid/OneGrid.ts`는 1549 LOC에서 1459 LOC로 낮아졌지만 여전히 기준 초과이므로 row model lifecycle, feature runtime factory, public API bridge 분리를 다음 전용 정리 작업으로 유지한다.
 - Mitigation update: 2026-04-30 후속 LOC 정리 패스에서 `OneGrid.ts`를 public export entry로 축소하고 DOM lifecycle을 `oneGridBase`, `oneGridRows`, `oneGridSortingFiltering`, `oneGridSelection`, `oneGridEditStore`, `oneGridEditing`, `oneGridTypes`로 분리했다. renderer source 파일은 모두 400 LOC 이하로 내려갔고 public API 이름은 유지했다.
+- Mitigation update: 2026-05-04 SEC-001 이후 LOC 정리 패스에서 `oneGridBase.ts`의 render option 조립, pagination API/runtime, virtual scroll runtime을 `renderOptionsFactory.ts`, `oneGridPagination.ts`, `oneGridScrolling.ts`로 분리했다. `oneGridBase.ts`는 558 LOC에서 345 LOC로 내려갔고 public API 이름은 유지했다.
+- Mitigation update: 2026-05-04 row-model 전용 LOC 정리에서 infinite/server/viewport reset/load/update 책임을 `oneGridRemoteRows.ts`로 분리했다. `oneGridRows.ts`는 422 LOC에서 227 LOC로 내려갔고 renderer source 파일은 다시 모두 400 LOC 이하가 되었다.
 - Evidence:
   - packages/dom/src/grid/OneGrid.ts
   - packages/dom/src/grid/oneGridBase.ts
+  - packages/dom/src/grid/oneGridPagination.ts
+  - packages/dom/src/grid/oneGridScrolling.ts
+  - packages/dom/src/grid/oneGridRemoteRows.ts
+  - packages/dom/src/grid/renderOptionsFactory.ts
   - packages/dom/src/grid/oneGridRows.ts
   - packages/dom/src/grid/oneGridSortingFiltering.ts
   - packages/dom/src/grid/oneGridSelection.ts
@@ -3396,10 +3771,17 @@
 - Context: F-SELECT에서 Vue wrapper에 shared `selection` prop과 selection API expose를 추가하면서 `packages/vue/src/OneGrid.ts`가 397 LOC가 되었다. wrapper는 core 기능을 재구현하지 않고 DOM bridge만 보유하지만, prop/expose/toGridOptions mapping이 한 파일에 누적되고 있다.
 - Risk: wrapper prop bridge가 계속 커지면 React/Vue API parity 검토와 wrapper lifecycle 리뷰가 어려워진다.
 - Mitigation: 2026-04-30 LOC 정리 패스에서 option normalization을 `packages/vue/src/gridOptions.ts`로 분리해 `packages/vue/src/OneGrid.ts`를 264 LOC로 낮췄다. public wrapper API 의미는 유지한다.
+- Mitigation update: 2026-05-04 Vue wrapper LOC 정리 패스에서 prop definition, expose method bridge, prop watch list를 각각 `oneGridProps.ts`, `gridExpose.ts`, `gridWatch.ts`로 분리했다. `packages/vue/src/OneGrid.ts`는 391 LOC에서 37 LOC로 내려갔고 wrapper source 파일은 모두 300 LOC 이하가 되었다.
 - Evidence:
   - packages/vue/src/OneGrid.ts
   - packages/vue/src/gridOptions.ts
+  - packages/vue/src/oneGridProps.ts
+  - packages/vue/src/gridExpose.ts
+  - packages/vue/src/gridWatch.ts
+  - packages/vue/test/vue-shell.test.ts
 - Verified:
+  - pnpm exec vitest run --config vitest.config.ts packages/vue/test/vue-shell.test.ts
+  - pnpm --filter @onegrid/vue typecheck
   - pnpm typecheck
   - pnpm lint
   - pnpm test:unit

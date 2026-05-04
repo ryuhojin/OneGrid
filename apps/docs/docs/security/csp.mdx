@@ -1,4 +1,70 @@
-# CSP and XSS
+# CSP
 
-OneGrid avoids `eval`, `new Function`, and inline event handlers. User strings are rendered as text
-by default. HTML renderers require explicit opt-in and sanitizer integration.
+OneGrid is designed for strict Content Security Policy deployments. The DOM package does not use
+`eval`, `new Function`, or inline event handler attributes, and runtime style insertion is controlled
+by `GridOptions.security.csp`.
+
+## Recommended policy
+
+```http
+Content-Security-Policy:
+  default-src 'self';
+  script-src 'self' 'nonce-{nonce}';
+  style-src 'self' 'nonce-{nonce}';
+  img-src 'self' data: blob:;
+  font-src 'self';
+  connect-src 'self';
+  object-src 'none';
+  base-uri 'self';
+```
+
+## Runtime style nonce
+
+OneGrid only inserts runtime styles for scoped theme variables. Pass the server-generated nonce to
+the grid so the inserted style tag is accepted by CSP.
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  theme: {
+    name: "finance",
+    variables: {
+      "--og-color-header-bg": "#eaf6f1",
+      "--og-color-focus-ring": "#0f766e"
+    }
+  },
+  security: {
+    csp: {
+      nonce: window.__CSP_NONCE__
+    }
+  }
+});
+```
+
+## Disable runtime style injection
+
+If your application provides all theme variables through static CSS, turn off runtime style injection.
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  security: {
+    csp: {
+      disableStyleInjection: true
+    }
+  }
+});
+```
+
+When disabled, the grid still renders normally and marks the host with
+`data-og-style-injection="disabled"` for diagnostics.
+
+## Verification
+
+The SEC-001 example is available at `/#SEC-001`, and the standalone CSP page is available at
+`/csp.html` in the examples app. Playwright verifies that the standalone page runs without CSP
+violations and that the injected runtime style carries the configured nonce.

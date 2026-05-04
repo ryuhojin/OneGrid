@@ -171,6 +171,7 @@ export class OneGridClipboard<TData = unknown> extends OneGridEditing<TData> {
       column: column.source,
       field: column.field,
       currentValue: previousValue,
+      ...(this.options.locale === undefined ? {} : { locale: this.options.locale }),
       ...(this.options.editing === undefined ? {} : { editing: this.options.editing })
     });
     if (!session) {
@@ -181,6 +182,7 @@ export class OneGridClipboard<TData = unknown> extends OneGridEditing<TData> {
       session,
       rawValue: patch.rawValue,
       validate: true,
+      ...(this.options.locale === undefined ? {} : { locale: this.options.locale }),
       ...(this.options.editing === undefined ? {} : { editing: this.options.editing })
     });
     return this.applyClipboardCommit(result, trigger);

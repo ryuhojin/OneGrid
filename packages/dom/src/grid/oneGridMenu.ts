@@ -1,5 +1,6 @@
 import {
   createContextMenuModel,
+  createLocaleFormatter,
   isCellEditable
 } from "@onegrid/core";
 import type {
@@ -125,6 +126,7 @@ export class OneGridMenu<TData = unknown> extends OneGridExport<TData> {
     }
 
     return isCellEditable(context.column, {
+      ...createLocaleFormatter(this.options.locale),
       row: context.row,
       rowIndex: context.rowIndex,
       rowKey: context.rowKey,

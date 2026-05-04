@@ -1,4 +1,4 @@
-import type { AccessibilityOptions } from "@onegrid/core";
+import type { AccessibilityOptions, LocaleFormatterBridge } from "@onegrid/core";
 
 export interface GridAccessibilityState {
   readonly rowCount: number;
@@ -13,9 +13,10 @@ export function applyGridAccessibility(
   host: HTMLElement,
   grid: HTMLElement,
   options: AccessibilityOptions | undefined,
-  state: GridAccessibilityState
+  state: GridAccessibilityState,
+  i18n: LocaleFormatterBridge
 ): void {
-  const label = options?.label?.trim() || "OneGrid data grid";
+  const label = options?.label?.trim() || i18n.text.gridLabel;
   grid.setAttribute("aria-label", label);
   grid.setAttribute("aria-readonly", "true");
   grid.setAttribute("aria-busy", String(state.loading));
@@ -27,7 +28,7 @@ export function applyGridAccessibility(
     describedByIds.push(description.id);
   }
 
-  const liveRegion = createGridLiveRegion(options, state);
+  const liveRegion = createGridLiveRegion(options, state, i18n);
   if (liveRegion) {
     host.append(liveRegion);
     describedByIds.push(liveRegion.id);
@@ -40,14 +41,15 @@ export function applyGridAccessibility(
 
 function createGridLiveRegion(
   options: AccessibilityOptions | undefined,
-  state: GridAccessibilityState
+  state: GridAccessibilityState,
+  i18n: LocaleFormatterBridge
 ): HTMLElement | undefined {
   const politeness = options?.liveRegion ?? "polite";
   if (politeness === "off") {
     return undefined;
   }
 
-  const liveRegion = createScreenReaderText(formatLiveRegionText(state));
+  const liveRegion = createScreenReaderText(formatLiveRegionText(state, i18n));
   liveRegion.classList.add("og-grid__live-region");
   liveRegion.setAttribute("role", state.error === undefined ? "status" : "alert");
   liveRegion.setAttribute("aria-live", state.error === undefined ? politeness : "assertive");
@@ -63,21 +65,21 @@ function createScreenReaderText(text: string): HTMLElement {
   return element;
 }
 
-function formatLiveRegionText(state: GridAccessibilityState): string {
+function formatLiveRegionText(
+  state: GridAccessibilityState,
+  i18n: LocaleFormatterBridge
+): string {
   if (state.error !== undefined) {
-    return "Grid rows could not be loaded.";
+    return i18n.text.gridRowsCouldNotLoad;
   }
 
   if (state.loading) {
-    return "Grid rows are loading.";
+    return i18n.text.gridRowsLoading;
   }
 
-  return `Grid ready. ${formatCount(state.rowCount, "row")} and ${formatCount(
-    state.columnCount,
-    "column"
-  )}.`;
-}
-
-function formatCount(value: number, label: string): string {
-  return `${new Intl.NumberFormat("en-US").format(value)} ${value === 1 ? label : `${label}s`}`;
+  return i18n.text.gridReady({
+    rowCount: state.rowCount,
+    columnCount: state.columnCount,
+    formatNumber: i18n.formatNumber
+  });
 }

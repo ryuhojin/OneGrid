@@ -6,9 +6,11 @@ import type {
   CellSpanWindow,
   EditingOptions,
   FixedRowVirtualWindow,
+  LocaleFormatterBridge,
   LayoutPane,
   SecurityOptions
 } from "@onegrid/core";
+import { createLocaleFormatter } from "@onegrid/core";
 import type { BodyRowEntry } from "./bodyRowRenderer.js";
 import type { TreeRowRuntime } from "./treeRowRenderer.js";
 
@@ -20,6 +22,7 @@ export interface BodyPaneRuntime {
   readonly treeColumnField?: string;
   readonly security?: SecurityOptions;
   readonly editing?: EditingOptions;
+  readonly i18n: LocaleFormatterBridge;
 }
 
 export function createBodyPane<TData>(
@@ -33,6 +36,7 @@ export function createBodyPane<TData>(
   body.className = "og-grid__body";
   applyPaneVirtualInlineWindow(body, pane);
   const rowIndexOffset = runtime?.rowIndexOffset ?? 0;
+  const i18n = runtime?.i18n ?? createLocaleFormatter();
   const cellSpanWindow = createPaneCellSpanWindow(pane, rows, virtualWindow, rowIndexOffset);
 
   appendVirtualSpacer(body, "top", virtualWindow?.beforeHeight ?? 0);
@@ -55,6 +59,7 @@ export function createBodyPane<TData>(
       ...(runtime?.cellSpanModel === undefined ? {} : { cellSpanModel: runtime.cellSpanModel }),
       ...(runtime?.security === undefined ? {} : { security: runtime.security }),
       ...(runtime?.editing === undefined ? {} : { editing: runtime.editing }),
+      i18n,
       ...(cellSpanWindow === undefined ? {} : { cellSpanWindow })
     }));
   });

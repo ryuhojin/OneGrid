@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { getLocale } from "../src/index.js";
 import type {
   ColumnDef,
   ColumnUiState,
@@ -10,6 +11,7 @@ import type {
   GridPendingEdit,
   GridPlugin,
   ImportOptions,
+  LocaleDefinition,
   RowKey,
   VirtualizationOptions
 } from "../src/index.js";
@@ -65,6 +67,13 @@ describe("@onegrid/core public type skeleton", () => {
         return undefined;
       }
     };
+    const locale: LocaleDefinition = {
+      locale: "en-AU",
+      text: {
+        ...getLocale("en-US").text,
+        footerRows: (rowCount, formatNumber) => `Rows: ${formatNumber(rowCount)}`
+      }
+    };
 
     const options: GridOptions<OrderRow> = {
       columns,
@@ -104,7 +113,12 @@ describe("@onegrid/core public type skeleton", () => {
       plugins: [plugin],
       security: {
         csp: { nonce: "test-nonce" },
-        html: { allowHtmlRenderer: false }
+        html: {
+          allowHtmlRenderer: false,
+          trustedTypesPolicyName: "onegrid-test",
+          sanitizer: { sanitize: (html) => html }
+        },
+        url: { allowedProtocols: ["https:", "mailto:"] }
       },
       accessibility: {
         label: "Orders",
@@ -127,7 +141,8 @@ describe("@onegrid/core public type skeleton", () => {
         mode: "replace",
         hasHeaders: true,
         columns: ["id", "amount", "status"]
-      }
+      },
+      locale: locale.locale
     };
 
     expectTypeOf<GridApi<OrderRow>["getPendingEdits"]>()
@@ -141,6 +156,8 @@ describe("@onegrid/core public type skeleton", () => {
     >();
     expectTypeOf<GridApi<OrderRow>["expandTreeNode"]>().returns.resolves.toBeVoid();
     expectTypeOf<GridApi<OrderRow>["getTreeSelection"]>().returns.toMatchTypeOf<readonly RowKey[]>();
+    expectTypeOf<GridApi<OrderRow>["setLocale"]>().parameter(0).toMatchTypeOf<string>();
+    expectTypeOf<GridApi<OrderRow>["getLocale"]>().returns.toMatchTypeOf<string>();
 
     expect(options.columns).toHaveLength(3);
     expectTypeOf(options.columnState).toMatchTypeOf<ColumnUiState | undefined>();

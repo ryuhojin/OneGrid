@@ -1,0 +1,90 @@
+# XSS Defense
+
+OneGrid treats renderer output as untrusted unless the application explicitly opts into a safer
+rendering path. Default values, formatters, and `kind: "text"` renderers are written with
+`textContent`, so strings such as `<img onerror="...">` remain inert text.
+
+## Renderer modes
+
+```ts
+const columns = [
+  { field: "name" },
+  {
+    field: "status",
+    renderer: {
+      kind: "text",
+      render: ({ value }) => `<strong>${String(value)}</strong>`
+    }
+  }
+];
+```
+
+The two columns above render text only. HTML is not interpreted.
+
+For HTML rendering, use `kind: "html"`, `sanitize: true`, and enable HTML rendering with a sanitizer:
+
+```ts
+new OneGrid({
+  el,
+  columns: [
+    {
+      field: "status",
+      renderer: {
+        kind: "html",
+        sanitize: true,
+        render: ({ value }) => `<strong>${String(value)}</strong>`
+      }
+    }
+  ],
+  data,
+  security: {
+    html: {
+      allowHtmlRenderer: true,
+      trustedTypesPolicyName: "onegrid-orders",
+      sanitizer: {
+        sanitize: (html) => DOMPurify.sanitize(html)
+      }
+    }
+  }
+});
+```
+
+If `allowHtmlRenderer` or `sanitizer` is missing, OneGrid blocks the HTML sink and renders the
+returned string as text.
+
+For deployments that want an HTML renderer hook but no markup, `@onegrid/dom` also exports
+`strictTextOnlySanitizer`, which reduces HTML input to text before it reaches the sink.
+
+## Element renderer URL policy
+
+`kind: "element"` uses DOM node creation instead of string HTML. OneGrid still rejects inline event
+attributes, inline style attributes, `srcdoc`, `srcset`, unsafe tag names, and URL attributes whose
+protocol is not allowed.
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  security: {
+    url: {
+      allowedProtocols: ["https:", "mailto:", "tel:"]
+    }
+  }
+});
+```
+
+Relative URLs, fragments, and `https:`, `http:`, `mailto:`, and `tel:` are allowed by default.
+Add protocols only when the surrounding application has reviewed them.
+
+## Trusted Types
+
+When the browser exposes Trusted Types, OneGrid creates a policy for sanitized HTML sinks. The
+default policy name is `onegrid-html-renderer`; pass `security.html.trustedTypesPolicyName` to use an
+application-specific policy name.
+
+## Verification
+
+The SEC-002 example is available at `/#SEC-002`. Playwright verifies malicious text payloads remain
+inert, HTML renderer output is sanitized, unsafe element URLs are removed, and no injected handler
+sets the example XSS sentinel.

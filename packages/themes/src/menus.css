@@ -1,0 +1,121 @@
+.og-grid__column-menu,
+.og-grid__context-menu {
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-border);
+  border-radius: 8px;
+  box-shadow: var(--og-shadow-popover);
+  display: grid;
+  gap: 2px;
+  min-inline-size: 160px;
+  padding: 5px;
+  position: fixed;
+  z-index: 1000;
+}
+
+.og-grid__column-menu-item,
+.og-grid__context-menu-item {
+  min-height: 30px;
+  padding: 4px 8px;
+  text-align: start;
+}
+
+.og-grid__column-menu-item:disabled,
+.og-grid__context-menu-item:disabled {
+  color: var(--og-color-muted);
+  cursor: not-allowed;
+}
+
+.og-grid__filter-panel {
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-border);
+  border-radius: 8px;
+  box-shadow: var(--og-shadow-popover);
+  box-sizing: border-box;
+  display: grid;
+  gap: 10px;
+  inline-size: min(360px, calc(100vw - 16px));
+  padding: 12px;
+  position: fixed;
+  z-index: 1100;
+}
+
+.og-grid__filter-panel-title {
+  font-weight: 750;
+}
+
+.og-grid__filter-panel-body {
+  display: grid;
+  gap: 10px;
+}
+
+.og-grid__filter-condition {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(112px, 0.45fr) minmax(130px, 1fr);
+}
+
+.og-grid__filter-input {
+  border: 1px solid var(--og-color-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: var(--og-color-fg);
+  font: inherit;
+  min-block-size: 32px;
+  min-inline-size: 0;
+  padding: 4px 8px;
+}
+
+.og-grid__filter-input:focus {
+  border-color: var(--og-color-focus-ring);
+  box-shadow: 0 0 0 2px var(--og-color-focus-ring-soft);
+  outline: 0;
+}
+
+.og-grid__filter-set-list {
+  border: 1px solid var(--og-color-border);
+  border-radius: 6px;
+  display: grid;
+  max-block-size: 180px;
+  overflow: auto;
+  padding: 4px;
+}
+
+.og-grid__filter-set-option {
+  align-items: center;
+  border-radius: 5px;
+  display: flex;
+  gap: 7px;
+  min-block-size: 30px;
+  padding: 3px 5px;
+}
+
+.og-grid__filter-set-option:hover {
+  background: var(--og-color-hover-bg);
+}
+
+.og-grid__filter-loading {
+  color: var(--og-color-muted);
+  min-block-size: 30px;
+}
+
+.og-grid__filter-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.og-grid__filter-button {
+  background: var(--og-color-control-bg);
+  min-block-size: 32px;
+  padding: 4px 12px;
+}
+
+.og-grid__filter-button--primary {
+  background: var(--og-color-focus-ring);
+  color: var(--og-color-on-accent);
+}
+
+.og-grid__filter-button--primary:hover,
+.og-grid__filter-button--primary:focus-visible {
+  background: var(--og-color-accent-hover);
+}

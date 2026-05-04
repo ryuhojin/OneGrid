@@ -1,0 +1,119 @@
+.og-grid__editor-overlay {
+  align-items: stretch;
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-accent);
+  box-shadow: 0 0 0 1px var(--og-color-accent-soft);
+  box-sizing: border-box;
+  display: grid;
+  gap: 0;
+  inline-size: min(100%, var(--og-editor-width, 100%));
+  min-inline-size: 0;
+  overflow: hidden;
+  padding: 0;
+  position: fixed;
+  z-index: 1200;
+}
+
+.og-grid__editor-overlay:not([data-editor-kind="textarea"]):not([data-editor-kind="multi-select"]):not([data-editor-kind="radio"]) {
+  block-size: var(--og-editor-cell-height, var(--og-row-height));
+}
+
+.og-grid__editor-overlay[data-editor-kind="checkbox"] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.og-grid__editor-control {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.og-grid__editor-control input:not([type="checkbox"]):not([type="radio"]),
+.og-grid__editor-control select,
+.og-grid__editor-control textarea,
+.og-grid__editor-overlay > input:not([type="checkbox"]):not([type="radio"]),
+.og-grid__editor-overlay > select,
+.og-grid__editor-overlay > textarea {
+  background: var(--og-color-panel-bg);
+  border: 0;
+  box-sizing: border-box;
+  color: var(--og-color-fg);
+  font: inherit;
+  inline-size: 100%;
+  min-block-size: calc(var(--og-editor-cell-height, var(--og-row-height)) - 2px);
+  min-inline-size: 0;
+  outline: 0;
+  padding: 3px 8px;
+}
+
+.og-grid__editor-control select:not([multiple]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23667085' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: calc(100% - 9px) 50%;
+  background-repeat: no-repeat;
+  background-size: 12px 12px;
+  padding-inline-end: 28px;
+}
+
+.og-grid__editor-control select[multiple] {
+  padding-block: 3px;
+}
+
+.og-grid__editor-checkbox-control {
+  align-items: center;
+  background: transparent;
+  box-sizing: border-box;
+  display: flex;
+  inline-size: 100%;
+  justify-content: flex-start;
+  min-block-size: calc(var(--og-editor-cell-height, var(--og-row-height)) - 2px);
+  min-inline-size: 0;
+  padding: 0 10px;
+}
+
+.og-grid__editor-native-checkbox,
+.og-grid__editor-native-radio {
+  accent-color: var(--og-color-accent);
+  block-size: 16px;
+  inline-size: 16px;
+  margin: 0;
+}
+
+.og-grid__editor-native-checkbox:focus-visible,
+.og-grid__editor-native-radio:focus-visible {
+  outline: 2px solid var(--og-color-accent-soft);
+  outline-offset: 2px;
+}
+
+.og-grid__editor-overlay textarea {
+  min-block-size: calc(var(--og-row-height) * 2);
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+.og-grid__editor-radio-group {
+  align-items: center;
+  background: var(--og-color-panel-bg);
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-block-size: calc(var(--og-editor-cell-height, var(--og-row-height)) - 2px);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 4px 8px;
+}
+
+.og-grid__editor-radio {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.og-grid__editor-error {
+  color: var(--og-color-danger-fg);
+  font-size: 12px;
+  padding: 2px 6px 4px;
+}

@@ -1,0 +1,22 @@
+@import "@onegrid/themes/default.css";
+
+:root,
+.og-root-host {
+  --og-font-size: 12px;
+  --og-row-height: 30px;
+  --og-header-height: 34px;
+  --og-color-bg: #ffffff;
+  --og-color-fg: #101828;
+  --og-color-border: #d4dae2;
+  --og-color-header-bg: #f4f6f8;
+  --og-color-hover-bg: #edf2f7;
+  --og-color-panel-bg: #ffffff;
+  --og-color-pinned-bg: #fafbfc;
+  --og-color-pinned-header-bg: #eef2f5;
+  --og-color-summary-bg: #f6f8fa;
+  --og-color-focus-ring: #315fce;
+  --og-color-accent: #315fce;
+  --og-scrollbar-gutter-size: 11px;
+  --og-scrollbar-thumb-offset: 3px;
+  --og-scrollbar-thumb-size: 5px;
+}

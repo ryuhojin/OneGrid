@@ -1,30 +1,113 @@
 import type {
   GroupModel,
-  RowKey,
+  RefreshOptions,
   RowUpdate,
-  ScrollToRowAlign,
-  ViewportLiveUpdate
+  RowKey
 } from "@onegrid/core";
 import { createClientRowModel } from "@onegrid/core";
 import type { GroupRowRuntime } from "./groupRowRenderer.js";
 import { invalidate } from "./renderInvalidation.js";
-import { createDomInfiniteRowModel, createDomServerRowModel, createDomViewportRowModel } from "./rowModelFactory.js";
-import {
-  getViewportHeight,
-  getViewportRowHeight
-} from "./rowModelOptions.js";
 import { createRowRenderState } from "./rowRenderStateFactory.js";
 import type { RowRenderState } from "./renderGridShell.js";
-import { resolveScrollTopForRow } from "./scrollPosition.js";
-import { OneGridBase } from "./oneGridBase.js";
+import { OneGridRemoteRows } from "./oneGridRemoteRows.js";
 
-interface PendingServerLoad {
-  readonly refresh: boolean;
-  readonly page: number;
-}
+export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TData> {
+  async refresh(options?: RefreshOptions): Promise<void> {
+    if (this.destroyed) {
+      return;
+    }
 
-export abstract class OneGridRows<TData = unknown> extends OneGridBase<TData> {
-  private pendingServerLoad: PendingServerLoad | undefined;
+    const reason = options?.reason ?? "refresh-api";
+    if (options?.purgeCache === true && this.resetRemoteRowModel(reason)) {
+      return;
+    }
+
+    if (this.serverRowModel) {
+      await this.loadServerRows(true);
+      return;
+    }
+    if (this.viewportRowModel) {
+      await this.scrollViewportTo(0);
+      return;
+    }
+
+    await this.render(invalidate(["rows", "columns", "layout", "overlay"], reason));
+  }
+
+  setData(rows: readonly TData[]): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    this.dataRows = Object.freeze([...rows]);
+    this.virtualScrollTop = 0;
+    this.paginationPage = 1;
+    void this.render(invalidate(["rows", "layout", "overlay"], "data-api-set"));
+  }
+
+  appendRows(rows: readonly TData[]): void {
+    if (this.destroyed || rows.length === 0) {
+      return;
+    }
+
+    this.setData([...(this.dataRows ?? this.options.data ?? []), ...rows]);
+  }
+
+  updateRows(updates: readonly RowUpdate<TData>[]): void {
+    if (this.destroyed || updates.length === 0) {
+      return;
+    }
+
+    if (this.serverRowModel) {
+      void this.updateServerRows(updates);
+      return;
+    }
+
+    const byKey = new Map(updates.map((update) => [String(update.rowKey), update.row]));
+    const rows = this.dataRows ?? this.options.data;
+    if (Array.isArray(rows)) {
+      this.setData(rows.map((row, index) => {
+        const patch = byKey.get(String(this.resolveDistinctRowKey(row, index)));
+        return patch === undefined ? row : mergeRowPatch(row, patch);
+      }));
+      return;
+    }
+
+    this.updateRemoteEntries(updates);
+  }
+
+  removeRows(rowKeys: readonly RowKey[]): void {
+    if (this.destroyed || rowKeys.length === 0) {
+      return;
+    }
+
+    const removals = new Set(rowKeys.map((rowKey) => String(rowKey)));
+    const rows = this.dataRows ?? this.options.data;
+    if (Array.isArray(rows)) {
+      this.setData(rows.filter((row, index) => !removals.has(String(this.resolveDistinctRowKey(row, index)))));
+      return;
+    }
+
+    this.serverEntries = this.serverEntries.filter((entry) =>
+      !("data" in entry && removals.has(String(entry.key)))
+    );
+    this.infiniteEntries = this.infiniteEntries.filter((entry) =>
+      !("data" in entry && removals.has(String(entry.key)))
+    );
+    this.viewportEntries = this.viewportEntries.filter((entry) => !removals.has(String(entry.key)));
+    this.treeEntries = this.treeEntries.filter((entry) => !removals.has(String(entry.key)));
+    void this.render(invalidate(["rows", "layout", "overlay"], "data-api-remove"));
+  }
+
+  getRow(rowKey: RowKey): TData | undefined {
+    const targetKey = String(rowKey);
+    const rows = this.dataRows ?? this.options.data;
+    if (Array.isArray(rows)) {
+      return rows.find((row, index) => String(this.resolveDistinctRowKey(row, index)) === targetKey);
+    }
+
+    return this.findRemoteRow(targetKey);
+  }
 
   setGroupModel(model: GroupModel): void {
     if (this.destroyed) {
@@ -61,35 +144,6 @@ export abstract class OneGridRows<TData = unknown> extends OneGridBase<TData> {
     this.setGroupExpanded(groupKey, !this.isGroupExpanded(groupKey), "group-toggle-api");
   }
 
-  async refreshServerRows(): Promise<void> {
-    await this.loadServerRows(true);
-  }
-
-  async updateServerRows(updates: readonly RowUpdate<TData>[]): Promise<void> {
-    if (!this.serverRowModel || this.destroyed) {
-      return;
-    }
-
-    await this.serverRowModel.applyTransaction(updates);
-    this.serverEntries = this.serverRowModel.entries;
-    await this.render(invalidate(["rows", "overlay"], "server-transaction"));
-  }
-
-  async scrollViewportTo(rowIndex: number): Promise<void> {
-    this.setVirtualScrollToRow(rowIndex, "start");
-    await this.loadViewportRows(rowIndex);
-  }
-
-  async scrollToRow(rowIndex: number, align: ScrollToRowAlign = "start"): Promise<void> {
-    this.setVirtualScrollToRow(rowIndex, align);
-    if (this.viewportRowModel) {
-      await this.loadViewportRows(rowIndex);
-      return;
-    }
-
-    await this.render(invalidate(["rows"], "scroll-row"));
-  }
-
   async expandTreeNode(key: string | number): Promise<void> {
     if (!this.treeRowModel || this.destroyed) {
       return;
@@ -110,15 +164,6 @@ export abstract class OneGridRows<TData = unknown> extends OneGridBase<TData> {
     this.treeRowModel.collapse(key);
     this.treeEntries = this.treeRowModel.visibleRows;
     void this.render(invalidate(["rows", "overlay"], "tree-collapse"));
-  }
-
-  applyViewportLiveUpdate(update: ViewportLiveUpdate<TData>): void {
-    if (!this.viewportRowModel || this.destroyed) {
-      return;
-    }
-
-    this.viewportEntries = this.viewportRowModel.applyLiveUpdate(update);
-    void this.render(invalidate(["rows", "overlay"], "viewport-live-update"));
   }
 
   async toggleTreeNode(key: string | number): Promise<void> {
@@ -200,39 +245,6 @@ export abstract class OneGridRows<TData = unknown> extends OneGridBase<TData> {
     return this.getResolvedClientGroupKeys().has(groupKey);
   }
 
-  protected resetRemoteRowModel(reason: string): boolean {
-    this.renderError = undefined;
-    if (this.infiniteRowModel) {
-      this.infiniteRowModel.cancelAll(reason);
-      this.infiniteRowModel = createDomInfiniteRowModel(this.getRenderOptions());
-      this.infiniteLoading = false;
-      this.infiniteEntries = this.infiniteRowModel?.getAppendRows() ?? [];
-      void this.render(invalidate(["rows", "columns", "overlay"], reason));
-      void this.loadNextInfiniteBlock();
-      return true;
-    }
-
-    if (this.serverRowModel) {
-      this.serverRowModel = createDomServerRowModel(this.getRenderOptions());
-      this.serverLoading = false;
-      this.serverEntries = [];
-      this.serverMergeMeta = [];
-      this.serverAggregate = undefined;
-      void this.loadServerRows(true);
-      return true;
-    }
-
-    if (this.viewportRowModel) {
-      this.viewportRowModel = createDomViewportRowModel(this.getRenderOptions());
-      this.viewportLoading = false;
-      this.viewportEntries = [];
-      void this.scrollViewportTo(0);
-      return true;
-    }
-
-    return false;
-  }
-
   protected createRowRenderState(): RowRenderState<TData> | undefined {
     const state = createRowRenderState({
       infiniteRowModel: this.infiniteRowModel,
@@ -269,114 +281,6 @@ export abstract class OneGridRows<TData = unknown> extends OneGridBase<TData> {
         : undefined;
   }
 
-  protected setVirtualScrollToRow(rowIndex: number, align: ScrollToRowAlign): void {
-    this.virtualScrollTop = resolveScrollTopForRow({
-      options: this.options,
-      rowIndex,
-      align,
-      currentScrollTop: this.virtualScrollTop,
-      viewportHeight: this.virtualViewportHeight,
-      infiniteRowModel: this.infiniteRowModel,
-      infiniteEntries: this.infiniteEntries,
-      serverRowModel: this.serverRowModel,
-      viewportRowModel: this.viewportRowModel,
-      treeRowModel: this.treeRowModel
-    });
-  }
-
-  protected async loadNextInfiniteBlock(): Promise<void> {
-    if (!this.infiniteRowModel || this.infiniteLoading || !this.infiniteRowModel.hasMore) {
-      return;
-    }
-
-    this.infiniteLoading = true;
-    this.renderError = undefined;
-    this.infiniteEntries = this.infiniteRowModel.getAppendRows();
-    await this.render(invalidate(["rows", "overlay"], "infinite-loading"));
-
-    try {
-      await this.infiniteRowModel.loadNextAppendBlock();
-    } catch (error) {
-      this.renderError = error;
-    } finally {
-      if (!this.destroyed) {
-        this.infiniteEntries = this.infiniteRowModel.getAppendRows();
-        this.infiniteLoading = false;
-        await this.render(invalidate(["rows", "overlay"], "infinite-loaded"));
-      }
-    }
-  }
-
-  protected async loadServerRows(refresh = false, page = this.paginationPage - 1): Promise<void> {
-    const rowModel = this.serverRowModel;
-    if (!rowModel) {
-      return;
-    }
-
-    if (this.serverLoading) {
-      this.pendingServerLoad = {
-        refresh: refresh || this.pendingServerLoad?.refresh === true,
-        page
-      };
-      return;
-    }
-
-    this.serverLoading = true;
-    this.renderError = undefined;
-    await this.render(invalidate(["rows", "overlay"], "server-loading"));
-
-    try {
-      const result = refresh
-        ? await rowModel.refresh()
-        : await rowModel.loadPage(page);
-      if (this.serverRowModel !== rowModel) {
-        return;
-      }
-      this.serverEntries = result.entries;
-      this.serverMergeMeta = result.mergeMeta ?? [];
-      this.serverAggregate = result.aggregate;
-    } catch (error) {
-      this.renderError = error;
-    } finally {
-      if (!this.destroyed) {
-        this.serverLoading = false;
-        await this.render(invalidate(["rows", "overlay"], "server-loaded"));
-        const pending = this.pendingServerLoad;
-        this.pendingServerLoad = undefined;
-        if (pending) {
-          await this.loadServerRows(pending.refresh, pending.page);
-        }
-      }
-    }
-  }
-
-  protected async loadViewportRows(rowIndex: number): Promise<void> {
-    if (!this.viewportRowModel || this.viewportLoading) {
-      return;
-    }
-
-    this.viewportLoading = true;
-    this.renderError = undefined;
-    await this.render(invalidate(["rows", "overlay"], "viewport-loading"));
-
-    try {
-      const result = await this.viewportRowModel.loadViewport({
-        scrollTop: Math.max(0, Math.trunc(rowIndex)) * getViewportRowHeight(this.options),
-        viewportHeight: getViewportHeight(this.options)
-      });
-      if (!result.stale) {
-        this.viewportEntries = result.entries;
-      }
-    } catch (error) {
-      this.renderError = error;
-    } finally {
-      if (!this.destroyed) {
-        this.viewportLoading = false;
-        await this.render(invalidate(["rows", "overlay"], "viewport-loaded"));
-      }
-    }
-  }
-
   protected getCurrentVisibleRowKeys(): readonly RowKey[] {
     const rowKeys: RowKey[] = [];
     const seen = new Set<string>();
@@ -390,6 +294,45 @@ export abstract class OneGridRows<TData = unknown> extends OneGridBase<TData> {
       }
     }
     return Object.freeze(rowKeys);
+  }
+
+  private updateRemoteEntries(updates: readonly RowUpdate<TData>[]): void {
+    const byKey = new Map(updates.map((update) => [String(update.rowKey), update.row]));
+    this.serverEntries = this.serverEntries.map((entry) =>
+      "data" in entry && byKey.has(String(entry.key))
+        ? { ...entry, data: mergeRowPatch(entry.data, byKey.get(String(entry.key)) ?? {}) }
+        : entry
+    );
+    this.infiniteEntries = this.infiniteEntries.map((entry) =>
+      "data" in entry && byKey.has(String(entry.key))
+        ? { ...entry, data: mergeRowPatch(entry.data, byKey.get(String(entry.key)) ?? {}) }
+        : entry
+    );
+    this.viewportEntries = this.viewportEntries.map((entry) =>
+      byKey.has(String(entry.key))
+        ? { ...entry, data: mergeRowPatch(entry.data, byKey.get(String(entry.key)) ?? {}) }
+        : entry
+    );
+    this.treeEntries = this.treeEntries.map((entry) =>
+      byKey.has(String(entry.key))
+        ? { ...entry, data: mergeRowPatch(entry.data, byKey.get(String(entry.key)) ?? {}) }
+        : entry
+    );
+    void this.render(invalidate(["rows", "layout", "overlay"], "data-api-update"));
+  }
+
+  private findRemoteRow(rowKey: string): TData | undefined {
+    for (const entry of [
+      ...this.serverEntries,
+      ...this.infiniteEntries,
+      ...this.viewportEntries,
+      ...this.treeEntries
+    ]) {
+      if ("data" in entry && String(entry.key) === rowKey) {
+        return entry.data;
+      }
+    }
+    return undefined;
   }
 
   private getResolvedClientGroupKeys(): Set<string> {
@@ -419,4 +362,16 @@ export abstract class OneGridRows<TData = unknown> extends OneGridBase<TData> {
         .map((entry) => entry.key)
     );
   }
+}
+
+function mergeRowPatch<TData>(row: TData, patch: Partial<TData>): TData {
+  if (isRecord(row) && isRecord(patch)) {
+    return { ...row, ...patch } as TData;
+  }
+
+  return patch as TData;
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return value !== null && typeof value === "object";
 }

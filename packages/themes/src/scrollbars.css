@@ -1,0 +1,58 @@
+.og-grid__scrollbar-layer {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 40;
+}
+
+.og-grid__scrollbar {
+  background: transparent;
+  border-radius: 0;
+  box-sizing: border-box;
+  opacity: 1;
+  pointer-events: auto;
+  position: absolute;
+}
+
+.og-grid__scrollbar[hidden] {
+  display: none;
+}
+
+.og-grid__scrollbar--vertical {
+  border-inline-start: 1px solid var(--og-color-border);
+  block-size: calc(100% - var(--og-scrollbar-block-gutter));
+  inline-size: var(--og-scrollbar-gutter-size);
+  inset-block-start: 0;
+  inset-inline-end: 0;
+}
+
+.og-grid__scrollbar--horizontal {
+  border-block-start: 1px solid var(--og-color-border);
+  block-size: var(--og-scrollbar-gutter-size);
+  inset-block-end: 0;
+  inset-inline-end: var(--og-scrollbar-inline-gutter);
+  inset-inline-start: 0;
+}
+
+.og-grid__scrollbar-thumb {
+  background: var(--og-color-scrollbar-thumb);
+  border-radius: 999px;
+  min-block-size: var(--og-scrollbar-thumb-size);
+  min-inline-size: var(--og-scrollbar-thumb-size);
+  position: absolute;
+}
+
+.og-grid__scrollbar--vertical .og-grid__scrollbar-thumb {
+  inline-size: var(--og-scrollbar-thumb-size);
+  inset-inline-start: var(--og-scrollbar-thumb-offset);
+}
+
+.og-grid__scrollbar--horizontal .og-grid__scrollbar-thumb {
+  block-size: var(--og-scrollbar-thumb-size);
+  inset-block-start: var(--og-scrollbar-thumb-offset);
+}
+
+.og-grid__scrollbar:hover .og-grid__scrollbar-thumb,
+.og-grid__scrollbar:focus-visible .og-grid__scrollbar-thumb {
+  background: var(--og-color-scrollbar-thumb-hover);
+}

@@ -20,6 +20,7 @@ export function mountServerRowModelExample(el: HTMLElement): OneGrid<ServerOrder
   const sortValue = appendValue(inspector, "Sort model", "pending");
   const filterValue = appendValue(inspector, "Filter model", "pending");
   const groupValue = appendValue(inspector, "Group fields", "pending");
+  const groupKeysValue = appendValue(inspector, "Group keys", "pending");
   const aggregateValue = appendValue(inspector, "Aggregate fields", "pending");
   const pivotValue = appendValue(inspector, "Pivot values", "pending");
 
@@ -66,6 +67,7 @@ export function mountServerRowModelExample(el: HTMLElement): OneGrid<ServerOrder
     sortValue.textContent = request.sortModel.map((sort) => `${sort.field}:${sort.direction}`).join(", ");
     filterValue.textContent = request.filterModel.conditions?.map((filter) => filter.field).join(", ") ?? "none";
     groupValue.textContent = request.groupModel.fields?.join(", ") ?? "none";
+    groupKeysValue.textContent = request.groupKeys.length === 0 ? "root" : request.groupKeys.join(" > ");
     aggregateValue.textContent = request.aggregateModel?.fields.map((field) => field.alias ?? field.field).join(", ") ?? "none";
     pivotValue.textContent = request.pivotModel?.values.join(", ") ?? "none";
   }

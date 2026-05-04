@@ -150,3 +150,30 @@ const imported = await api.importData(xlsx.content as Uint8Array, {
 `importData()` returns imported rows plus rejected parser rows. The default import mode is
 `"replace"`, so CSV/XLSX/JSON import clears existing client-side rows before applying imported rows.
 Use `mode: "append"` only when the imported rows should be added after the current client rows.
+
+Locale methods switch renderer chrome and formatter context values without remounting the grid:
+
+```ts
+api.setLocale("ko-KR");
+const activeLocale = api.getLocale();
+```
+
+The DOM renderer rerenders footer, overlays, pagination, ARIA live messages, and formatted cell
+values using the selected locale.
+
+Theme updates use the same CSP-aware runtime style path as initial grid creation:
+
+```ts
+api.applyTheme({
+  name: "dark",
+  density: "compact",
+  variables: {
+    "--og-color-focus-ring": "#d7191f"
+  }
+});
+```
+
+When `security.csp.nonce` is configured, the inserted runtime style tag receives that nonce. When
+`security.csp.disableStyleInjection` is true, `applyTheme()` updates the theme metadata without
+inserting a style tag. Built-in theme names and density values are documented in
+`features/theme-foundation`; SI token mapping is documented in `features/si-customization`.

@@ -1,4 +1,7 @@
-import { calculateFixedRowVirtualWindow } from "@onegrid/core";
+import {
+  calculateFixedRowVirtualWindow,
+  createLocaleFormatter
+} from "@onegrid/core";
 import { createBodyPane } from "./bodyPaneRenderer.js";
 import {
   isRowVirtualizationEnabled,
@@ -97,6 +100,7 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
       panes: getPanes?.() ?? panes,
       rowRenderState,
       cellSpanModel: input.cellSpanModel,
+      ...(options.locale === undefined ? {} : { locale: options.locale }),
       ...(rowIndexOffset === undefined ? {} : { rowIndexOffset }),
       centerOwnsTreeControls,
       virtualWindow: nextWindow
@@ -169,6 +173,7 @@ function replaceBodyRows<TData>(input: {
   readonly panes: Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>;
   readonly rowRenderState: RowRenderState<TData> | undefined;
   readonly cellSpanModel: CellSpanModel;
+  readonly locale?: string;
   readonly rowIndexOffset?: number;
   readonly centerOwnsTreeControls: boolean;
   readonly virtualWindow: FixedRowVirtualWindow;
@@ -195,6 +200,7 @@ function replaceBodyRows<TData>(input: {
           ? {}
           : { treeColumnField: input.rowRenderState.treeRuntime.treeColumnField }),
         cellSpanModel: input.cellSpanModel,
+        i18n: createLocaleFormatter(input.locale),
         ...(input.rowIndexOffset === undefined ? {} : { rowIndexOffset: input.rowIndexOffset })
       },
       input.centerOwnsTreeControls,

@@ -12,7 +12,30 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./default.css": "./src/default.css"
+    "./tokens.css": {
+      "style": "./src/tokens.css",
+      "default": "./src/tokens.css"
+    },
+    "./default.css": {
+      "style": "./src/default.css",
+      "default": "./src/default.css"
+    },
+    "./clean.css": {
+      "style": "./src/clean.css",
+      "default": "./src/clean.css"
+    },
+    "./compact.css": {
+      "style": "./src/compact.css",
+      "default": "./src/compact.css"
+    },
+    "./dark.css": {
+      "style": "./src/dark.css",
+      "default": "./src/dark.css"
+    },
+    "./high-contrast.css": {
+      "style": "./src/high-contrast.css",
+      "default": "./src/high-contrast.css"
+    }
   },
   "files": ["dist", "src/*.css"],
   "scripts": {

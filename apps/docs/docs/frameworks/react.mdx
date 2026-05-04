@@ -1,0 +1,95 @@
+# React Wrapper
+
+`@onegrid/react` is a thin lifecycle bridge over `@onegrid/dom`. It does not
+reimplement sorting, filtering, editing, selection, virtualization, merge, export,
+theme, or security behavior.
+
+```tsx
+import { useRef } from "react";
+import { OneGrid, type OneGridHandle } from "@onegrid/react";
+
+interface Row {
+  id: string;
+  status: "Ready" | "Review";
+}
+
+export function OrdersGrid() {
+  const gridRef = useRef<OneGridHandle<Row>>(null);
+
+  return (
+    <OneGrid<Row>
+      ref={gridRef}
+      columns={[
+        { field: "id", headerName: "ID" },
+        { field: "status", headerName: "Status", editable: true, editor: "text" }
+      ]}
+      data={[{ id: "ORD-1001", status: "Ready" }]}
+      rowKey="id"
+      rowModel="client"
+      onSelectionChanged={(event) => console.log(event.rowKeys)}
+    />
+  );
+}
+```
+
+## Ref Bridge
+
+The component exposes the DOM GridApi surface through a React ref for user
+commands such as `selectRows`, `scrollToRow`, `startEdit`,
+`commitPendingEdits`, `cancelPendingEdits`, `exportData`, `importData`,
+`setLocale`, and `applyTheme`.
+
+```tsx
+gridRef.current?.selectRows(["ORD-1001"]);
+await gridRef.current?.commitPendingEdits();
+```
+
+## Event Props
+
+Core `events` remain supported. React event props are merged after core event
+handlers, so both paths can observe the same event.
+
+```tsx
+<OneGrid
+  columns={columns}
+  data={rows}
+  events={{ sortChanged: auditSort }}
+  onSortChanged={syncReactState}
+/>
+```
+
+## React Renderers
+
+React cell and header renderers are opt-in via `reactRenderers`. The bridge
+mounts React into safe placeholder elements created by OneGrid's element
+renderer path, keeping the default text renderer and sanitizer behavior intact.
+
+```tsx
+<OneGrid
+  columns={columns}
+  data={rows}
+  reactRenderers={{
+    headers: {
+      status: () => <span>Stage</span>
+    },
+    cells: {
+      status: ({ value }) => <strong>{String(value)}</strong>
+    }
+  }}
+/>
+```
+
+Editor UI still uses the core `EditorDef` contract (`text`, `number`,
+`select`, `checkbox`, `radio`, and related built-ins). This keeps React, Vue,
+and vanilla examples on the same editing semantics.
+
+## Controlled Updates
+
+When option references change, the React wrapper destroys the previous DOM grid
+and mounts a new instance with the updated options. This baseline is deliberate:
+the wrapper stays small and predictable until fine-grained DOM option mutation
+APIs are added.
+
+Direct test screen: `apps/examples/react.html`.
+
+API parity with vanilla and Vue is tracked in `frameworks/api-parity`.

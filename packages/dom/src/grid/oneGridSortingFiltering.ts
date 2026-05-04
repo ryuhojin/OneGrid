@@ -91,7 +91,7 @@ export abstract class OneGridSortingFiltering<TData = unknown> extends OneGridRo
     }
     this.virtualScrollTop = 0;
     this.paginationPage = 1;
-    this.options.events?.sortChanged?.({ type: "sortChanged", sortModel: this.sortModel });
+    this.emitGridEvent("sortChanged", { type: "sortChanged", sortModel: this.sortModel });
     if (this.resetRemoteRowModel(reason)) {
       return;
     }
@@ -111,7 +111,7 @@ export abstract class OneGridSortingFiltering<TData = unknown> extends OneGridRo
     }
     this.virtualScrollTop = 0;
     this.paginationPage = 1;
-    this.options.events?.filterChanged?.({ type: "filterChanged", filterModel: this.filterModel });
+    this.emitGridEvent("filterChanged", { type: "filterChanged", filterModel: this.filterModel });
     if (this.resetRemoteRowModel(reason)) {
       return;
     }

@@ -98,3 +98,21 @@ const columns: ColumnDef<OrderRow>[] = [
 
 Supported editor kinds are `text`, `number`, `date`, `datetime`, `checkbox`, `select`,
 `multi-select`, `radio`, `textarea`, `autocomplete`, and `custom`.
+
+Cell renderers are secure by default. Omitted renderers and `kind: "text"` renderers write strings
+with `textContent`. `kind: "element"` uses DOM node creation and filters unsafe tags, inline event
+attributes, inline style attributes, and unsafe URL protocols. `kind: "html"` is interpreted only
+when `GridOptions.security.html.allowHtmlRenderer` is true and a sanitizer is supplied:
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  {
+    field: "status",
+    renderer: {
+      kind: "html",
+      sanitize: true,
+      render: ({ value }) => `<strong>${String(value)}</strong>`
+    }
+  }
+];
+```

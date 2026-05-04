@@ -1,0 +1,65 @@
+.og-grid__group-footer-row {
+  background: var(--og-color-pinned-bg);
+  font-weight: 650;
+}
+
+.og-grid__group-footer-cell {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 1px;
+  justify-content: center;
+}
+
+.og-grid__group-footer-label-cell {
+  align-items: center;
+  color: var(--og-color-group-fg);
+  flex-direction: row;
+}
+
+.og-grid__summary-row {
+  background: var(--og-color-summary-bg);
+  font-weight: 700;
+}
+
+.og-grid__summary-cell {
+  align-items: flex-start;
+  color: var(--og-color-fg);
+  flex-direction: column;
+  gap: 1px;
+  justify-content: center;
+}
+
+.og-grid__summary-label {
+  color: var(--og-color-muted);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.og-grid__summary-value {
+  color: var(--og-color-fg);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.15;
+}
+
+.og-grid__footer-pane {
+  align-items: center;
+  box-sizing: border-box;
+  color: var(--og-color-muted);
+  display: flex;
+  gap: 10px;
+  min-block-size: 40px;
+  padding: 0 10px;
+}
+
+.og-grid__footer-status {
+  font-weight: 650;
+}
+
+.og-grid__pane--left .og-grid__summary-cell,
+.og-grid__pane--right .og-grid__summary-cell,
+.og-grid__pane--left .og-grid__footer-pane,
+.og-grid__pane--right .og-grid__footer-pane {
+  background: var(--og-color-pinned-bg);
+}

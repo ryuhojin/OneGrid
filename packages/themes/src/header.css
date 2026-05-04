@@ -1,0 +1,187 @@
+.og-grid__header {
+  display: grid;
+  grid-auto-columns: minmax(120px, 1fr);
+  grid-auto-flow: column;
+  min-height: var(--og-row-height);
+}
+
+.og-grid__header {
+  background: var(--og-color-header-bg);
+  font-weight: 600;
+  grid-auto-flow: initial;
+}
+
+.og-grid__header-row {
+  display: contents;
+}
+
+.og-grid__header-cell {
+  gap: 6px;
+  position: relative;
+}
+
+.og-grid__header-cell--sortable {
+  cursor: pointer;
+}
+
+.og-grid__header-cell--sortable:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--og-color-focus-ring);
+  outline: 0;
+}
+
+.og-grid__header-cell--filtered {
+  box-shadow: inset 0 -2px 0 var(--og-color-focus-ring);
+}
+
+.og-grid__filter-indicator {
+  background: var(--og-color-focus-ring);
+  border-radius: 999px;
+  block-size: 6px;
+  flex: 0 0 auto;
+  inline-size: 6px;
+}
+
+.og-grid__sort-indicator {
+  block-size: 14px;
+  display: grid;
+  flex: 0 0 auto;
+  inline-size: 14px;
+  opacity: 0.42;
+  place-items: center;
+}
+
+.og-grid__sort-indicator::before {
+  border-inline: 4px solid transparent;
+  content: "";
+}
+
+.og-grid__header-cell[data-sort-direction="asc"] .og-grid__sort-indicator,
+.og-grid__header-cell[data-sort-direction="desc"] .og-grid__sort-indicator {
+  opacity: 1;
+}
+
+.og-grid__header-cell[data-sort-direction="asc"] .og-grid__sort-indicator::before {
+  border-block-end: 6px solid var(--og-color-focus-ring);
+}
+
+.og-grid__header-cell[data-sort-direction="desc"] .og-grid__sort-indicator::before {
+  border-block-start: 6px solid var(--og-color-focus-ring);
+}
+
+.og-grid__sort-priority {
+  align-items: center;
+  background: var(--og-color-focus-ring);
+  border-radius: 999px;
+  color: var(--og-color-on-accent);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  inline-size: 16px;
+  justify-content: center;
+  line-height: 16px;
+}
+
+.og-grid__header-actions {
+  align-items: center;
+  align-self: stretch;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  margin-inline-start: auto;
+}
+
+.og-grid__menu-button {
+  block-size: 24px;
+  display: grid;
+  inline-size: 24px;
+  opacity: 0.72;
+  place-items: center;
+}
+
+.og-grid__menu-button[aria-expanded="true"] {
+  background: var(--og-color-hover-bg);
+  opacity: 1;
+}
+
+.og-grid__menu-icon {
+  background-image: radial-gradient(circle, var(--og-color-icon-muted) 1.5px, transparent 1.8px);
+  background-position: center;
+  background-repeat: repeat-y;
+  background-size: 4px 5px;
+  block-size: 15px;
+  inline-size: 4px;
+}
+
+.og-grid__resize-handle {
+  appearance: none;
+  background: var(--og-color-resize-hit-area);
+  border: 0;
+  cursor: col-resize;
+  display: block;
+  inset-block: 0;
+  inset-inline-end: -5px;
+  inline-size: 10px;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  z-index: 20;
+}
+
+.og-grid__resize-handle::after {
+  background: transparent;
+  block-size: calc(100% - 12px);
+  content: "";
+  inline-size: 2px;
+  inset-block-start: 6px;
+  inset-inline-end: 4px;
+  position: absolute;
+}
+
+.og-grid__resize-handle:hover::after,
+.og-grid__resize-handle:focus-visible::after,
+.og-grid__header-cell:hover > .og-grid__resize-handle::after,
+.og-grid--resizing-column .og-grid__resize-handle::after {
+  background: var(--og-color-focus-ring);
+}
+
+.og-grid__resize-handle:focus-visible {
+  outline: 0;
+}
+
+.og-grid--resizing-column {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.og-grid__header-cell--group,
+.og-grid__header-cell--merge {
+  justify-content: center;
+}
+
+.og-grid__header-cell--merge {
+  background: var(--og-color-merge-header-bg);
+}
+
+.og-grid__header-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.og-grid__header-label {
+  background: var(--og-color-header-label-bg);
+  border: 1px solid var(--og-color-header-label-border);
+  border-radius: 999px;
+  color: var(--og-color-header-label-fg);
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  margin-inline-start: 8px;
+  padding: 3px 7px;
+}
+
+.og-grid__pane--left .og-grid__header-cell,
+.og-grid__pane--right .og-grid__header-cell {
+  background: var(--og-color-pinned-header-bg);
+}

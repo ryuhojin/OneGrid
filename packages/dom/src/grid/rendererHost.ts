@@ -1,12 +1,14 @@
 import type {
   CellContext,
   HeaderContext,
+  LocaleFormatterBridge,
   RenderElement,
   RenderElementBuilder,
   RowKey,
   SecurityOptions
 } from "@onegrid/core";
 import type { HeaderCell, NormalizedColumn, NormalizedDataColumn } from "@onegrid/core";
+import { applySafeAttribute, getSafeTagName, renderSanitizedHtml } from "./htmlSecurity.js";
 
 export interface CellRendererHostInput<TData> {
   readonly cell: HTMLElement;
@@ -16,6 +18,7 @@ export interface CellRendererHostInput<TData> {
   readonly column: NormalizedDataColumn<TData>;
   readonly value: unknown;
   readonly security?: SecurityOptions;
+  readonly i18n: LocaleFormatterBridge;
 }
 
 export interface HeaderRendererHostInput<TData> {
@@ -49,9 +52,7 @@ export function renderCellHost<TData>(input: CellRendererHostInput<TData>): void
 }
 
 export function renderHeaderHost<TData>(input: HeaderRendererHostInput<TData>): void {
-  const renderer = input.column?.kind === "group"
-    ? input.column.source.headerRenderer
-    : undefined;
+  const renderer = input.column?.source.headerRenderer;
 
   if (!renderer) {
     input.host.textContent = input.cell.headerName;
@@ -59,7 +60,7 @@ export function renderHeaderHost<TData>(input: HeaderRendererHostInput<TData>): 
   }
 
   const column = input.column;
-  if (!column || column.kind !== "group") {
+  if (!column) {
     input.host.textContent = input.cell.headerName;
     return;
   }
@@ -92,6 +93,7 @@ export function readCellValue<TData>(
 
 function createCellContext<TData>(input: CellRendererHostInput<TData>): CellContext<TData> {
   return {
+    ...input.i18n,
     row: input.rowData,
     rowIndex: input.rowIndex,
     rowKey: input.rowKey,
@@ -140,14 +142,7 @@ function applyCellDecoration<TData>(
 }
 
 function renderHtml(cell: HTMLElement, html: string, security: SecurityOptions | undefined): void {
-  const sanitizer = security?.html?.sanitizer;
-  if (security?.html?.allowHtmlRenderer === true && sanitizer) {
-    cell.innerHTML = sanitizer.sanitize(html);
-    return;
-  }
-
-  cell.textContent = html;
-  cell.dataset.htmlRendererBlocked = "true";
+  renderSanitizedHtml(cell, html, security);
 }
 
 const elementBuilder: RenderElementBuilder = {
@@ -172,49 +167,6 @@ function createElement(spec: RenderElement, security: SecurityOptions | undefine
   }
 
   return element;
-}
-
-function getSafeTagName(tagName: string): string {
-  const normalized = tagName.toLowerCase();
-  if (!/^[a-z][a-z0-9-]*$/u.test(normalized)) {
-    return "span";
-  }
-
-  return ["script", "style", "iframe", "object", "embed"].includes(normalized)
-    ? "span"
-    : normalized;
-}
-
-function applySafeAttribute(
-  element: HTMLElement,
-  name: string,
-  value: string,
-  security: SecurityOptions | undefined
-): void {
-  const normalized = name.toLowerCase();
-  if (normalized.startsWith("on") || normalized === "style") {
-    return;
-  }
-
-  if ((normalized === "href" || normalized === "src") && !isAllowedUrl(value, security)) {
-    return;
-  }
-
-  element.setAttribute(name, value);
-}
-
-function isAllowedUrl(value: string, security: SecurityOptions | undefined): boolean {
-  if (value.startsWith("/") || value.startsWith("#") || value.startsWith("./") || value.startsWith("../")) {
-    return true;
-  }
-
-  try {
-    const url = new URL(value);
-    const allowed = security?.url?.allowedProtocols ?? ["https:", "http:", "mailto:", "tel:"];
-    return allowed.includes(url.protocol);
-  } catch {
-    return false;
-  }
 }
 
 function readField(row: unknown, field: string): unknown {

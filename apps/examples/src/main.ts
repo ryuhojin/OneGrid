@@ -10,6 +10,7 @@ import { mountClientRowModelExample } from "./features/client-row-model/vanilla.
 import { mountColumnModelExample } from "./features/column-model/vanilla.js";
 import { mountColumnVirtualizationExample } from "./features/column-virtualization/vanilla.js";
 import { mountColumnUiExample } from "./features/column-ui/vanilla.js";
+import { mountCspExample } from "./features/csp/vanilla.js";
 import { mountEditingExample } from "./features/editing/vanilla.js";
 import { mountExportExample } from "./features/export/vanilla.js";
 import { mountFilteringExample } from "./features/filtering/vanilla.js";
@@ -18,18 +19,22 @@ import { mountGroupHeaderExample } from "./features/group-header/vanilla.js";
 import { mountGroupingExample } from "./features/grouping/vanilla.js";
 import { mountInfiniteRowModelExample } from "./features/infinite-row-model/vanilla.js";
 import { mountKeyboardFocusExample } from "./features/keyboard-focus/vanilla.js";
+import { mountLocalizationExample } from "./features/localization/vanilla.js";
 import { mountMenusExample } from "./features/menus/vanilla.js";
 import { mountPaginationExample } from "./features/pagination/vanilla.js";
 import { mountPivotExample } from "./features/pivot/vanilla.js";
 import { mountRendererFoundationExample } from "./features/renderer-foundation/vanilla.js";
 import { mountRowVirtualizationExample } from "./features/row-virtualization/vanilla.js";
 import { mountServerRowModelExample } from "./features/server-row-model/vanilla.js";
+import { mountSiCustomizationExample } from "./features/si-customization/vanilla.js";
 import { mountSelectionExample } from "./features/selection/vanilla.js";
 import { mountSortingExample } from "./features/sorting/vanilla.js";
 import { mountSummaryExample } from "./features/summary/vanilla.js";
+import { mountThemeFoundationExample } from "./features/theme-foundation/vanilla.js";
 import { mountTreeExample } from "./features/tree/vanilla.js";
 import { mountTreeRowModelExample } from "./features/tree-row-model/vanilla.js";
 import { mountViewportRowModelExample } from "./features/viewport-row-model/vanilla.js";
+import { mountXssDefenseExample } from "./features/xss-defense/vanilla.js";
 
 interface MountedExample {
   destroy(): void;
@@ -66,7 +71,12 @@ const mounts: Readonly<Record<string, ExampleMount>> = {
   "F-PIVOT": mountPivotExample,
   "F-PAGE": mountPaginationExample,
   "F-FROZEN": mountFrozenExample,
-  "F-EXPORT": mountExportExample
+  "F-EXPORT": mountExportExample,
+  "F-I18N": mountLocalizationExample,
+  "SEC-001": mountCspExample,
+  "SEC-002": mountXssDefenseExample,
+  "THEME-001": mountThemeFoundationExample,
+  "THEME-002": mountSiCustomizationExample
 };
 
 const app = document.querySelector<HTMLElement>("#app");

@@ -4,9 +4,10 @@ import {
   createFrozenRowSlices,
   createGridLayoutModel,
   createHeaderModel,
+  createLocaleFormatter,
   createSummaryRow
 } from "@onegrid/core";
-import type { CellSpanModel } from "@onegrid/core";
+import type { CellSpanModel, LocaleFormatterBridge } from "@onegrid/core";
 import { createBodyPane } from "./bodyPaneRenderer.js";
 import type { ColumnVirtualScrollRuntime } from "./columnVirtualScrollRuntime.js";
 import { resolveColumnUiOptions } from "./columnControls.js";
@@ -95,6 +96,7 @@ export function renderGridShell<TData>(
   const rowData = getGridRowData(renderOptions, rowRenderState);
   const allRows = rowData.rows;
   const rowCount = rowRenderState?.rowCount ?? allRows.length;
+  const i18n = createLocaleFormatter(renderOptions.locale);
   const frozenRows = createFrozenRowSlices(allRows, {
     ...(renderOptions.frozenRows === undefined ? {} : renderOptions.frozenRows),
     totalRowCount: rowCount
@@ -116,7 +118,8 @@ export function renderGridShell<TData>(
     rows: createCellSpanRows(allRows),
     columns: columnModel.visibleLeafColumns,
     ...(renderOptions.merge === undefined ? {} : { options: renderOptions.merge }),
-    ...(rowRenderState?.mergeMeta === undefined ? {} : { serverMeta: rowRenderState.mergeMeta })
+    ...(rowRenderState?.mergeMeta === undefined ? {} : { serverMeta: rowRenderState.mergeMeta }),
+    ...(renderOptions.locale === undefined ? {} : { locale: renderOptions.locale })
   });
   const summary = createSummaryRow(
     columnModel.visibleLeafColumns,
@@ -165,10 +168,10 @@ export function renderGridShell<TData>(
     columnCount: columnModel.visibleLeafColumns.length,
     loading: rowRenderState?.loading ?? false,
     ...(rowRenderState?.error === undefined ? {} : { error: rowRenderState.error })
-  });
+  }, i18n);
   const bodyViewport = createBodyViewport();
   const bodyShell = createBodyShell(bodyViewport);
-  const bodyRuntime = createBodyPaneRuntime(renderOptions, rowRenderState, cellSpanModel, groupRuntime);
+  const bodyRuntime = createBodyPaneRuntime(renderOptions, rowRenderState, cellSpanModel, groupRuntime, i18n);
   const centerOwnsTreeControls = paneState.panes.left.columns.length === 0;
   attachWheelBoundaryGuard(bodyViewport);
   attachInfiniteScroll(bodyViewport, rowRenderState);
@@ -260,7 +263,7 @@ export function renderGridShell<TData>(
       loading: rowRenderState?.loading ?? false,
       hasMore: rowRenderState?.hasMore ?? false,
       onLoadMore: rowRenderState?.onLoadMore ?? (() => undefined)
-    }));
+    }, i18n));
   }
 
   grid.append(createOverlayLayer({
@@ -268,7 +271,7 @@ export function renderGridShell<TData>(
     renderedRowCount: frozenRows.topRows.length + rows.length + frozenRows.bottomRows.length,
     loading: rowRenderState?.loading ?? false,
     ...(rowRenderState?.error === undefined ? {} : { error: rowRenderState.error })
-  }));
+  }, i18n));
   attachColumnVirtualScroll({
     grid,
     scrollElement: bodyViewport,
@@ -348,13 +351,15 @@ function createBodyPaneRuntime<TData>(
   options: DomGridOptions<TData>,
   rowRenderState: RowRenderState<TData> | undefined,
   cellSpanModel: CellSpanModel,
-  groupRuntime: GroupRowRuntime | undefined
+  groupRuntime: GroupRowRuntime | undefined,
+  i18n: LocaleFormatterBridge
 ) {
   return {
     ...(rowRenderState?.treeRuntime === undefined ? {} : { treeRuntime: rowRenderState.treeRuntime }),
     ...(groupRuntime === undefined ? {} : { groupRuntime }),
     ...(options.tree?.treeColumnField === undefined ? {} : { treeColumnField: options.tree.treeColumnField }),
     cellSpanModel,
+    i18n,
     ...(options.editing === undefined ? {} : { editing: options.editing }),
     ...(options.security === undefined ? {} : { security: options.security })
   };

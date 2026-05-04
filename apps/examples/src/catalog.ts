@@ -179,5 +179,35 @@ export const examples: readonly ExampleCatalogItem[] = [
     title: "Export / Import",
     feature: "export",
     variants: ["vanilla", "react", "vue"]
+  },
+  {
+    id: "F-I18N",
+    title: "Localization",
+    feature: "localization",
+    variants: ["vanilla", "react", "vue"]
+  },
+  {
+    id: "SEC-001",
+    title: "CSP",
+    feature: "csp",
+    variants: ["vanilla", "react", "vue"]
+  },
+  {
+    id: "SEC-002",
+    title: "XSS defense",
+    feature: "xss-defense",
+    variants: ["vanilla", "react", "vue"]
+  },
+  {
+    id: "THEME-001",
+    title: "Theme foundation",
+    feature: "theme-foundation",
+    variants: ["vanilla", "react", "vue"]
+  },
+  {
+    id: "THEME-002",
+    title: "SI customization",
+    feature: "si-customization",
+    variants: ["vanilla", "react", "vue"]
   }
 ];

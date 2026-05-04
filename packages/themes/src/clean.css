@@ -1,0 +1,24 @@
+@import "@onegrid/themes/default.css";
+
+:root,
+.og-root-host {
+  --og-color-bg: #ffffff;
+  --og-color-fg: #111827;
+  --og-color-border: #d9dee6;
+  --og-color-subtle-border: #e7ebf0;
+  --og-color-header-bg: #f5f7fa;
+  --og-color-hover-bg: #eef2f6;
+  --og-color-muted: #5f6b7a;
+  --og-color-panel-bg: #ffffff;
+  --og-color-pinned-bg: #f9fbfd;
+  --og-color-pinned-header-bg: #eef2f6;
+  --og-color-summary-bg: #f8fafc;
+  --og-color-selected-bg: #eaf2ff;
+  --og-color-focus-ring: #2563eb;
+  --og-color-accent: #2563eb;
+  --og-color-accent-hover: #1d4ed8;
+  --og-color-control-active-bg: #e7efff;
+  --og-color-control-active-border: #b9ccff;
+  --og-color-control-active-fg: #1d4ed8;
+  --og-shadow-popover: 0 14px 36px rgb(17 24 39 / 13%);
+}

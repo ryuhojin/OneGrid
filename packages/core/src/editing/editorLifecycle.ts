@@ -1,4 +1,5 @@
 import { readField } from "../row/rowIdentity.js";
+import { createLocaleFormatter } from "../i18n/index.js";
 import type {
   CellContext,
   DataColumnDef,
@@ -17,6 +18,7 @@ export interface StartCellEditInput<TData = unknown> {
   readonly currentValue?: unknown;
   readonly editing?: EditingOptions;
   readonly startedAt?: number;
+  readonly locale?: string;
 }
 
 export interface CellEditSession<TData = unknown> {
@@ -29,6 +31,7 @@ export interface CellEditSession<TData = unknown> {
   readonly previousValue: unknown;
   readonly editor: ResolvedEditorDef<TData>;
   readonly startedAt: number;
+  readonly locale: string;
 }
 
 export interface ResolvedEditorDef<TData = unknown> {
@@ -43,6 +46,7 @@ export interface CommitCellEditInput<TData = unknown> {
   readonly rawValue: unknown;
   readonly validate?: boolean;
   readonly editing?: EditingOptions;
+  readonly locale?: string;
 }
 
 export interface CellEditCommitResult<TData = unknown> {
@@ -66,7 +70,15 @@ export function startCellEdit<TData>(
   const field = input.field ?? input.column.field;
   const currentValue = input.currentValue
     ?? readEditedValue(input.row, input.rowIndex, input.rowKey, input.column, field);
-  const context = createCellContext(input.row, input.rowIndex, input.rowKey, input.column, field, currentValue);
+  const context = createCellContext(
+    input.row,
+    input.rowIndex,
+    input.rowKey,
+    input.column,
+    field,
+    currentValue,
+    input.locale
+  );
   if (!isCellEditable(input.column, context, input.editing)) {
     return undefined;
   }
@@ -80,7 +92,8 @@ export function startCellEdit<TData>(
     field,
     previousValue: currentValue,
     editor: resolveEditorDef(input.column),
-    startedAt: input.startedAt ?? Date.now()
+    startedAt: input.startedAt ?? Date.now(),
+    locale: context.locale
   });
 }
 
@@ -94,7 +107,8 @@ export async function commitCellEdit<TData>(
     session.rowKey,
     session.column,
     session.field,
-    session.previousValue
+    session.previousValue,
+    input.locale ?? session.locale
   );
   const nextValue = parseEditedValue(input.rawValue, session.editor.kind, session.column, context);
   const shouldValidate = input.validate !== false && input.editing?.validateOnCommit !== false;
@@ -238,9 +252,11 @@ function createCellContext<TData>(
   rowKey: RowKey,
   column: DataColumnDef<TData>,
   field: string,
-  value: unknown
+  value: unknown,
+  locale: string | undefined
 ): CellContext<TData> {
   return {
+    ...createLocaleFormatter(locale),
     row,
     rowIndex,
     rowKey,

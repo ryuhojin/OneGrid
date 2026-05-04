@@ -1,35 +1,36 @@
 import {
   createColumnModel,
   createInitialSortModel,
+  createLocaleFormatter,
   createSelectionState,
-  isFilterModelEmpty,
   normalizeFilterModel,
   readField
 } from "@onegrid/core";
-import {
-  normalizePage,
-  normalizePageSize
-} from "@onegrid/pagination";
+import { normalizePage, normalizePageSize } from "@onegrid/pagination";
 import type {
   ColumnModel,
   ColumnUiState,
   FilterModel,
   GridSelectionState,
   AggregateResult,
+  GridEventHandler,
+  GridEventMap,
   GroupModel,
   InfiniteRowEntry,
   InfiniteRowModel,
   MergeMeta,
   NormalizedDataColumn,
-  ScrollAlign,
   SelectedCell,
   ServerRowEntry,
   ServerRowModel,
   SortModel,
+  ThemeInput,
+  ThemeOptions,
   TreeRowEntry,
   TreeRowModel,
   ViewportRowEntry,
-  ViewportRowModel
+  ViewportRowModel,
+  Unsubscribe
 } from "@onegrid/core";
 import { createColumnUiRuntime as createColumnUiRuntimeFromState } from "./columnUiRuntimeFactory.js";
 import type { ColumnUiRuntime } from "./columnControls.js";
@@ -43,22 +44,29 @@ import { disposeGridShell, renderGridShell } from "./renderGridShell.js";
 import type { RowRenderState } from "./renderGridShell.js";
 import { fullInvalidation, invalidate } from "./renderInvalidation.js";
 import { DomRenderScheduler } from "./renderScheduler.js";
+import { createRenderOptions } from "./renderOptionsFactory.js";
 import { createDomInfiniteRowModel, createDomServerRowModel, createDomTreeRowModel, createDomViewportRowModel } from "./rowModelFactory.js";
 import { observeGridHostResize } from "./resizeObserver.js";
 import type { GridResizeObserverHandle } from "./resizeObserver.js";
-import { resolveScrollLeftForField } from "./scrollPosition.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
 import type { HeaderSortRuntime } from "./sortRuntime.js";
-import { isColumnVirtualizationEnabled, resolveColumnViewportWidth } from "./columnVirtualScrollRuntime.js";
+import { GridThemeRuntime, normalizeThemeInput } from "./themeRuntime.js";
 import type { ColumnVirtualScrollRuntime } from "./columnVirtualScrollRuntime.js";
-import { isRowVirtualizationEnabled, resolveVirtualViewportHeight } from "./virtualScrollRuntime.js";
 import type { VirtualScrollRuntime } from "./virtualScrollRuntime.js";
 import type { ActiveDomEdit, DomGridOptions } from "./oneGridTypes.js";
+
+let nextGridInstanceId = 0;
+type MutableDomGridOptions<TData> = {
+  -readonly [K in keyof DomGridOptions<TData>]: DomGridOptions<TData>[K];
+};
+type AnyGridEventHandler<TData> = GridEventHandler<TData, keyof GridEventMap<TData>>;
 
 export abstract class OneGridBase<TData = unknown> {
   readonly root: HTMLElement;
 
   protected readonly options: DomGridOptions<TData>;
+  protected readonly instanceId = `og-${++nextGridInstanceId}`;
+  protected readonly themeRuntime: GridThemeRuntime;
   protected columnState: ColumnUiState;
   protected dataRows: readonly TData[] | undefined;
   protected infiniteRowModel: InfiniteRowModel<TData> | undefined;
@@ -86,6 +94,7 @@ export abstract class OneGridBase<TData = unknown> {
   protected viewportLoading = false;
   protected columnScrollLeft = 0;
   protected columnViewportWidth: number | undefined;
+  protected locale: string;
   protected paginationPage: number;
   protected paginationPageSize: number;
   protected pendingHeaderFocusField: string | undefined;
@@ -93,8 +102,10 @@ export abstract class OneGridBase<TData = unknown> {
   protected filterRequestSequence = 0;
   protected activeEdit: ActiveDomEdit<TData> | undefined;
   protected readonly editBatch = new EditBatchRuntime<TData>();
+  protected theme: ThemeOptions | undefined;
   protected renderError: unknown;
   protected destroyed = false;
+  private readonly apiEventHandlers = new Map<string, Set<AnyGridEventHandler<TData>>>();
 
   constructor(options: DomGridOptions<TData>) {
     this.options = options;
@@ -109,6 +120,7 @@ export abstract class OneGridBase<TData = unknown> {
     this.groupModel = options.grouping?.model ?? Object.freeze({});
     this.serverGroupKeys = options.server?.groupKeys ?? Object.freeze([]);
     this.selectionState = createSelectionState(options.selection);
+    this.locale = createLocaleFormatter(options.locale).locale;
     this.paginationPage = normalizePage(
       options.pagination?.page ?? (options.server?.initialPage === undefined
         ? undefined
@@ -122,6 +134,8 @@ export abstract class OneGridBase<TData = unknown> {
     this.infiniteEntries = this.infiniteRowModel?.getAppendRows() ?? [];
     this.treeEntries = this.treeRowModel?.visibleRows ?? [];
     this.root = options.el;
+    this.theme = normalizeThemeInput(options.theme);
+    this.themeRuntime = new GridThemeRuntime(this.root, this.instanceId);
     this.renderScheduler = new DomRenderScheduler((invalidation) => {
       this.commitRender(invalidation);
     });
@@ -138,6 +152,7 @@ export abstract class OneGridBase<TData = unknown> {
     this.activeEdit?.overlay.destroy();
     this.activeEdit = undefined;
     this.root.replaceChildren();
+    this.themeRuntime.destroy();
     this.root.classList.remove("og-root-host");
     this.infiniteRowModel?.cancelAll("grid destroyed");
     this.renderScheduler.destroy();
@@ -145,13 +160,58 @@ export abstract class OneGridBase<TData = unknown> {
     this.destroyed = true;
   }
 
-  async scrollToColumn(field: string, align: ScrollAlign = "start"): Promise<void> {
-    this.setColumnScrollToField(field, align);
-    await this.render(invalidate(["columns"], "scroll-column"));
+  setLocale(locale: string): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    const nextLocale = createLocaleFormatter(locale).locale;
+    if (nextLocale === this.locale) {
+      return;
+    }
+
+    this.locale = nextLocale;
+    void this.render(invalidate(["rows", "columns", "layout", "overlay"], "locale"));
+  }
+
+  getLocale(): string {
+    return this.locale;
+  }
+
+  applyTheme(theme: ThemeInput): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    this.theme = normalizeThemeInput(theme);
+    this.applyRuntimeTheme();
+    void this.render(invalidate(["layout"], "theme"));
+  }
+
+  on<K extends keyof GridEventMap<TData> & string>(
+    eventName: K,
+    handler: GridEventHandler<TData, K>
+  ): Unsubscribe {
+    const key = String(eventName);
+    const handlers = this.apiEventHandlers.get(key) ?? new Set<AnyGridEventHandler<TData>>();
+    handlers.add(handler as AnyGridEventHandler<TData>);
+    this.apiEventHandlers.set(key, handlers);
+    return () => {
+      this.off(eventName, handler);
+    };
+  }
+
+  off<K extends keyof GridEventMap<TData> & string>(
+    eventName: K,
+    handler: GridEventHandler<TData, K>
+  ): void {
+    const handlers = this.apiEventHandlers.get(String(eventName));
+    handlers?.delete(handler as AnyGridEventHandler<TData>);
   }
 
   protected mount(): void {
     this.root.classList.add("og-root-host");
+    this.applyRuntimeTheme();
     this.renderNow(fullInvalidation("mount"));
     if (this.infiniteRowModel) {
       void this.loadNextInfiniteBlock();
@@ -177,6 +237,7 @@ export abstract class OneGridBase<TData = unknown> {
       this.pendingQuickFilterFocus = true;
     }
 
+    this.applyRuntimeTheme();
     const renderOptions = this.getRenderOptions();
     renderGridShell(
       this.root,
@@ -198,153 +259,39 @@ export abstract class OneGridBase<TData = unknown> {
   }
 
   protected getRenderOptions(): DomGridOptions<TData> {
-    const sorting = this.getSortingOptions();
-    const filtering = this.getFilteringOptions();
-    const grouping = this.getGroupingOptions();
-    const server = this.getServerOptions();
-    const pagination = this.getPaginationOptions();
-    return {
-      ...this.options,
-      ...(this.dataRows === undefined ? {} : { data: this.dataRows }),
+    return createRenderOptions({
+      options: this.options,
+      ...(this.dataRows === undefined ? {} : { dataRows: this.dataRows }),
       columnState: this.columnState,
-      ...(sorting === undefined ? {} : { sorting }),
-      ...(filtering === undefined ? {} : { filtering }),
-      ...(grouping === undefined ? {} : { grouping }),
-      ...(server === undefined ? {} : { server }),
-      ...(pagination === undefined ? {} : { pagination })
-    };
-  }
-
-  protected getSortingOptions(): DomGridOptions<TData>["sorting"] {
-    if (this.options.sorting === undefined && this.sortModel.length === 0) {
-      return undefined;
-    }
-
-    return { ...this.options.sorting, model: this.sortModel };
-  }
-
-  protected getFilteringOptions(): DomGridOptions<TData>["filtering"] {
-    if (this.options.filtering === undefined && isFilterModelEmpty(this.filterModel)) {
-      return undefined;
-    }
-
-    return { ...this.options.filtering, model: this.filterModel };
-  }
-
-  protected getGroupingOptions(): DomGridOptions<TData>["grouping"] {
-    if (this.options.grouping === undefined && this.groupModel.fields === undefined) {
-      return undefined;
-    }
-
-    return { ...this.options.grouping, model: this.groupModel };
-  }
-
-  protected getServerOptions(): DomGridOptions<TData>["server"] {
-    if (this.options.server === undefined && this.serverGroupKeys.length === 0) {
-      return undefined;
-    }
-
-    const paginationMode = this.options.pagination?.mode;
-    const usesPagination = paginationMode === "server" || paginationMode === "cursor";
-    return {
-      ...this.options.server,
-      groupKeys: this.serverGroupKeys,
-      ...(usesPagination ? { pageSize: this.paginationPageSize } : {})
-    };
-  }
-
-  protected getPaginationOptions(): DomGridOptions<TData>["pagination"] {
-    if (this.options.pagination === undefined) {
-      return undefined;
-    }
-
-    return {
-      ...this.options.pagination,
-      page: this.paginationPage,
-      pageSize: this.paginationPageSize
-    };
-  }
-
-  setPage(page: number): void {
-    if (this.destroyed || this.options.pagination === undefined) {
-      return;
-    }
-
-    const nextPage = normalizePage(page);
-    if (nextPage === this.paginationPage) {
-      return;
-    }
-
-    this.paginationPage = nextPage;
-    this.virtualScrollTop = 0;
-    this.options.events?.pageChanged?.({
-      type: "pageChanged",
-      page: this.paginationPage,
-      pageSize: this.paginationPageSize
+      sortModel: this.sortModel,
+      filterModel: this.filterModel,
+      groupModel: this.groupModel,
+      serverGroupKeys: this.serverGroupKeys,
+      paginationPage: this.paginationPage,
+      paginationPageSize: this.paginationPageSize,
+      locale: this.locale,
+      ...(this.theme === undefined ? {} : { theme: this.theme })
     });
-    if (this.serverRowModel) {
-      void this.loadServerRows(false, this.paginationPage - 1);
-      return;
-    }
-
-    void this.render(invalidate(["rows", "layout", "overlay"], "pagination-page"));
   }
 
-  getPage(): number {
-    return this.paginationPage;
+  protected applyRuntimeTheme(): void {
+    this.themeRuntime.apply(this.theme, this.options.security);
   }
 
-  setPageSize(pageSize: number): void {
-    if (this.destroyed || this.options.pagination === undefined) {
-      return;
-    }
-
-    const nextPageSize = normalizePageSize(pageSize);
-    if (nextPageSize === this.paginationPageSize) {
-      return;
-    }
-
-    this.paginationPageSize = nextPageSize;
-    this.paginationPage = 1;
-    this.virtualScrollTop = 0;
-    this.options.events?.pageChanged?.({
-      type: "pageChanged",
-      page: this.paginationPage,
-      pageSize: this.paginationPageSize
+  protected emitGridEvent<K extends keyof GridEventMap<TData> & string>(
+    eventName: K,
+    event: GridEventMap<TData>[K]
+  ): void {
+    const configured = this.options.events?.[eventName] as GridEventHandler<TData, K> | undefined;
+    configured?.(event);
+    const handlers = this.apiEventHandlers.get(String(eventName));
+    handlers?.forEach((handler) => {
+      (handler as GridEventHandler<TData, K>)(event);
     });
-
-    if (this.serverRowModel) {
-      this.serverRowModel = createDomServerRowModel(this.getRenderOptions());
-      this.serverEntries = [];
-      this.serverMergeMeta = [];
-      this.serverAggregate = undefined;
-      void this.loadServerRows(true);
-      return;
-    }
-
-    void this.render(invalidate(["rows", "layout", "overlay"], "pagination-page-size"));
   }
 
-  getPageSize(): number {
-    return this.paginationPageSize;
-  }
-
-  protected createPaginationRuntime(): GridPaginationRuntime | undefined {
-    if (this.options.pagination === undefined) {
-      return undefined;
-    }
-
-    return {
-      setPage: (page) => this.setPage(page),
-      setPageSize: (pageSize) => this.setPageSize(pageSize),
-      loadNextPage: () => {
-        if (this.infiniteRowModel) {
-          void this.loadNextInfiniteBlock();
-        } else {
-          this.setPage(this.paginationPage + 1);
-        }
-      }
-    };
+  protected get mutableOptions(): MutableDomGridOptions<TData> {
+    return this.options as MutableDomGridOptions<TData>;
   }
 
   protected createColumnUiRuntime(): ColumnUiRuntime {
@@ -428,81 +375,16 @@ export abstract class OneGridBase<TData = unknown> {
       && document.activeElement.classList.contains("og-grid__quick-filter-input");
   }
 
-  protected createVirtualScrollRuntime(): VirtualScrollRuntime {
-    return {
-      enabled: isRowVirtualizationEnabled(this.options),
-      scrollTop: this.virtualScrollTop,
-      viewportHeight: this.virtualViewportHeight ?? resolveVirtualViewportHeight(this.options),
-      onScroll: (scrollTop, viewportHeight) => {
-        this.updateVirtualScroll(scrollTop, viewportHeight);
-      }
-    };
-  }
-
-  protected createColumnVirtualScrollRuntime(): ColumnVirtualScrollRuntime {
-    return {
-      enabled: isColumnVirtualizationEnabled(this.options),
-      scrollLeft: this.columnScrollLeft,
-      viewportWidth: this.columnViewportWidth ?? resolveColumnViewportWidth(this.options),
-      onScroll: (scrollLeft, viewportWidth) => {
-        this.updateColumnVirtualScroll(scrollLeft, viewportWidth);
-      }
-    };
-  }
-
-  protected updateVirtualScroll(scrollTop: number, viewportHeight: number): void {
-    const nextScrollTop = Math.max(0, scrollTop);
-    const nextViewportHeight = viewportHeight > 0
-      ? viewportHeight
-      : this.virtualViewportHeight ?? resolveVirtualViewportHeight(this.options);
-    if (
-      Math.abs(nextScrollTop - this.virtualScrollTop) < 1
-      && Math.abs(nextViewportHeight - (this.virtualViewportHeight ?? nextViewportHeight)) < 1
-    ) {
-      return;
-    }
-
-    this.virtualScrollTop = nextScrollTop;
-    this.virtualViewportHeight = nextViewportHeight;
-  }
-
-  protected updateColumnVirtualScroll(scrollLeft: number, viewportWidth: number): void {
-    const nextScrollLeft = Math.max(0, scrollLeft);
-    const nextViewportWidth = viewportWidth > 0
-      ? viewportWidth
-      : this.columnViewportWidth ?? resolveColumnViewportWidth(this.options);
-    if (
-      Math.abs(nextScrollLeft - this.columnScrollLeft) < 1
-      && Math.abs(nextViewportWidth - (this.columnViewportWidth ?? nextViewportWidth)) < 1
-    ) {
-      return;
-    }
-
-    this.columnScrollLeft = nextScrollLeft;
-    this.columnViewportWidth = nextViewportWidth;
-  }
-
-  protected setColumnScrollToField(field: string, align: ScrollAlign): void {
-    const nextScrollLeft = resolveScrollLeftForField({
-      options: this.options,
-      columnState: this.columnState,
-      field,
-      align,
-      currentScrollLeft: this.columnScrollLeft,
-      viewportWidth: this.columnViewportWidth
-    });
-    if (nextScrollLeft !== undefined) {
-      this.columnScrollLeft = nextScrollLeft;
-    }
-  }
-
   protected abstract loadNextInfiniteBlock(): Promise<void>;
   protected abstract loadServerRows(refresh?: boolean, page?: number): Promise<void>;
   protected abstract scrollViewportTo(rowIndex: number): Promise<void>;
   protected abstract createRowRenderState(): RowRenderState<TData> | undefined;
+  protected abstract createVirtualScrollRuntime(): VirtualScrollRuntime;
+  protected abstract createColumnVirtualScrollRuntime(): ColumnVirtualScrollRuntime;
   protected abstract createSortRuntime(): HeaderSortRuntime;
   protected abstract createFilterRuntime(): HeaderFilterRuntime;
   protected abstract createGroupRuntime(): GroupRowRuntime;
   protected abstract createEditRuntime(): GridEditRuntime;
   protected abstract createSelectionRuntime(): GridSelectionRuntime | undefined;
+  protected abstract createPaginationRuntime(): GridPaginationRuntime | undefined;
 }

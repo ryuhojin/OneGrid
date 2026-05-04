@@ -1,0 +1,82 @@
+# Vue Wrapper
+
+`@onegrid/vue` is the Vue lifecycle and slot bridge for the shared OneGrid DOM
+renderer. The wrapper forwards `GridOptions` to `@onegrid/dom`, exposes GridApi
+methods, emits shared grid events, and mounts Vue slot content into OneGrid's
+safe element renderer path.
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import { OneGrid, type OneGridExpose } from "@onegrid/vue";
+
+const grid = ref<OneGridExpose>();
+const rows = [{ id: "ORD-1001", status: "Ready" }];
+const columns = [
+  { field: "id", headerName: "ID" },
+  { field: "status", headerName: "Status" }
+];
+</script>
+
+<template>
+  <OneGrid
+    ref="grid"
+    :columns="columns"
+    :data="rows"
+    row-key="id"
+    row-model="client"
+    @selection-changed="console.log($event.rowKeys)"
+  />
+</template>
+```
+
+## Expose Bridge
+
+The component exposes the same command surface used by the DOM grid:
+`selectRows`, `scrollToRow`, `scrollToColumn`, `startEdit`, `stopEdit`,
+`commitPendingEdits`, `cancelPendingEdits`, `exportData`, `importData`,
+`setLocale`, and `applyTheme`.
+
+```ts
+grid.value?.selectRows(["ORD-1001"]);
+await grid.value?.commitPendingEdits();
+```
+
+## Event Emits
+
+Vue emits use the shared core event names. Template listeners can use kebab-case
+names such as `@selection-changed`, `@sort-changed`, `@filter-changed`, and
+`@cell-edit-committed`. The `events` prop remains available and is chained before
+Vue emits.
+
+## Vue Slots
+
+Cell and header content can be customized with named slots:
+
+```vue
+<OneGrid :columns="columns" :data="rows">
+  <template #header-status>
+    <span>Stage</span>
+  </template>
+  <template #cell-status="{ value }">
+    <strong>{{ value }}</strong>
+  </template>
+</OneGrid>
+```
+
+Slot names support `cell-{columnId}`, `cell:{columnId}`, `header-{columnId}`,
+and `header:{columnId}`. For group headers, use the group id or header name.
+
+Editor UI still uses the shared core `EditorDef` and DOM editor overlay. Vue
+does not reimplement editors, so vanilla, React, and Vue keep the same editing
+lifecycle and validation behavior.
+
+## Reactive Updates
+
+When relevant prop references or nested values change, the wrapper remounts the
+DOM grid with updated options. This keeps Vue behavior predictable until the DOM
+package grows fine-grained option mutation APIs.
+
+Direct test screen: `apps/examples/vue.html`.
+
+API parity with vanilla and React is tracked in `frameworks/api-parity`.

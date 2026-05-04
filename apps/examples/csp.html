@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'nonce-onegrid-csp-test'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws://127.0.0.1:4174; object-src 'none'; base-uri 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneGrid CSP Example</title>
+    <link rel="stylesheet" href="/src/features/csp/csp-theme.css" />
+  </head>
+  <body>
+    <main>
+      <h1>OneGrid CSP Example</h1>
+      <section id="csp-app" aria-label="CSP example"></section>
+    </main>
+    <script type="module" src="/src/features/csp/page.ts"></script>
+  </body>
+</html>

@@ -9,6 +9,16 @@ const repoRoot = resolve(rootDir, "../..");
 
 export default defineConfig({
   plugins: [react(), vue()],
+  build: {
+    rollupOptions: {
+      input: {
+        csp: resolve(rootDir, "csp.html"),
+        main: resolve(rootDir, "index.html"),
+        react: resolve(rootDir, "react.html"),
+        vue: resolve(rootDir, "vue.html")
+      }
+    }
+  },
   resolve: {
     alias: {
       "@onegrid/core": resolve(repoRoot, "packages/core/src/index.ts"),

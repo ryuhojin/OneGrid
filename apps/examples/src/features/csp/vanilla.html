@@ -1,0 +1,11 @@
+<div id="csp-example"></div>
+<script type="module">
+  import { mountCspExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#csp-example");
+  if (!host) {
+    throw new Error("CSP example host was not found.");
+  }
+
+  mountCspExample(host);
+</script>

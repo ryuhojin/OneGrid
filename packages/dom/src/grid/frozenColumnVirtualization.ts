@@ -1,3 +1,4 @@
+import { createLocaleFormatter } from "@onegrid/core";
 import { createFrozenPane } from "./frozenRowRenderer.js";
 import type {
   CellSpanModel,
@@ -48,6 +49,7 @@ export function replaceFrozenCenterPanes<TData>(
               : { treeColumnField: input.rowRenderState.treeRuntime.treeColumnField }),
             ...(input.groupRuntime === undefined ? {} : { groupRuntime: input.groupRuntime }),
             cellSpanModel: input.cellSpanModel,
+            i18n: createLocaleFormatter(input.options.locale),
             ...(input.options.editing === undefined ? {} : { editing: input.options.editing }),
             ...(input.security === undefined ? {} : { security: input.security })
           },

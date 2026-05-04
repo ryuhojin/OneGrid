@@ -5,6 +5,7 @@ import type {
   ClientRowModelEntry,
   EditingOptions,
   InfiniteRowEntry,
+  LocaleFormatterBridge,
   NormalizedDataColumn,
   SecurityOptions,
   ServerRowEntry,
@@ -42,6 +43,7 @@ export interface BodyRowRenderOptions<TData> {
   readonly cellSpanWindow?: CellSpanWindow;
   readonly security?: SecurityOptions;
   readonly editing?: EditingOptions;
+  readonly i18n: LocaleFormatterBridge;
 }
 
 export function createBodyRow<TData>(options: BodyRowRenderOptions<TData>): HTMLElement {
@@ -88,7 +90,8 @@ export function createBodyRow<TData>(options: BodyRowRenderOptions<TData>): HTML
     options.cellSpanModel,
     options.cellSpanWindow,
     options.security,
-    options.editing
+    options.editing,
+    options.i18n
   );
 }
 
@@ -104,7 +107,8 @@ function createDataRow<TData>(
   cellSpanModel: CellSpanModel | undefined,
   cellSpanWindow: CellSpanWindow | undefined,
   security: SecurityOptions | undefined,
-  editing: EditingOptions | undefined
+  editing: EditingOptions | undefined,
+  i18n: LocaleFormatterBridge
 ): HTMLElement {
   const row = createPaneRow("og-grid__row", columnTemplate, rowIndex, rowKey, exposeRowKey);
 
@@ -122,6 +126,7 @@ function createDataRow<TData>(
       rowIndex,
       ...(sourceIndex === undefined ? {} : { sourceIndex }),
       ...(editing === undefined ? {} : { editing }),
+      i18n,
       ...(security === undefined ? {} : { security }),
       ...(spanState === undefined ? {} : { spanState })
     });
@@ -147,7 +152,7 @@ function createSkeletonRow<TData>(options: BodyRowRenderOptions<TData>): HTMLEle
       column,
       options.ariaColumnOffset + columnIndex + 1
     );
-    cell.textContent = "Loading";
+    cell.textContent = options.i18n.text.loadingRows;
     row.append(cell);
   });
 
@@ -199,6 +204,7 @@ function createDataCell<TData>(input: {
   readonly sourceIndex?: number;
   readonly security?: SecurityOptions;
   readonly editing?: EditingOptions;
+  readonly i18n: LocaleFormatterBridge;
   readonly spanState?: CellSpanCellState;
 }): HTMLElement {
   if (input.spanState?.kind === "covered") {
@@ -227,6 +233,7 @@ function createDataCell<TData>(input: {
     rowIndex: input.rowIndex,
     column: input.column,
     value,
+    i18n: input.i18n,
     ...(input.security === undefined ? {} : { security: input.security })
   });
 
@@ -246,6 +253,7 @@ function applyEditMetadata<TData>(
     readonly rowIndex: number;
     readonly sourceIndex?: number;
     readonly editing?: EditingOptions;
+    readonly i18n: LocaleFormatterBridge;
   },
   value: unknown
 ): void {
@@ -257,6 +265,7 @@ function applyEditMetadata<TData>(
   }
 
   const editable = isCellEditable(input.column.source, {
+    ...input.i18n,
     row: input.rowData,
     rowIndex: input.rowIndex,
     rowKey: input.rowKey,

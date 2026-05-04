@@ -1,0 +1,53 @@
+@import "@onegrid/themes/default.css";
+
+:root,
+.og-root-host {
+  color-scheme: dark;
+  --og-color-bg: #101418;
+  --og-color-fg: #edf2f7;
+  --og-color-border: #3a4655;
+  --og-color-subtle-border: #2d3744;
+  --og-color-header-bg: #171d24;
+  --og-color-hover-bg: #202936;
+  --og-color-muted: #a5b0c1;
+  --og-color-disabled-fg: #687385;
+  --og-color-panel-bg: #151b22;
+  --og-color-pinned-bg: #151a21;
+  --og-color-pinned-header-bg: #1b222b;
+  --og-color-pinned-border: #546173;
+  --og-color-summary-bg: #151b22;
+  --og-color-selected-bg: #203a5f;
+  --og-color-range-bg: #183453;
+  --og-color-range-ring: rgb(93 170 255 / 48%);
+  --og-color-focus-ring: #6aa8ff;
+  --og-color-focus-ring-soft: rgb(106 168 255 / 24%);
+  --og-color-accent: #6aa8ff;
+  --og-color-accent-hover: #8bbcff;
+  --og-color-accent-soft: rgb(106 168 255 / 22%);
+  --og-color-on-accent: #061426;
+  --og-color-control-bg: #202936;
+  --og-color-control-active-bg: #253e63;
+  --og-color-control-active-border: #5487d8;
+  --og-color-control-active-fg: #dceaff;
+  --og-color-checkbox-border: #6e7a8c;
+  --og-color-checkbox-border-hover: #9aa8bc;
+  --og-color-icon-muted: #b7c2d3;
+  --og-color-danger-fg: #fca5a5;
+  --og-color-merge-header-bg: #1d302d;
+  --og-color-merge-bg: #232112;
+  --og-color-merge-pinned-bg: #272315;
+  --og-color-merge-border: #b08a33;
+  --og-color-merge-ring: rgb(205 162 63 / 28%);
+  --og-color-group-row-bg: #1a222c;
+  --og-color-group-fg: #cbd5e1;
+  --og-color-skeleton-start: #1d2530;
+  --og-color-skeleton-mid: #2a3442;
+  --og-color-header-label-bg: #15362f;
+  --og-color-header-label-border: #2e6f60;
+  --og-color-header-label-fg: #b9f3df;
+  --og-color-scrollbar-thumb: rgb(185 198 216 / 62%);
+  --og-color-scrollbar-thumb-hover: rgb(218 228 241 / 82%);
+  --og-shadow-popover: 0 18px 46px rgb(0 0 0 / 42%);
+  --og-shadow-pinned-left: 6px 0 14px -12px rgb(0 0 0 / 80%);
+  --og-shadow-pinned-right: -6px 0 14px -12px rgb(0 0 0 / 80%);
+}

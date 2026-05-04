@@ -1,0 +1,44 @@
+@import "@onegrid/themes/default.css";
+
+:root,
+.og-root-host {
+  color-scheme: light;
+  --og-color-bg: #ffffff;
+  --og-color-fg: #000000;
+  --og-color-border: #111111;
+  --og-color-subtle-border: #111111;
+  --og-color-header-bg: #f1f5f9;
+  --og-color-hover-bg: #e2e8f0;
+  --og-color-muted: #253244;
+  --og-color-disabled-fg: #475569;
+  --og-color-panel-bg: #ffffff;
+  --og-color-pinned-bg: #ffffff;
+  --og-color-pinned-header-bg: #e8eef6;
+  --og-color-pinned-border: #111111;
+  --og-color-summary-bg: #f8fafc;
+  --og-color-selected-bg: #ffec99;
+  --og-color-range-bg: #fff4bf;
+  --og-color-range-ring: #000000;
+  --og-color-focus-ring: #000000;
+  --og-color-focus-ring-soft: rgb(0 0 0 / 24%);
+  --og-color-accent: #000000;
+  --og-color-accent-hover: #253244;
+  --og-color-on-accent: #ffffff;
+  --og-color-control-bg: #ffffff;
+  --og-color-control-active-bg: #ffec99;
+  --og-color-control-active-border: #000000;
+  --og-color-control-active-fg: #000000;
+  --og-color-checkbox-border: #000000;
+  --og-color-checkbox-border-hover: #000000;
+  --og-color-icon-muted: #000000;
+  --og-color-merge-header-bg: #eef7ff;
+  --og-color-merge-bg: #fffbea;
+  --og-color-merge-pinned-bg: #fffbea;
+  --og-color-merge-border: #000000;
+  --og-color-merge-ring: rgb(0 0 0 / 22%);
+  --og-color-group-row-bg: #f1f5f9;
+  --og-color-group-fg: #000000;
+  --og-color-header-label-bg: #ffffff;
+  --og-color-header-label-border: #000000;
+  --og-color-header-label-fg: #000000;
+}

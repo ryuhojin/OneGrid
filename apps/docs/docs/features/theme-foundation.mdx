@@ -1,0 +1,56 @@
+# Theme Foundation
+
+OneGrid themes are CSS-variable based. The default stylesheet loads structural grid CSS plus
+semantic tokens from `@onegrid/themes/tokens.css`.
+
+```ts
+import "@onegrid/themes/default.css";
+```
+
+Runtime themes use `GridOptions.theme` or `api.applyTheme()`:
+
+```ts
+api.applyTheme({
+  name: "dark",
+  density: "compact"
+});
+```
+
+Built-in runtime names are:
+
+| Name | Purpose |
+| --- | --- |
+| `default` | Enterprise baseline with neutral surfaces |
+| `clean` | Lower-contrast application chrome |
+| `compact` | Dense rows and headers |
+| `dark` | Dark UI surfaces with readable pinned panes and overlays |
+| `high-contrast` | Strong borders and focus rings for accessibility review |
+
+Density can be switched independently with `comfortable`, `standard`, or `compact`.
+
+Scoped variables are applied per grid instance and can be CSP nonce protected:
+
+```ts
+api.applyTheme({
+  name: "finance",
+  density: "standard",
+  variables: {
+    "--og-color-focus-ring": "#d7191f",
+    "--og-color-header-bg": "#f7f3ef"
+  }
+});
+```
+
+Static CSS variants are exported for applications that prefer stylesheet-level themes:
+
+```ts
+import "@onegrid/themes/clean.css";
+import "@onegrid/themes/dark.css";
+import "@onegrid/themes/high-contrast.css";
+```
+
+The THEME-001 example is available at `/#THEME-001` and covers runtime switching, density changes,
+dark and high-contrast modes, and scoped enterprise-brand variables.
+
+SI projects that need brand-guide mapping should use `createSiTheme()` from `@onegrid/themes`; the
+mapping contract and static CSS override recipe are documented in `features/si-customization`.

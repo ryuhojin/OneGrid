@@ -18,6 +18,11 @@ module.exports = {
     },
     {
       type: "category",
+      label: "Framework Wrappers",
+      items: ["frameworks/react", "frameworks/vue", "frameworks/api-parity"]
+    },
+    {
+      type: "category",
       label: "Features",
       items: [
         "features/basic-grid",
@@ -49,8 +54,15 @@ module.exports = {
         "features/pagination",
         "features/frozen",
         "features/export",
-        "security/csp"
+        "features/localization",
+        "features/theme-foundation",
+        "features/si-customization"
       ]
+    },
+    {
+      type: "category",
+      label: "Security",
+      items: ["security/csp", "security/xss"]
     }
   ]
 };

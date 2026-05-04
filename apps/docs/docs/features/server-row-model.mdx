@@ -45,5 +45,8 @@ new OneGrid({
 });
 ```
 
-The example route `ROW-003` renders a server-managed page, exposes request model metadata, refreshes
-the server cache, and applies a transaction update through `DataSource.updateRows`.
+The example route `ROW-003` renders server-owned region groups at the root level. Expanding a group
+sends that group's `groupKeys` back to the `DataSource`; the server response keeps the selected group
+header expanded and returns the matching leaf rows for the current server page. The page also exposes
+request model metadata, refreshes the server cache, and applies a transaction update through
+`DataSource.updateRows`.

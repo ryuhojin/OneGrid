@@ -7,6 +7,7 @@ import type {
   RowKey,
   SummaryKind
 } from "./shared.js";
+import type { LocaleFormatterBridge } from "../i18n/localeTypes.js";
 
 export type ColumnDef<TData = unknown> = DataColumnDef<TData> | ColumnGroupDef<TData>;
 
@@ -15,6 +16,7 @@ export interface DataColumnDef<TData = unknown> {
   readonly field: string;
   readonly headerName?: string;
   readonly headerTooltip?: string;
+  readonly headerRenderer?: HeaderRendererDef<TData>;
   readonly type?: ColumnType;
   readonly width?: number;
   readonly minWidth?: number;
@@ -60,7 +62,7 @@ export interface RowContext<TData = unknown> {
   readonly rowKey: RowKey;
 }
 
-export interface CellContext<TData = unknown> extends RowContext<TData> {
+export interface CellContext<TData = unknown> extends RowContext<TData>, LocaleFormatterBridge {
   readonly column: DataColumnDef<TData>;
   readonly field: string;
   readonly value: unknown;

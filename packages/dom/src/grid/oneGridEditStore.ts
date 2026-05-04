@@ -142,7 +142,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
   }
 
   protected emitCellEditStarted(session: CellEditSession<TData>): void {
-    this.options.events?.cellEditStarted?.({
+    this.emitGridEvent("cellEditStarted", {
       type: "cellEditStarted",
       row: session.row,
       rowKey: session.rowKey,
@@ -156,7 +156,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
   }
 
   protected emitCellEditStaged(edit: PendingDomEdit<TData>, trigger: EditCommitTrigger): void {
-    this.options.events?.cellEditStaged?.({
+    this.emitGridEvent("cellEditStaged", {
       type: "cellEditStaged",
       row: edit.row,
       rowKey: edit.rowKey,
@@ -172,7 +172,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
     edit: PendingDomEdit<TData>,
     trigger: EditCommitTrigger
   ): void {
-    this.options.events?.cellEditCommitted?.({
+    this.emitGridEvent("cellEditCommitted", {
       type: "cellEditCommitted",
       row: edit.row,
       rowKey: edit.rowKey,
@@ -188,7 +188,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
     result: CellEditCommitResult<TData>,
     trigger: EditCommitTrigger
   ): void {
-    this.options.events?.cellEditCommitted?.({
+    this.emitGridEvent("cellEditCommitted", {
       type: "cellEditCommitted",
       row: result.nextRow,
       rowKey: result.session.rowKey,
@@ -205,7 +205,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
   }
 
   protected emitCellValidationFailed(result: CellEditCommitResult<TData>): void {
-    this.options.events?.validationFailed?.({
+    this.emitGridEvent("validationFailed", {
       type: "validationFailed",
       row: result.session.row,
       rowKey: result.session.rowKey,
@@ -221,7 +221,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
 
   protected emitPendingEditCancelled(edit: PendingDomEdit<TData>, reason: EditCancelReason): void {
     const original = this.editBatch.getOriginalRow(edit.rowKey);
-    this.options.events?.cellEditCancelled?.({
+    this.emitGridEvent("cellEditCancelled", {
       type: "cellEditCancelled",
       row: original?.row ?? edit.row,
       rowKey: edit.rowKey,
@@ -232,7 +232,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
   }
 
   protected emitCellEditCancelled(session: CellEditSession<TData>, reason: EditCancelReason): void {
-    this.options.events?.cellEditCancelled?.({
+    this.emitGridEvent("cellEditCancelled", {
       type: "cellEditCancelled",
       row: session.row,
       rowKey: session.rowKey,

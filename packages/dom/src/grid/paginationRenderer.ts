@@ -6,7 +6,9 @@ import {
   getVisiblePageGroup,
   normalizePageSizeOptions
 } from "@onegrid/pagination";
+import { createLocaleFormatter } from "@onegrid/core";
 import type { PaginationMode, PaginationPosition, PaginationState } from "@onegrid/pagination";
+import type { LocaleFormatterBridge } from "@onegrid/core";
 import type { DomGridOptions } from "./OneGrid.js";
 import type { RowRenderState } from "./renderGridTypes.js";
 
@@ -24,6 +26,7 @@ export interface PaginationRenderModel {
   readonly label: string;
   readonly loading: boolean;
   readonly loadedRowCount: number;
+  readonly i18n: LocaleFormatterBridge;
 }
 
 export function createPaginationRenderModel<TData>(
@@ -53,7 +56,8 @@ export function createPaginationRenderModel<TData>(
     pageGroupSize: pagination.pageGroupSize ?? 5,
     label: options.accessibility?.label ?? "Grid",
     loading: rowRenderState?.loading ?? false,
-    loadedRowCount: rowRenderState?.entries.length ?? totalRowCount
+    loadedRowCount: rowRenderState?.entries.length ?? totalRowCount,
+    i18n: createLocaleFormatter(options.locale)
   };
 }
 
@@ -68,7 +72,7 @@ export function createPaginationToolbar(
 
   const toolbar = document.createElement("nav");
   toolbar.className = `og-grid__pagination og-grid__pagination--${placement}`;
-  toolbar.setAttribute("aria-label", `${model.label} ${placement} pagination`);
+  toolbar.setAttribute("aria-label", model.i18n.text.paginationAriaLabel({ label: model.label, placement }));
   toolbar.dataset.paginationPlacement = placement;
 
   const status = document.createElement("span");
@@ -78,16 +82,16 @@ export function createPaginationToolbar(
   toolbar.append(status);
 
   if (isAppendMode(model.state.mode)) {
-    toolbar.append(createButton("Load next page", "Load more", () => runtime.loadNextPage(), {
+    toolbar.append(createButton(model.i18n.text.paginationLoadNextPage, model.i18n.text.paginationLoadMore, () => runtime.loadNextPage(), {
       disabled: model.loading || model.state.hasMore !== true
     }));
     return toolbar;
   }
 
-  toolbar.append(createButton("First page", "First", () => runtime.setPage(1), {
+  toolbar.append(createButton(model.i18n.text.paginationFirstPage, model.i18n.text.paginationFirst, () => runtime.setPage(1), {
     disabled: isAtFirstPage(model.state) || model.loading
   }));
-  toolbar.append(createButton("Previous page", "Prev", () => runtime.setPage(model.state.page - 1), {
+  toolbar.append(createButton(model.i18n.text.paginationPreviousPage, model.i18n.text.paginationPrevious, () => runtime.setPage(model.state.page - 1), {
     disabled: isAtFirstPage(model.state) || model.loading
   }));
 
@@ -95,7 +99,7 @@ export function createPaginationToolbar(
     toolbar.append(createPageButton(page, model, runtime));
   }
 
-  toolbar.append(createButton("Next page", "Next", () => runtime.setPage(model.state.page + 1), {
+  toolbar.append(createButton(model.i18n.text.paginationNextPage, model.i18n.text.paginationNext, () => runtime.setPage(model.state.page + 1), {
     disabled: !canMoveNext(model.state) || model.loading
   }));
   toolbar.append(createLastPageButton(model, runtime));
@@ -109,7 +113,7 @@ function createPageButton(
   model: PaginationRenderModel,
   runtime: GridPaginationRuntime
 ): HTMLButtonElement {
-  return createButton(`Page ${page}`, String(page), () => runtime.setPage(page), {
+  return createButton(model.i18n.text.paginationPage(page), String(page), () => runtime.setPage(page), {
     current: page === model.state.page,
     disabled: model.loading
   });
@@ -120,7 +124,7 @@ function createLastPageButton(
   runtime: GridPaginationRuntime
 ): HTMLButtonElement {
   const pageCount = getPageCount(model.state.rowCount, model.state.pageSize);
-  return createButton("Last page", "Last", () => {
+  return createButton(model.i18n.text.paginationLastPage, model.i18n.text.paginationLast, () => {
     if (pageCount !== undefined) {
       runtime.setPage(pageCount);
     }
@@ -136,9 +140,9 @@ function createPageSizeSelect(
   const label = document.createElement("label");
   label.className = "og-grid__pagination-size";
   const text = document.createElement("span");
-  text.textContent = "Rows per page";
+  text.textContent = model.i18n.text.paginationRowsPerPage;
   const select = document.createElement("select");
-  select.setAttribute("aria-label", "Rows per page");
+  select.setAttribute("aria-label", model.i18n.text.paginationRowsPerPage);
   select.disabled = model.loading;
   for (const pageSize of model.pageSizeOptions) {
     const option = document.createElement("option");
@@ -173,20 +177,29 @@ function createButton(
 
 function getStatusText(model: PaginationRenderModel): string {
   const state = model.state;
-  const prefix = model.loading ? "Loading " : "";
   if (isAppendMode(state.mode)) {
-    const total = state.rowCount === undefined ? "unknown" : formatNumber(state.rowCount);
-    return `${prefix}Loaded ${formatNumber(model.loadedRowCount)} of ${total} rows`;
+    return model.i18n.text.paginationLoadedRows({
+      loadedRowCount: model.loadedRowCount,
+      ...(state.rowCount === undefined ? {} : { rowCount: state.rowCount }),
+      loading: model.loading,
+      formatNumber: model.i18n.formatNumber
+    });
   }
 
   const pageCount = getPageCount(state.rowCount, state.pageSize);
-  const pageText = pageCount === undefined
-    ? `Page ${state.page}`
-    : `Page ${state.page} of ${pageCount}`;
+  const pageText = model.i18n.text.paginationPageStatus({
+    page: state.page,
+    ...(pageCount === undefined ? {} : { pageCount })
+  });
   const startRow = state.rowCount === 0 ? 0 : getPageStartRow(state) + 1;
   const endRow = getPageEndRow(state);
-  const count = state.rowCount === undefined ? "unknown" : formatNumber(state.rowCount);
-  return `${prefix}${pageText} · Rows ${formatNumber(startRow)}-${formatNumber(endRow)} of ${count}`;
+  const rangeText = model.i18n.text.paginationRowsRange({
+    startRow,
+    endRow,
+    ...(state.rowCount === undefined ? {} : { rowCount: state.rowCount }),
+    formatNumber: model.i18n.formatNumber
+  });
+  return `${model.loading ? model.i18n.text.loadingPrefix : ""}${pageText} · ${rangeText}`;
 }
 
 function resolveDefaultMode<TData>(options: DomGridOptions<TData>): PaginationMode {
@@ -226,8 +239,4 @@ function canMoveNext(state: PaginationState): boolean {
 
 function isAppendMode(mode: PaginationMode): boolean {
   return mode === "append-scroll" || mode === "infinite";
-}
-
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("en-US").format(value);
 }

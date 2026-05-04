@@ -23,6 +23,69 @@
 
 아직 기록된 public API 변경 없음.
 
+## 2026-05-04 — Framework wrapper API parity contract
+
+- Status: accepted
+- Area: GridOptions | GridApi | Events | Wrapper
+- Change:
+  - `@onegrid/core` now exports `gridOptionParityKeys`, `gridEventParityNames`, and `gridApiMethodParityNames`.
+  - DOM, React, and Vue expose the same GridOptions keys, event names, and GridApi method names.
+  - React `OneGridHandle<TData>` and Vue `OneGridExpose` now extend the shared `GridApi` method surface.
+  - Wrapper parity is documented in `frameworks/api-parity` and enforced by unit tests.
+- Reason: WRAP-003 requires JS/React/Vue option, event, and method parity before deeper wrapper API work.
+- Impact: No breaking change for existing wrapper consumers. Previously missing wrapper methods are additive.
+- Migration: Use the same method names from vanilla grid instances, React refs, and Vue template refs.
+
+## 2026-05-04 — SI design token theme builder
+
+- Status: accepted
+- Area: Theme
+- Change:
+  - `@onegrid/themes` now exports `createSiTheme()` and `siTokenMappings`.
+  - SI token groups (`colors`, `typography`, `shadows`) map to scoped OneGrid CSS variables.
+  - `createSiTheme()` returns the same `theme` shape consumed by DOM, React, and Vue.
+- Reason: THEME-002 requires SI design-token mapping, a theme builder example, CSS override guidance, and visual coverage per tenant theme.
+- Impact: No breaking change. Existing `theme.variables` usage remains valid.
+- Migration: Projects with existing design systems can replace hand-written `theme.variables` objects with `createSiTheme({ tokens })`.
+
+## 2026-05-04 — Theme foundation presets and density runtime
+
+- Status: accepted
+- Area: GridOptions | GridApi | Theme
+- Change:
+  - `@onegrid/themes` now exports semantic CSS tokens plus `default`, `clean`, `compact`, `dark`, and `high-contrast` stylesheet entry points.
+  - DOM theme runtime maps `theme.name` to `data-og-theme` and `theme.density` to `data-og-density`.
+  - `GridApi.applyTheme()` switches theme name, density, custom class, and scoped CSS variables without remounting.
+- Reason: THEME-001 requires default, clean, compact, dark, high-contrast, density, runtime switching, and scoped theme support from one shared contract.
+- Impact: No breaking change. Existing `@onegrid/themes/default.css` import remains valid.
+- Migration: Use `theme: { name: "dark", density: "compact" }` for built-in runtime themes, or import variant CSS files directly for static application-wide themes.
+
+## 2026-05-04 — XSS renderer security contract
+
+- Status: accepted
+- Area: GridOptions | ColumnDef | Security
+- Change:
+  - `ColumnDef.renderer.kind: "html"` remains an explicit opt-in path and now uses the audited DOM HTML security boundary.
+  - `GridOptions.security.html.trustedTypesPolicyName` is consumed when the browser exposes Trusted Types.
+  - Element renderer URL attributes are filtered through `GridOptions.security.url.allowedProtocols`.
+  - `@onegrid/dom` exports `strictTextOnlySanitizer` for deployments that want HTML renderer content reduced to text.
+- Reason: SEC-002 requires default text escaping, sanitizer-backed HTML rendering, Trusted Types support, and URL protocol allowlisting.
+- Impact: Unsafe `href`, `src`, `action`, `formaction`, `poster`, `cite`, and `background` attribute values are dropped from element renderers. Inline event attributes, inline style attributes, `srcdoc`, and `srcset` are dropped.
+- Migration: Use `kind: "text"` or `kind: "element"` for most cells. For HTML rendering, provide `security.html.allowHtmlRenderer: true`, a sanitizer, and an optional Trusted Types policy name.
+
+## 2026-05-04 — CSP runtime style controls
+
+- Status: accepted
+- Area: GridOptions | Security | Theme | Wrapper
+- Change:
+  - `GridOptions.security.csp.nonce` is now consumed by the DOM runtime style injector.
+  - `GridOptions.security.csp.disableStyleInjection` disables scoped runtime theme variable injection.
+  - DOM `OneGrid.applyTheme()` applies scoped theme variables through the same nonce-aware path.
+  - Vue wrapper now accepts the shared `theme` prop and exposes `applyTheme()`.
+- Reason: SEC-001 requires strict CSP support without `unsafe-inline`, `eval`, `new Function`, or wrapper-specific theme behavior.
+- Impact: No breaking change. Existing static theme CSS remains the default path.
+- Migration: Provide `security.csp.nonce` when using runtime `theme.variables`, or use `disableStyleInjection` with static CSS variables.
+
 ## 2026-04-29 — Cell merge layout contract
 
 - Status: accepted
@@ -237,4 +300,45 @@
   - DOM export/import uses visible rows, header merge, cell merge, and selected range state without wrapper reimplementation.
 - Reason: F-EXPORT requires export/import behavior to be shared by core, DOM, React, and Vue.
 - Impact: No breaking change. Export and import are opt-in public methods. Import replaces existing client rows by default.
+- Migration: None.
+
+## 2026-05-04 — Localization registry and formatter bridge
+
+- Status: accepted
+- Area: GridOptions | GridApi | Wrapper | DOM | Core
+- Change:
+  - Core exports locale definitions, `registerLocale()`, `getLocale()`, `listLocales()`, and `createLocaleFormatter()`.
+  - `CellContext` now includes `locale`, `formatNumber()`, and `formatDate()`.
+  - DOM footer, overlays, pagination, ARIA live regions, and formatter calls consume the active locale.
+  - `GridApi.setLocale()` and `getLocale()` were added for runtime locale switching.
+  - Vue wrapper accepts the shared `locale` prop and exposes locale methods.
+- Reason: F-I18N requires renderer chrome and user formatter callbacks to share one locale contract across vanilla, React, and Vue.
+- Impact: Custom `CellContext` objects in tests or external helpers must provide the locale formatter bridge.
+- Migration: Use `createLocaleFormatter()` when constructing `CellContext` manually.
+
+## 2026-05-04 — React wrapper lifecycle and renderer bridge
+
+- Status: accepted
+- Area: React | GridOptions | Wrapper | DOM | Core
+- Change:
+  - `@onegrid/react` exposes `<OneGrid />` as a `forwardRef` component with a typed `OneGridHandle`.
+  - React event props such as `onReady`, `onSelectionChanged`, `onSortChanged`, and editing events are merged with core `GridOptions.events`.
+  - `reactRenderers.cells` and `reactRenderers.headers` mount React nodes through the existing safe element-renderer path.
+  - `DataColumnDef.headerRenderer` was added so leaf headers and group headers share the same header renderer contract.
+- Reason: WRAP-001 requires React to be a lifecycle, ref, event, and renderer bridge without reimplementing core or DOM grid behavior.
+- Impact: React renderer slots are opt-in and use React DOM rendering. Untrusted HTML must still go through OneGrid sanitizer or React-safe text rendering.
+- Migration: None.
+
+## 2026-05-04 — Vue wrapper expose, emit, and slot bridge
+
+- Status: accepted
+- Area: Vue | GridOptions | Wrapper | DOM
+- Change:
+  - `@onegrid/vue` exposes `OneGridExpose` and `OneGridProps` types.
+  - Vue emits now mirror shared grid events such as `ready`, `selectionChanged`, `sortChanged`, and editing events.
+  - The Vue wrapper accepts shared `events` and `plugins` props and chains core event handlers before component emits.
+  - Vue `#cell-*` and `#header-*` slots mount through the existing safe element-renderer path.
+  - Direct `width`, `height`, `bodyHeight`, and `headerHeight` props were added to the Vue bridge for GridOptions parity.
+- Reason: WRAP-002 requires Vue to be a lifecycle, expose, event, and slot bridge without reimplementing core or DOM grid behavior.
+- Impact: Vue slot renderers are opt-in. Editor UI still uses the shared `EditorDef` and DOM editor overlay.
 - Migration: None.

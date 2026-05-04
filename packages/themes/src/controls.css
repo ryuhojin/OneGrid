@@ -1,0 +1,290 @@
+.og-grid__toolbar {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-block-end: 8px;
+  position: relative;
+}
+
+.og-grid__filter-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-block-end: 8px;
+}
+
+.og-grid__selection-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-block-end: 8px;
+}
+
+.og-grid__pagination {
+  align-items: center;
+  color: var(--og-color-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block: 8px;
+}
+
+.og-grid__pagination--top {
+  margin-block-start: 0;
+}
+
+.og-grid__pagination--bottom {
+  margin-block-end: 0;
+}
+
+.og-grid__pagination-status {
+  font-size: 13px;
+  font-weight: 650;
+  margin-inline-end: 4px;
+}
+
+.og-grid__pagination-button {
+  appearance: none;
+  background: var(--og-color-control-bg);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--og-color-fg);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  min-block-size: 30px;
+  min-inline-size: 32px;
+  padding: 4px 9px;
+}
+
+.og-grid__pagination-button[aria-current="page"] {
+  background: var(--og-color-control-active-bg);
+  border-color: var(--og-color-control-active-border);
+  color: var(--og-color-control-active-fg);
+}
+
+.og-grid__pagination-button:disabled {
+  color: var(--og-color-disabled-fg);
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.og-grid__pagination-button:not(:disabled):hover,
+.og-grid__pagination-button:not(:disabled):focus-visible {
+  background: var(--og-color-hover-bg);
+  outline: 2px solid transparent;
+}
+
+.og-grid__pagination-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--og-color-focus-ring);
+}
+
+.og-grid__pagination-size {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  margin-inline-start: 4px;
+}
+
+.og-grid__pagination-size select {
+  appearance: none;
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-border);
+  border-radius: 6px;
+  color: var(--og-color-fg);
+  font: inherit;
+  min-block-size: 30px;
+  padding: 4px 28px 4px 8px;
+}
+
+.og-grid__quick-filter-input {
+  appearance: none;
+  border: 1px solid var(--og-color-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: var(--og-color-fg);
+  font: inherit;
+  inline-size: min(280px, 100%);
+  min-block-size: 32px;
+  padding: 5px 10px;
+}
+
+.og-grid__quick-filter-input:focus {
+  border-color: var(--og-color-focus-ring);
+  box-shadow: 0 0 0 2px var(--og-color-focus-ring-soft);
+  outline: 0;
+}
+
+.og-grid__toolbar-button,
+.og-grid__menu-button,
+.og-grid__column-menu-item,
+.og-grid__context-menu-item,
+.og-grid__tool-panel-pin,
+.og-grid__quick-filter-clear,
+.og-grid__filter-button,
+.og-grid__selection-action {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--og-color-fg);
+  cursor: pointer;
+  font: inherit;
+}
+
+.og-grid__toolbar-button {
+  background: var(--og-color-control-bg);
+  font-weight: 650;
+  min-height: 30px;
+  padding: 4px 10px;
+}
+
+.og-grid__quick-filter-clear {
+  background: var(--og-color-control-bg);
+  min-height: 32px;
+  padding: 4px 10px;
+}
+
+.og-grid__selection-action {
+  background: var(--og-color-control-bg);
+  font-weight: 650;
+  min-block-size: 30px;
+  padding: 4px 10px;
+}
+
+.og-grid__toolbar-button:hover,
+.og-grid__toolbar-button:focus-visible,
+.og-grid__menu-button:hover,
+.og-grid__menu-button:focus-visible,
+.og-grid__column-menu-item:hover,
+.og-grid__column-menu-item:focus-visible,
+.og-grid__context-menu-item:hover,
+.og-grid__context-menu-item:focus-visible,
+.og-grid__tool-panel-pin:hover,
+.og-grid__tool-panel-pin:focus-visible,
+.og-grid__quick-filter-clear:hover,
+.og-grid__quick-filter-clear:focus-visible,
+.og-grid__filter-button:hover,
+.og-grid__filter-button:focus-visible,
+.og-grid__selection-action:hover,
+.og-grid__selection-action:focus-visible {
+  background: var(--og-color-hover-bg);
+  outline: 2px solid transparent;
+}
+
+.og-grid__toolbar-button:focus-visible,
+.og-grid__menu-button:focus-visible,
+.og-grid__column-menu-item:focus-visible,
+.og-grid__context-menu-item:focus-visible,
+.og-grid__tool-panel-pin:focus-visible,
+.og-grid__quick-filter-clear:focus-visible,
+.og-grid__filter-button:focus-visible,
+.og-grid__selection-action:focus-visible {
+  box-shadow: 0 0 0 2px var(--og-color-focus-ring);
+}
+
+.og-grid__tool-panel {
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-border);
+  border-radius: 8px;
+  box-shadow: var(--og-shadow-popover);
+  display: grid;
+  gap: 4px;
+  inline-size: min(320px, 100%);
+  inset-block-start: 36px;
+  padding: 8px;
+  position: absolute;
+  z-index: 30;
+}
+
+.og-grid__tool-panel[hidden] {
+  display: none;
+}
+
+.og-grid__pivot-panel {
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-border);
+  box-shadow: var(--og-shadow-popover);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(5, minmax(96px, 1fr));
+  inline-size: min(760px, calc(100vw - 48px));
+  inset-block-start: 36px;
+  padding: 10px;
+  position: absolute;
+  z-index: 30;
+}
+
+.og-grid__pivot-panel[hidden] {
+  display: none;
+}
+
+.og-grid__pivot-bucket {
+  border: 1px solid var(--og-color-subtle-border);
+  min-width: 0;
+  padding: 8px;
+}
+
+.og-grid__pivot-bucket-title {
+  color: var(--og-color-muted);
+  font-size: 11px;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.og-grid__pivot-list {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.og-grid__pivot-item {
+  background: var(--og-color-header-bg);
+  border: 1px solid var(--og-color-subtle-border);
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.og-grid__tool-panel-row {
+  align-items: center;
+  border-radius: 6px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 30px 30px 30px;
+  min-height: 32px;
+  padding: 2px 4px;
+}
+
+.og-grid__tool-panel-row:hover {
+  background: var(--og-color-hover-bg);
+}
+
+.og-grid__tool-panel-label {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.og-grid__tool-panel-label input {
+  accent-color: var(--og-color-focus-ring);
+}
+
+.og-grid__tool-panel-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.og-grid__tool-panel-pin {
+  block-size: 26px;
+  color: var(--og-color-muted);
+  font-size: 12px;
+  font-weight: 700;
+  inline-size: 28px;
+}

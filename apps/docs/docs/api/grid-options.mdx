@@ -212,6 +212,78 @@ Import uses `mode: "replace"` by default so a file import clears the current cli
 rendering imported rows. `mode: "append"` is opt-in for workflows that intentionally add imported
 rows beneath the current dataset.
 
+Localization options select the active locale for renderer chrome and formatter context helpers:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  locale: "ko-KR"
+};
+```
+
+`CellContext` includes `locale`, `formatNumber()`, and `formatDate()` so column formatters can use
+the same locale as footer, pagination, overlays, and ARIA live-region messages. Built-in locales
+are `en-US` and `ko-KR`; custom definitions are registered through `registerLocale()` from
+`@onegrid/core`.
+
+Theme and CSP security options control scoped runtime CSS variables without requiring
+`unsafe-inline`:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  theme: {
+    name: "finance",
+    density: "standard",
+    variables: {
+      "--og-color-header-bg": "#eaf6f1"
+    }
+  },
+  security: {
+    csp: {
+      nonce: window.__CSP_NONCE__
+    }
+  }
+};
+```
+
+Set `security.csp.disableStyleInjection: true` when your application provides all OneGrid CSS
+variables from static stylesheets. OneGrid does not use `eval`, `new Function`, or inline event
+handler attributes.
+
+`theme.name` maps to data-driven built-in presets from `@onegrid/themes/default.css`:
+`default`, `clean`, `compact`, `dark`, and `high-contrast`. `theme.density` controls the row/header
+scale independently with `comfortable`, `standard`, or `compact`.
+For SI projects, `createSiTheme()` from `@onegrid/themes` converts organization design tokens into
+the same `theme.variables` shape.
+
+`security.html` controls the only code path that may write sanitized HTML:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  security: {
+    html: {
+      allowHtmlRenderer: true,
+      trustedTypesPolicyName: "onegrid-orders",
+      sanitizer: {
+        sanitize: (html) => DOMPurify.sanitize(html)
+      }
+    },
+    url: {
+      allowedProtocols: ["https:", "mailto:", "tel:"]
+    }
+  }
+};
+```
+
+Without both `allowHtmlRenderer: true` and a sanitizer, `kind: "html"` renderer output is displayed
+as text. Element renderer URL attributes are filtered through `security.url.allowedProtocols`.
+
 Menu options control row and cell context menu items while header menu availability remains under
 `columnUi.menu`:
 

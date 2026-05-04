@@ -1,0 +1,20 @@
+.og-grid__overlay-layer {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 30;
+}
+
+.og-grid__overlay-status {
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-border);
+  border-radius: 8px;
+  box-shadow: var(--og-shadow-popover);
+  color: var(--og-color-fg);
+  font-weight: 650;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  padding: 10px 14px;
+  position: absolute;
+  transform: translate(-50%, -50%);
+}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneGrid Theme Foundation</title>
+  </head>
+  <body>
+    <main>
+      <h1>Theme Foundation</h1>
+      <section id="example" aria-label="Theme foundation example"></section>
+    </main>
+    <script type="module">
+      import { mountThemeFoundationExample } from "./vanilla.ts";
+
+      const host = document.querySelector("#example");
+      if (host instanceof HTMLElement) {
+        mountThemeFoundationExample(host);
+      }
+    </script>
+  </body>
+</html>

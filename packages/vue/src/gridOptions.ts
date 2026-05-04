@@ -12,7 +12,9 @@ import type {
   FilteringOptions,
   FrozenColumnOptions,
   FrozenRowOptions,
+  GridEventHandlers,
   GridOptions,
+  GridPlugin,
   GroupingOptions,
   HeaderMergeOptions,
   ImportOptions,
@@ -28,10 +30,14 @@ import type {
   ServerRowOptions,
   SortingOptions,
   SummaryOptions,
+  ThemeOptions,
   TreeOptions,
   VirtualizationOptions,
   ViewportRowOptions
 } from "@onegrid/core";
+import { createVueGridEventHandlers } from "./vueEvents.js";
+import type { VueGridEmit } from "./vueEvents.js";
+import type { VueRendererBridge } from "./vueRendererBridge.js";
 
 export interface OneGridProps {
   readonly columns: readonly ColumnDef<unknown>[];
@@ -44,6 +50,10 @@ export interface OneGridProps {
   readonly rowKey?: string | ((row: unknown, index: number) => RowKey) | undefined;
   readonly rowModel?: RowModelKind | undefined;
   readonly rowHeight?: NonNullable<GridOptions<unknown>["rowHeight"]> | undefined;
+  readonly width?: NonNullable<GridOptions<unknown>["width"]> | undefined;
+  readonly height?: NonNullable<GridOptions<unknown>["height"]> | undefined;
+  readonly bodyHeight?: NonNullable<GridOptions<unknown>["bodyHeight"]> | undefined;
+  readonly headerHeight?: NonNullable<GridOptions<unknown>["headerHeight"]> | undefined;
   readonly infinite?: InfiniteRowOptions | undefined;
   readonly server?: ServerRowOptions | undefined;
   readonly viewport?: ViewportRowOptions | undefined;
@@ -68,9 +78,18 @@ export interface OneGridProps {
   readonly pagination?: PaginationOptions | undefined;
   readonly accessibility?: AccessibilityOptions | undefined;
   readonly security?: SecurityOptions | undefined;
+  readonly locale?: string | undefined;
+  readonly theme?: ThemeOptions | undefined;
+  readonly events?: GridEventHandlers<unknown> | undefined;
+  readonly plugins?: readonly GridPlugin<unknown>[] | undefined;
 }
 
-export function toGridOptions(props: OneGridProps): GridOptions<unknown> {
+export function toGridOptions(
+  props: OneGridProps,
+  bridge?: VueRendererBridge<unknown>,
+  emit?: VueGridEmit<unknown>
+): GridOptions<unknown> {
+  const events = createVueGridEventHandlers(props.events, emit);
   const options: {
     columns: readonly ColumnDef<unknown>[];
     columnOrder?: readonly string[];
@@ -82,6 +101,10 @@ export function toGridOptions(props: OneGridProps): GridOptions<unknown> {
     rowKey?: string | ((row: unknown, index: number) => RowKey);
     rowModel?: RowModelKind;
     rowHeight?: NonNullable<GridOptions<unknown>["rowHeight"]>;
+    width?: NonNullable<GridOptions<unknown>["width"]>;
+    height?: NonNullable<GridOptions<unknown>["height"]>;
+    bodyHeight?: NonNullable<GridOptions<unknown>["bodyHeight"]>;
+    headerHeight?: NonNullable<GridOptions<unknown>["headerHeight"]>;
     infinite?: InfiniteRowOptions;
     server?: ServerRowOptions;
     viewport?: ViewportRowOptions;
@@ -106,7 +129,11 @@ export function toGridOptions(props: OneGridProps): GridOptions<unknown> {
     pagination?: PaginationOptions;
     accessibility?: AccessibilityOptions;
     security?: SecurityOptions;
-  } = { columns: props.columns };
+    locale?: string;
+    theme?: ThemeOptions;
+    events?: GridEventHandlers<unknown>;
+    plugins?: readonly GridPlugin<unknown>[];
+  } = { columns: bridge?.enhanceColumns(props.columns) ?? props.columns };
 
   if (props.columnOrder !== undefined) {
     options.columnOrder = props.columnOrder;
@@ -134,6 +161,18 @@ export function toGridOptions(props: OneGridProps): GridOptions<unknown> {
   }
   if (props.rowHeight !== undefined) {
     options.rowHeight = props.rowHeight;
+  }
+  if (props.width !== undefined) {
+    options.width = props.width;
+  }
+  if (props.height !== undefined) {
+    options.height = props.height;
+  }
+  if (props.bodyHeight !== undefined) {
+    options.bodyHeight = props.bodyHeight;
+  }
+  if (props.headerHeight !== undefined) {
+    options.headerHeight = props.headerHeight;
   }
   if (props.infinite !== undefined) {
     options.infinite = props.infinite;
@@ -206,6 +245,18 @@ export function toGridOptions(props: OneGridProps): GridOptions<unknown> {
   }
   if (props.security !== undefined) {
     options.security = props.security;
+  }
+  if (props.locale !== undefined) {
+    options.locale = props.locale;
+  }
+  if (props.theme !== undefined) {
+    options.theme = props.theme;
+  }
+  if (events !== undefined) {
+    options.events = events;
+  }
+  if (props.plugins !== undefined) {
+    options.plugins = props.plugins;
   }
 
   return options;

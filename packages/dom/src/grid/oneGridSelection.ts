@@ -139,7 +139,7 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
     }
 
     this.selectionState = state;
-    this.options.events?.selectionChanged?.({
+    this.emitGridEvent("selectionChanged", {
       type: "selectionChanged",
       rows: this.getSelectedRows(),
       rowKeys: state.rowKeys,

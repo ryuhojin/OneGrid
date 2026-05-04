@@ -2,7 +2,7 @@
 
 # ⚡ OneGrid
 
-### Enterprise-grade data grid foundation for high-volume business applications
+### Enterprise-grade data grid platform for high-volume business applications
 
 OneGrid is a TypeScript-first frontend grid platform for financial, public-sector,
 and SI environments where scale, security, accessibility, and long-term
@@ -13,6 +13,8 @@ maintainability are first-class requirements.
 ![React](https://img.shields.io/badge/React-wrapper-61DAFB?style=for-the-badge&logo=react&logoColor=0B1220)
 ![Vue](https://img.shields.io/badge/Vue-wrapper-42B883?style=for-the-badge&logo=vuedotjs&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-tested-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)
+![Security](https://img.shields.io/badge/Security-CSP%20%2F%20XSS-D71920?style=for-the-badge)
+![Themes](https://img.shields.io/badge/Themes-runtime%20tokens-8B6F47?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Status-pre--1.0-FFB020?style=for-the-badge)
 
 **Vanilla JS · TypeScript · React · Vue · npm/CDN-ready architecture**
@@ -32,6 +34,25 @@ maintainability are first-class requirements.
 
 ---
 
+## 🧾 Current Engineering Snapshot
+
+OneGrid now has the core commercial grid surface wired through vanilla DOM,
+React, and Vue examples. The active milestone is still pre-1.0, but the
+repository is no longer a scaffold: feature work includes row models, layout,
+editing, selection, export/import, localization, CSP/XSS hardening, theme
+runtime, SI customization, and wrapper API parity.
+
+| Track | Current coverage |
+| --- | --- |
+| ✅ Row models | Client, Infinite, Server with `groupKeys`, Viewport, Tree |
+| ✅ Layout | Pinned panes, frozen rows/columns, row virtualization, column virtualization, merge-aware layout |
+| ✅ Data operations | Sorting, filtering, grouping, summary/aggregation, tree, pivot, pagination |
+| ✅ User workflows | Editing with batch commit, selection, clipboard, menus, export/import |
+| ✅ Enterprise baseline | Localization, CSP controls, XSS-safe renderers, theme tokens, SI tenant palettes |
+| ✅ Frameworks | Vanilla, React, Vue examples plus shared option/event/method parity |
+
+---
+
 ## 🧭 Why OneGrid
 
 OneGrid is not a table widget. It is a layered grid engine with separated core
@@ -44,6 +65,8 @@ assets.
 | 🖥 DOM renderer | Pinned panes, virtualized body/columns, keyboard focus, overlays, menus, editors, scrollbars, and ARIA semantics |
 | ⚛ React | Lifecycle, prop, event, and ref bridge without reimplementing core behavior |
 | 🟢 Vue | Component and expose bridge aligned with the same core API model |
+| 🌍 Localization | Locale registry, Korean/English baseline locales, runtime locale switching, formatter bridges |
+| 🎨 Themes | CSS token foundation, default/clean/compact/dark/high-contrast presets, SI theme builder |
 | 🛡 Security | Escaped text defaults, sanitizer-ready HTML paths, CSP-conscious styling, and no `eval`/`new Function` design |
 | 🧪 Quality | Unit, E2E, a11y, visual, and performance smoke test coverage |
 
@@ -54,9 +77,13 @@ assets.
 | Category | Features |
 | --- | --- |
 | 📊 Columns | Column model, grouped headers, header merge, column menu, resize, reorder, visibility, left/right pinning |
-| 🧱 Layout | Base layout, pinned panes, row virtualization, column virtualization, cell merge layout |
+| 🧱 Layout | Base layout, pinned panes, frozen rows/columns, row virtualization, column virtualization, cell merge layout |
 | 🌊 Row Models | Client, Infinite, Server, Viewport, Tree |
-| 🧩 Core Features | Sorting, filtering, editing, selection, clipboard, menus, summary, grouping, tree, pivot, pagination |
+| 🧩 Core Features | Sorting, filtering, editing, selection, clipboard, menus, summary, grouping, tree, pivot, pagination, export/import |
+| 🌐 Internationalization | Locale registry, `en-US`, `ko-KR`, runtime switch, number/date formatter bridge |
+| 🎨 Theming | Runtime theme API, scoped CSS variables, density, clean/compact/dark/high-contrast presets, SI token mapping |
+| 🛡 Security | CSP nonce, style injection controls, text-safe defaults, HTML sanitizer opt-in, Trusted Types path, URL protocol allowlist |
+| 🔌 Wrappers | Vanilla `OneGrid`, React component/ref bridge, Vue component/expose bridge, API parity matrix |
 | ♿ Accessibility | ARIA grid/treegrid semantics, keyboard focus, focus trap, screen-reader status regions |
 | 🧪 Examples | Vanilla, React, and Vue variants for roadmap features |
 
@@ -73,7 +100,7 @@ Roadmap status and implementation evidence are tracked in [`CHECKLIST.md`](CHECK
 | `@onegrid/react` | React lifecycle and ref bridge |
 | `@onegrid/vue` | Vue component and expose bridge |
 | `@onegrid/pagination` | Pagination state and page navigation helpers |
-| `@onegrid/themes` | Theme tokens and default CSS |
+| `@onegrid/themes` | Theme tokens, preset CSS, runtime theme helpers, and SI theme builder |
 | `@onegrid/adapters` | Server adapter foundations |
 | `@onegrid/testing` | Test and benchmark helper foundation |
 
@@ -124,6 +151,7 @@ const grid = new OneGrid<OrderRow>({
 });
 
 grid.setPage(1);
+grid.applyTheme({ name: "clean", density: "standard" });
 ```
 
 ---
@@ -141,6 +169,8 @@ const grid = new OneGrid<OrderRow>({
   columns,
   dataSource: {
     async getRows(request) {
+      // request.groupKeys, sortModel, filterModel, aggregateModel, pivotModel,
+      // viewport, page, and cursor are serialized by the shared core contract.
       const response = await fetch("/api/orders/query", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -161,6 +191,79 @@ const grid = new OneGrid<OrderRow>({
 });
 ```
 
+Server grouping is server-owned. Root requests can return `groupMeta`; expanding a
+group sends `groupKeys` back to the `DataSource`, and the server returns the
+expanded group header plus leaf rows for that scope.
+
+---
+
+## 📤 Export / Import
+
+The export foundation supports grid-shaped CSV, XLSX-like workbook data, print
+layout, and PDF-oriented rendering paths with merge/header layout awareness.
+Import flows replace the current dataset by default, with append behavior kept as
+an explicit option.
+
+```ts
+await grid.exportData({ format: "csv", fileName: "orders.csv" });
+await grid.importData(file, { mode: "replace" });
+```
+
+---
+
+## 🛡 Security Defaults
+
+OneGrid renders strings as text by default. HTML rendering is an explicit opt-in
+path that must pass through the configured security boundary.
+
+```ts
+import { OneGrid, strictTextOnlySanitizer } from "@onegrid/dom";
+
+new OneGrid({
+  el,
+  columns,
+  data,
+  security: {
+    csp: {
+      nonce: window.__CSP_NONCE__,
+      disableStyleInjection: false
+    },
+    html: {
+      allowHtmlRenderer: true,
+      trustedTypesPolicyName: "onegrid",
+      sanitizer: strictTextOnlySanitizer
+    },
+    url: {
+      allowedProtocols: ["http:", "https:", "mailto:"]
+    }
+  }
+});
+```
+
+---
+
+## 🎨 Themes and SI Customization
+
+Themes are CSS-variable based and can be switched at runtime without remounting.
+SI projects can map customer design tokens into scoped OneGrid variables.
+
+```ts
+import { createSiTheme } from "@onegrid/themes";
+
+grid.applyTheme(
+  createSiTheme({
+    name: "si-bnk-red",
+    tokens: {
+      colors: {
+        primary: "rgb(215 25 31)",
+        accent: "rgb(137 110 74)",
+        surface: "#ffffff"
+      }
+    }
+  })
+);
+```
+
 ---
 
 ## ⚛ React
@@ -170,12 +273,16 @@ pnpm add @onegrid/react @onegrid/core @onegrid/dom @onegrid/themes
 ```
 
 ```tsx
-import { OneGrid } from "@onegrid/react";
+import { useRef } from "react";
+import { OneGrid, type OneGridHandle } from "@onegrid/react";
 import "@onegrid/themes/default.css";
 
 export function OrdersGrid() {
+  const gridRef = useRef<OneGridHandle<OrderRow>>(null);
+
   return (
     <OneGrid<OrderRow>
+      ref={gridRef}
       rowKey="id"
       columns={columns}
       data={rows}
@@ -185,6 +292,9 @@ export function OrdersGrid() {
   );
 }
 ```
+
+React exposes the same method names as vanilla `GridApi` through refs. Events use
+the same semantic names through React props.
 
 ---
 
@@ -211,6 +321,9 @@ import "@onegrid/themes/default.css";
 </script>
 ```
 
+Vue exposes the same `GridApi` method surface through template refs and emits the
+same event names used by the DOM runtime.
+
 ---
 
 ## 🛠 Local Development
@@ -225,6 +338,17 @@ Open:
 ```text
 http://127.0.0.1:4174
 ```
+
+Useful routes:
+
+| Route | What to inspect |
+| --- | --- |
+| `/#ROW-003` | Server row model with group expand requests |
+| `/#LAY-003` | Column virtualization and pinned-pane scroll sync |
+| `/#F-EXPORT` | Export/import, print, PDF/XLSX layout paths |
+| `/#F-I18N` | Runtime locale switching |
+| `/#SEC-001` | CSP-safe example page |
+| `/#THEME-002` | SI tenant theme palettes |
 
 ---
 
@@ -258,6 +382,9 @@ pnpm test:e2e:visual
 | [`API_CHANGELOG.md`](API_CHANGELOG.md) | API contract changes |
 | [`SECURITY.md`](SECURITY.md) | Security policy notes |
 | [`apps/docs/docs`](apps/docs/docs) | Docusaurus documentation source |
+| [`apps/docs/docs/frameworks`](apps/docs/docs/frameworks) | React, Vue, and API parity docs |
+| [`apps/docs/docs/security`](apps/docs/docs/security) | CSP and XSS guidance |
+| [`apps/docs/docs/features`](apps/docs/docs/features) | Feature guides and examples |
 
 ---
 

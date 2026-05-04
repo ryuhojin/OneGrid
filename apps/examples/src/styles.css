@@ -83,6 +83,11 @@ section {
   outline-offset: 2px;
 }
 
+.example-action-button[aria-pressed="true"] {
+  background: #0f172a;
+  box-shadow: inset 0 0 0 2px #93c5fd;
+}
+
 .example-inspector {
   border: 1px solid #d7dbe0;
   display: grid;
@@ -129,6 +134,74 @@ section {
   margin: 0 0 8px;
 }
 
+.theme-example-grid {
+  min-width: 0;
+}
+
+.theme-example-button {
+  min-inline-size: 92px;
+}
+
+.theme-example-inspector {
+  margin-block-start: 12px;
+}
+
+.si-theme-actions {
+  align-items: center;
+}
+
+.si-theme-button {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+  min-inline-size: 106px;
+}
+
+.si-theme-grid {
+  min-width: 0;
+}
+
+.si-theme-inspector {
+  margin-block-start: 12px;
+}
+
+.si-theme-swatch {
+  block-size: 12px;
+  border: 1px solid rgb(255 255 255 / 70%);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 24%);
+  flex: 0 0 auto;
+  inline-size: 12px;
+}
+
+.si-theme-swatch--public-red {
+  background: #d7191f;
+}
+
+.si-theme-swatch--civic-blue {
+  background: #1d4ed8;
+}
+
+.si-theme-swatch--forest {
+  background: #237454;
+}
+
+.si-theme-swatch--neutral-audit {
+  background: #655c4f;
+}
+
+.si-theme-swatch--bnk-red {
+  background: #d7191f;
+}
+
+.si-theme-swatch--bnk-gold {
+  background: #896e4a;
+}
+
+.si-theme-swatch--bnk-gray {
+  background: #655c4f;
+}
+
 .pagination-example-inspector {
   margin-block-start: 8px;
 }
@@ -158,6 +231,47 @@ section {
 }
 
 .risk-badge--high {
+  background: #fdecec;
+  color: #a51f1f;
+}
+
+.react-wrapper-header {
+  align-items: center;
+  display: inline-flex;
+  font-weight: 750;
+}
+
+.vue-wrapper-header {
+  align-items: center;
+  display: inline-flex;
+  font-weight: 750;
+}
+
+.react-wrapper-status,
+.vue-wrapper-status {
+  border: 1px solid #cdd5df;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.react-wrapper-status--ready,
+.vue-wrapper-status--ready {
+  background: #eaf7ef;
+  color: #17663a;
+}
+
+.react-wrapper-status--review,
+.vue-wrapper-status--review {
+  background: #fff3d6;
+  color: #8a4b00;
+}
+
+.react-wrapper-status--blocked,
+.vue-wrapper-status--blocked {
   background: #fdecec;
   color: #a51f1f;
 }

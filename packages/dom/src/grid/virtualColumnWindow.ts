@@ -1,6 +1,7 @@
 import {
   calculateFixedColumnVirtualWindow,
-  clipHeaderRowsToColumns
+  clipHeaderRowsToColumns,
+  createLocaleFormatter
 } from "@onegrid/core";
 import { createBodyPane } from "./bodyPaneRenderer.js";
 import { syncColumnScroll } from "./columnScrollSync.js";
@@ -284,6 +285,7 @@ function replaceCenterPanes<TData>(
           : { treeColumnField: input.rowRenderState.treeRuntime.treeColumnField }),
         ...(input.groupRuntime === undefined ? {} : { groupRuntime: input.groupRuntime }),
         cellSpanModel: input.cellSpanModel,
+        i18n: createLocaleFormatter(input.options.locale),
         rowIndexOffset: input.rowIndexOffset,
         ...(input.options.editing === undefined ? {} : { editing: input.options.editing }),
         ...(input.security === undefined ? {} : { security: input.security })

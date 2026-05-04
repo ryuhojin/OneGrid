@@ -68,6 +68,8 @@ export interface GridApi<TData = unknown> {
   copyToClipboard(options?: ClipboardCopyOptions): Promise<void>;
   pasteFromClipboard(text: string): Promise<void>;
   applyTheme(theme: ThemeInput): void;
+  setLocale(locale: string): void;
+  getLocale(): string;
   on<K extends keyof GridEventMap<TData> & string>(
     eventName: K,
     handler: GridEventHandler<TData, K>

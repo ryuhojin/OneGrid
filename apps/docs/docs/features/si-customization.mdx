@@ -1,0 +1,85 @@
+# SI Customization
+
+THEME-002 adds a small design-token bridge for system-integration projects that already have a
+brand guide or public-sector design system. The bridge maps tenant tokens into OneGrid CSS
+variables and returns a `theme` object that can be passed to every entry point.
+
+```ts
+import { createSiTheme } from "@onegrid/themes";
+
+const theme = createSiTheme({
+  name: "si-public-red",
+  density: "standard",
+  tokens: {
+    colors: {
+      accent: "#d7191f",
+      accentHover: "#8b0304",
+      header: "#f7f3ef",
+      pinnedHeader: "#efe7df",
+      selected: "#fff0f0"
+    }
+  }
+});
+
+api.applyTheme(theme);
+```
+
+BNK-style SI palettes can be expressed with the same bridge without adding customer-specific
+presets to the public package API:
+
+| Palette | Accent | Hover / strong | Neutral support | Use |
+| --- | --- | --- | --- | --- |
+| `si-bnk-red` | `#d7191f` | `#8b0304` | `#b7a997` | Approval and exception-heavy operations |
+| `si-bnk-gold` | `#896e4a` | `#655c4f` | `#b7a997` | Executive dashboards and reporting grids |
+| `si-bnk-gray` | `#655c4f` | `#4a4238` | `#909394` | Audit, back-office, and neutral review screens |
+
+The THEME-002 example includes these BNK-derived palettes using the provided CI RGB values:
+red `R215 G25 B31`, dark red `R139 G3 B4`, dark gray `R101 G92 B79`, light gray
+`R183 G169 B151`, silver `R144 G147 B148`, and gold `R137 G110 B74`.
+
+## Token Mapping
+
+| SI token | OneGrid variable | Usage |
+| --- | --- | --- |
+| `colors.canvas` | `--og-color-bg` | Body and empty surface |
+| `colors.foreground` | `--og-color-fg` | Primary text and icons |
+| `colors.border` | `--og-color-border` | Grid lines and pane borders |
+| `colors.header` | `--og-color-header-bg` | Column header surface |
+| `colors.pinnedHeader` | `--og-color-pinned-header-bg` | Pinned header surface |
+| `colors.selected` | `--og-color-selected-bg` | Selected rows and cells |
+| `colors.accent` | `--og-color-accent`, `--og-color-focus-ring` | Checkbox, editor, and focus accent |
+| `colors.summary` | `--og-color-summary-bg` | Summary and footer surface |
+| `typography.fontFamily` | `--og-font-family` | Grid font stack |
+| `typography.rowHeight` | `--og-row-height` | Body row height |
+| `typography.headerHeight` | `--og-header-height` | Header row height |
+| `shadows.popover` | `--og-shadow-popover` | Menus, filter panels, and editor overlays |
+
+`overrides` can still target any `--og-*` variable for project-specific exceptions.
+
+## CSS Override Recipe
+
+For deployments that disallow runtime style injection, define variables in static CSS and set
+`security.csp.disableStyleInjection: true`.
+
+```css
+.og-root-host[data-og-theme="si-public-red"] {
+  --og-color-accent: #d7191f;
+  --og-color-focus-ring: #d7191f;
+  --og-color-header-bg: #f7f3ef;
+  --og-color-pinned-header-bg: #efe7df;
+  --og-color-selected-bg: #fff0f0;
+}
+```
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  theme: { name: "si-public-red", density: "standard" },
+  security: { csp: { disableStyleInjection: true } }
+});
+```
+
+The THEME-002 example is available at `/#THEME-002`. It verifies tenant palette switching,
+density switching, pinned panes, group headers, and per-theme visual regression snapshots.

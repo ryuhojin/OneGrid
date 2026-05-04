@@ -1,0 +1,78 @@
+# API Parity
+
+OneGrid keeps vanilla JavaScript, React, and Vue on the same API contract.
+Wrappers are lifecycle bridges only. They do not reimplement grid behavior.
+
+## Option Matrix
+
+Vanilla passes these keys through `new OneGrid({ ...options, el })`.
+React accepts the same keys as component props. Vue accepts the same keys as
+component props.
+
+| Area | Shared option keys |
+| --- | --- |
+| Columns | `columns`, `columnOrder`, `columnState`, `columnUi`, `headerMerge` |
+| Rows | `data`, `dataSource`, `rowModel`, `infinite`, `server`, `viewport`, `rowKey` |
+| Layout | `width`, `height`, `bodyHeight`, `layout`, `virtualization`, `rowHeight`, `headerHeight`, `frozenRows`, `frozenColumns` |
+| Features | `selection`, `editing`, `filtering`, `sorting`, `grouping`, `aggregation`, `pivot`, `summary`, `tree`, `merge`, `pagination`, `clipboard`, `export`, `import`, `contextMenu` |
+| Platform | `accessibility`, `security`, `theme`, `locale`, `plugins`, `events` |
+
+Framework-specific renderer bridges are intentionally separate:
+
+| Runtime | Renderer bridge |
+| --- | --- |
+| Vanilla | `ColumnDef.renderer`, `ColumnDef.headerRenderer`, shared editor definitions |
+| React | `reactRenderers.cells`, `reactRenderers.headers`, shared editor definitions |
+| Vue | `cell-*` and `header-*` slots, shared editor definitions |
+
+## Event Matrix
+
+The shared event names are identical across runtimes.
+
+| Event | Vanilla | React | Vue |
+| --- | --- | --- | --- |
+| `ready` | `events.ready` | `events.ready`, `onReady` | `events.ready`, `@ready` |
+| `destroyed` | `events.destroyed` | `events.destroyed`, `onDestroyed` | `events.destroyed`, `@destroyed` |
+| `dataRequested` | `events.dataRequested` | `events.dataRequested`, `onDataRequested` | `events.dataRequested`, `@data-requested` |
+| `dataLoaded` | `events.dataLoaded` | `events.dataLoaded`, `onDataLoaded` | `events.dataLoaded`, `@data-loaded` |
+| `rowClicked` | `events.rowClicked` | `events.rowClicked`, `onRowClicked` | `events.rowClicked`, `@row-clicked` |
+| `cellClicked` | `events.cellClicked` | `events.cellClicked`, `onCellClicked` | `events.cellClicked`, `@cell-clicked` |
+| `selectionChanged` | `events.selectionChanged` | `events.selectionChanged`, `onSelectionChanged` | `events.selectionChanged`, `@selection-changed` |
+| `sortChanged` | `events.sortChanged` | `events.sortChanged`, `onSortChanged` | `events.sortChanged`, `@sort-changed` |
+| `filterChanged` | `events.filterChanged` | `events.filterChanged`, `onFilterChanged` | `events.filterChanged`, `@filter-changed` |
+| `pageChanged` | `events.pageChanged` | `events.pageChanged`, `onPageChanged` | `events.pageChanged`, `@page-changed` |
+| `cellEditStarted` | `events.cellEditStarted` | `events.cellEditStarted`, `onCellEditStarted` | `events.cellEditStarted`, `@cell-edit-started` |
+| `cellEditStaged` | `events.cellEditStaged` | `events.cellEditStaged`, `onCellEditStaged` | `events.cellEditStaged`, `@cell-edit-staged` |
+| `cellEditCommitted` | `events.cellEditCommitted` | `events.cellEditCommitted`, `onCellEditCommitted` | `events.cellEditCommitted`, `@cell-edit-committed` |
+| `cellEditCancelled` | `events.cellEditCancelled` | `events.cellEditCancelled`, `onCellEditCancelled` | `events.cellEditCancelled`, `@cell-edit-cancelled` |
+| `validationFailed` | `events.validationFailed` | `events.validationFailed`, `onValidationFailed` | `events.validationFailed`, `@validation-failed` |
+| `error` | `events.error` | `events.error`, `onError` | `events.error`, `@error` |
+
+React event props and Vue emits are chained after `events`, so applications can
+use the framework bridge and a core event object at the same time.
+
+## Method Matrix
+
+The same command surface is available from:
+
+| Runtime | Access path |
+| --- | --- |
+| Vanilla | DOM grid instance returned by `new OneGrid(...)` |
+| React | `ref.current` typed as `OneGridHandle<TData>` |
+| Vue | template ref typed as `OneGridExpose` |
+
+| Area | Shared methods |
+| --- | --- |
+| Lifecycle and data | `destroy`, `refresh`, `setData`, `appendRows`, `updateRows`, `removeRows`, `getRow` |
+| Selection | `getSelectionState`, `getSelectedRows`, `selectRows`, `selectCell`, `selectCellRange`, `selectAllVisibleRows`, `selectServerDataset`, `clearSelection` |
+| Editing | `startEdit`, `stopEdit`, `getPendingEdits`, `commitPendingEdits`, `cancelPendingEdits`, `validate` |
+| Columns | `setColumns`, `showColumn`, `hideColumn`, `pinColumn`, `autoSizeColumn` |
+| Models | `setFilterModel`, `getFilterModel`, `setSortModel`, `getSortModel`, `setGroupModel`, `getGroupModel` |
+| Tree and grouping | `expandGroup`, `collapseGroup`, `toggleGroup`, `expandTreeNode`, `collapseTreeNode`, `toggleTreeNode`, `selectTreeNode`, `getTreeSelection` |
+| Paging and scroll | `setPage`, `getPage`, `setPageSize`, `getPageSize`, `scrollToRow`, `scrollToColumn` |
+| I/O | `exportData`, `importData`, `copyToClipboard`, `pasteFromClipboard` |
+| Platform | `applyTheme`, `setLocale`, `getLocale`, `on`, `off` |
+
+The automated parity tests use the exported core parity keys and fail when a
+React prop, Vue prop, event bridge, or exposed method drifts from the shared
+contract.

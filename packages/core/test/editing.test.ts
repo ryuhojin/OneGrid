@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { commitCellEdit, isCellEditable, resolveEditorDef, startCellEdit } from "../src/index.js";
+import {
+  commitCellEdit,
+  createLocaleFormatter,
+  isCellEditable,
+  resolveEditorDef,
+  startCellEdit
+} from "../src/index.js";
 import type { CellContext, ColumnDef, DataColumnDef } from "../src/index.js";
 
 interface EditRow {
@@ -147,6 +153,7 @@ function createContext(column: ColumnDef<EditRow>, value: unknown): CellContext<
   }
 
   return {
+    ...createLocaleFormatter(),
     row,
     rowIndex: 0,
     rowKey: row.id,

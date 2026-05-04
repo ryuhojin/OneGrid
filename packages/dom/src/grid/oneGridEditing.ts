@@ -145,6 +145,7 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
       column: resolved.column.source,
       field: resolved.column.field,
       currentValue: resolved.value,
+      ...(this.options.locale === undefined ? {} : { locale: this.options.locale }),
       ...(this.options.editing === undefined ? {} : { editing: this.options.editing })
     });
     if (!session) {
@@ -181,6 +182,7 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
       session: active.session,
       rawValue,
       validate,
+      ...(this.options.locale === undefined ? {} : { locale: this.options.locale }),
       ...(this.options.editing === undefined ? {} : { editing: this.options.editing })
     });
     if (!result.valid) {

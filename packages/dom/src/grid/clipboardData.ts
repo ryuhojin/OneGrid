@@ -3,12 +3,14 @@ import {
   createCellSpanModel,
   createClipboardText,
   createColumnModel,
+  createLocaleFormatter,
   isCellEditable
 } from "@onegrid/core";
 import type {
   CellSpanModel,
   ClipboardCopyOptions,
   GridSelectionState,
+  LocaleFormatterBridge,
   NormalizedDataColumn,
   RowKey,
   SelectedCell
@@ -33,6 +35,7 @@ export interface ClipboardDataSnapshot<TData> {
   readonly rows: readonly ClipboardDataRow<TData>[];
   readonly columns: readonly NormalizedDataColumn<TData>[];
   readonly cellSpanModel: CellSpanModel;
+  readonly i18n: LocaleFormatterBridge;
 }
 
 export function createClipboardSnapshot<TData>(
@@ -57,8 +60,10 @@ export function createClipboardSnapshot<TData>(
       rows: createCellSpanRows(rows),
       columns,
       ...(options.merge === undefined ? {} : { options: options.merge }),
-      ...(rowRenderState?.mergeMeta === undefined ? {} : { serverMeta: rowRenderState.mergeMeta })
-    })
+      ...(rowRenderState?.mergeMeta === undefined ? {} : { serverMeta: rowRenderState.mergeMeta }),
+      ...(options.locale === undefined ? {} : { locale: options.locale })
+    }),
+    i18n: createLocaleFormatter(options.locale)
   });
 }
 
@@ -91,6 +96,7 @@ export function isClipboardCellEditable<TData>(
 ): boolean {
   const value = readCellValue(row.row, row.rowKey, row.rowIndex, column);
   return isCellEditable(column.source, {
+    ...createLocaleFormatter(),
     row: row.row,
     rowIndex: row.rowIndex,
     rowKey: row.rowKey,
@@ -215,7 +221,7 @@ function createCopyCell<TData>(
     : readCellValue(row.row, row.rowKey, row.rowIndex, column);
 
   return {
-    value: formatCopyValue(row, column, value),
+    value: formatCopyValue(row, column, value, snapshot.i18n),
     ...(covered ? { covered } : {})
   };
 }
@@ -223,10 +229,12 @@ function createCopyCell<TData>(
 function formatCopyValue<TData>(
   row: ClipboardDataRow<TData>,
   column: NormalizedDataColumn<TData>,
-  value: unknown
+  value: unknown,
+  i18n: LocaleFormatterBridge
 ): string {
   if (column.source.formatter) {
     return column.source.formatter({
+      ...i18n,
       row: row.row,
       rowIndex: row.rowIndex,
       rowKey: row.rowKey,

@@ -1,4 +1,5 @@
 import type { NormalizedDataColumn } from "../column/index.js";
+import { createLocaleFormatter } from "../i18n/index.js";
 import type { CellContext } from "../types/column.js";
 import type { MergeOptions, MergeSpan } from "../types/grid-options.js";
 import type { MergeMeta } from "../types/shared.js";
@@ -9,6 +10,7 @@ export interface CellSpanModelInput<TData = unknown> {
   readonly columns: readonly NormalizedDataColumn<TData>[];
   readonly options?: MergeOptions<TData>;
   readonly serverMeta?: readonly MergeMeta[];
+  readonly locale?: string;
 }
 
 interface MutableSpanIndex {
@@ -92,7 +94,8 @@ function appendCustomSpans<TData>(
         column,
         columnIndex,
         input.columns.length,
-        rowsByIndex
+        rowsByIndex,
+        input.locale
       );
       if (!span) {
         return;
@@ -109,9 +112,10 @@ function resolveCustomSpan<TData>(
   column: NormalizedDataColumn<TData>,
   columnIndex: number,
   columnCount: number,
-  rowsByIndex: ReadonlyMap<number, CellSpanRow<TData>>
+  rowsByIndex: ReadonlyMap<number, CellSpanRow<TData>>,
+  locale: string | undefined
 ): CellSpan | undefined {
-  const context = createCellContext(row, column);
+  const context = createCellContext(row, column, locale);
   const optionSpan = options?.getSpan?.(context);
   const columnSpan = column.source.merge?.mode === "custom"
     ? resolveColumnSpan(column.source.merge, context)
@@ -272,10 +276,12 @@ function indexSpanCells(
 
 function createCellContext<TData>(
   row: CellSpanRow<TData>,
-  column: NormalizedDataColumn<TData>
+  column: NormalizedDataColumn<TData>,
+  locale: string | undefined
 ): CellContext<TData> {
   const value = readField(row.data, column.field);
   return {
+    ...createLocaleFormatter(locale),
     row: row.data,
     rowIndex: row.rowIndex,
     rowKey: row.rowKey,
