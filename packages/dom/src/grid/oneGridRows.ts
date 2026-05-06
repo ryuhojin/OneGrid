@@ -6,6 +6,7 @@ import type {
 } from "@onegrid/core";
 import { createClientRowModel } from "@onegrid/core";
 import type { GroupRowRuntime } from "./groupRowRenderer.js";
+import { isGroupKeyExpanded, setGroupKeyExpanded } from "./groupExpansionState.js";
 import { invalidate } from "./renderInvalidation.js";
 import { createRowRenderState } from "./rowRenderStateFactory.js";
 import type { RowRenderState } from "./renderGridShell.js";
@@ -218,8 +219,8 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     }
 
     if (this.serverRowModel) {
-      this.serverGroupKeys = expanded ? Object.freeze([groupKey]) : Object.freeze([]);
-      this.resetRemoteRowModel(reason);
+      this.groupModel = setGroupKeyExpanded(this.groupModel, groupKey, expanded);
+      void this.setServerGroupExpanded(groupKey, expanded, reason);
       return;
     }
 
@@ -239,7 +240,7 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
 
   protected isGroupExpanded(groupKey: string): boolean {
     if (this.serverRowModel) {
-      return this.serverGroupKeys.includes(groupKey);
+      return isGroupKeyExpanded(this.groupModel, groupKey);
     }
 
     return this.getResolvedClientGroupKeys().has(groupKey);

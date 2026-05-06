@@ -249,6 +249,7 @@ export interface ImportOptions<TData = unknown> {
   readonly format?: "csv" | "xlsx" | "json";
   readonly mode?: "replace" | "append";
   readonly hasHeaders?: boolean;
+  readonly headerRowCount?: number;
   readonly columns?: readonly string[];
   parseRow?(record: Readonly<Record<string, unknown>>, rowIndex: number): TData;
 }

@@ -5,12 +5,12 @@ import {
   listServerCacheEntries,
   setServerCacheEntry
 } from "./serverCache.js";
+import { createServerEntries } from "./serverEntries.js";
 import { createServerRowsRequest } from "./serverRequest.js";
 import { resolveRowKey } from "./rowIdentity.js";
 import type { ServerRowCache } from "./serverCache.js";
 import type {
   ServerLoadResult,
-  ServerGroupFooterRowEntry,
   ServerGroupRowEntry,
   ServerRowCacheEntry,
   ServerRowEntry,
@@ -18,7 +18,7 @@ import type {
   ServerUpdateRowsResult
 } from "./serverTypes.js";
 import type { RowUpdate } from "../types/data.js";
-import type { GroupMeta, RowKey } from "../types/shared.js";
+import type { RowKey } from "../types/shared.js";
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -30,13 +30,19 @@ export class ServerRowModel<TData = unknown> {
   private requestSequence = 0;
   private currentPage: number;
   private currentResult: ServerLoadResult<TData> | undefined;
+  private currentBaseCacheKey: string | undefined;
   private readonly cursors = new Map<number, string | undefined>();
+  private readonly expandedGroupKeys = new Set<string>();
+  private readonly collapsedGroupKeys = new Set<string>();
 
   constructor(options: ServerRowModelOptions<TData>) {
     this.options = options;
     this.cache = createServerRowCache<TData>();
     this.currentPage = normalizePage(options.initialPage);
     this.cursors.set(0, options.initialCursor);
+    for (const groupKey of options.groupModel?.expandedKeys ?? []) {
+      this.expandedGroupKeys.add(groupKey);
+    }
   }
 
   get page(): number {
@@ -63,60 +69,46 @@ export class ServerRowModel<TData = unknown> {
     return listServerCacheEntries(this.cache);
   }
 
-  loadPage(page = this.currentPage, refresh = false): Promise<ServerLoadResult<TData>> {
+  get expandedGroups(): readonly string[] {
+    return Object.freeze([...this.expandedGroupKeys]);
+  }
+
+  async loadPage(page = this.currentPage, refresh = false): Promise<ServerLoadResult<TData>> {
     this.currentPage = normalizePage(page);
     if (refresh) {
       clearServerRowCache(this.cache);
       this.resetCursors();
     }
 
-    const requestId = `server:${++this.requestSequence}:${this.currentPage}`;
-    const cursor = this.getCursorForPage(this.currentPage);
-    const requestBundle = createServerRowsRequest(this.options, {
-      page: this.currentPage,
-      pageSize: this.pageSize,
-      requestId,
-      ...(cursor === undefined ? {} : { cursor })
-    });
-
-    const cached = getServerCacheEntry(this.cache, requestBundle.cacheKey);
-    if (cached && !refresh) {
-      const result = this.toLoadResult(cached, true);
-      this.currentResult = result;
-      return Promise.resolve(result);
-    }
-
-    const pending = this.pending.get(requestBundle.cacheKey);
-    if (pending) {
-      return pending.then((result) => {
-        this.currentResult = result;
-        return result;
-      });
-    }
-
-    const promise = this.options.dataSource.getRows(requestBundle.request).then((result) => {
-      this.rememberNextCursor(result.nextCursor);
-      const entry = Object.freeze({
-        cacheKey: requestBundle.cacheKey,
-        request: requestBundle.request,
-        result,
-        entries: this.createEntries(result.rows, requestBundle.request.startRow, result.groupMeta),
-        lastAccess: ++this.accessSequence
-      });
-      setServerCacheEntry(this.cache, entry);
-      const loadResult = this.toLoadResult(entry, false);
-      this.currentResult = loadResult;
-      return loadResult;
-    }).finally(() => {
-      this.pending.delete(requestBundle.cacheKey);
-    });
-
-    this.pending.set(requestBundle.cacheKey, promise);
-    return promise;
+    const baseResult = await this.loadRequest(this.currentPage, refresh);
+    const result = await this.expandLoadResult(baseResult, refresh);
+    this.currentBaseCacheKey = baseResult.cacheKey;
+    this.currentResult = result;
+    return result;
   }
 
   refresh(): Promise<ServerLoadResult<TData>> {
     return this.loadPage(this.currentPage, true);
+  }
+
+  expandGroup(groupKey: string): Promise<ServerLoadResult<TData>> {
+    this.collapsedGroupKeys.delete(groupKey);
+    this.expandedGroupKeys.add(groupKey);
+    return this.loadPage(this.currentPage);
+  }
+
+  collapseGroup(groupKey: string): Promise<ServerLoadResult<TData>> {
+    this.expandedGroupKeys.delete(groupKey);
+    this.collapsedGroupKeys.add(groupKey);
+    return this.loadPage(this.currentPage);
+  }
+
+  toggleGroup(groupKey: string): Promise<ServerLoadResult<TData>> {
+    return this.isGroupExpanded(groupKey) ? this.collapseGroup(groupKey) : this.expandGroup(groupKey);
+  }
+
+  isGroupExpanded(groupKey: string): boolean {
+    return this.expandedGroupKeys.has(groupKey) && !this.collapsedGroupKeys.has(groupKey);
   }
 
   async applyTransaction(
@@ -131,39 +123,125 @@ export class ServerRowModel<TData = unknown> {
       requestId: `server:update:${++this.requestSequence}`
     });
     this.patchCachedRows(result.rows);
+    await this.refreshCurrentResultFromCache();
     return result;
   }
 
-  private createEntries(
-    rows: readonly TData[],
-    startRow: number,
-    groupMeta: readonly GroupMeta[] | undefined = undefined
-  ): readonly ServerRowEntry<TData>[] {
-    if (groupMeta && groupMeta.length > 0) {
-      return this.createGroupedEntries(rows, startRow, groupMeta);
+  private loadRequest(
+    page: number,
+    refresh: boolean,
+    groupKeys?: readonly string[]
+  ): Promise<ServerLoadResult<TData>> {
+    const normalizedPage = normalizePage(page);
+    const requestId = createRequestId(++this.requestSequence, normalizedPage, groupKeys);
+    const cursor = groupKeys === undefined ? this.getCursorForPage(normalizedPage) : undefined;
+    const requestBundle = createServerRowsRequest(this.options, {
+      page: normalizedPage,
+      pageSize: this.pageSize,
+      requestId,
+      ...(cursor === undefined ? {} : { cursor }),
+      ...(groupKeys === undefined ? {} : { groupKeys })
+    });
+
+    const cached = getServerCacheEntry(this.cache, requestBundle.cacheKey);
+    if (cached && !refresh) {
+      return Promise.resolve(this.toLoadResult(cached, true));
     }
 
-    return Object.freeze(
-      rows.map<ServerRowEntry<TData>>((row, index) =>
-        Object.freeze({
-          kind: "data",
-          rowIndex: startRow + index,
-          key: resolveRowKey(row, startRow + index, this.options.rowKey),
-          data: row
-        })
-      )
-    );
+    const pending = this.pending.get(requestBundle.cacheKey);
+    if (pending) {
+      return pending;
+    }
+
+    const promise = this.options.dataSource.getRows(requestBundle.request).then((result) => {
+      if (groupKeys === undefined) {
+        this.rememberNextCursor(result.nextCursor);
+      }
+      const entry = Object.freeze({
+        cacheKey: requestBundle.cacheKey,
+        request: requestBundle.request,
+        result,
+        entries: createServerEntries(
+          result.rows,
+          requestBundle.request.startRow,
+          this.options.rowKey,
+          result.groupMeta
+        ),
+        lastAccess: ++this.accessSequence
+      });
+      setServerCacheEntry(this.cache, entry);
+      return this.toLoadResult(entry, false);
+    }).finally(() => {
+      this.pending.delete(requestBundle.cacheKey);
+    });
+
+    this.pending.set(requestBundle.cacheKey, promise);
+    return promise;
   }
 
-  private createGroupedEntries(
-    rows: readonly TData[],
-    startRow: number,
-    groupMeta: readonly GroupMeta[]
-  ): readonly ServerRowEntry<TData>[] {
-    const headers = groupMeta.filter((meta) => meta.footer !== true).map(toServerGroupEntry);
-    const footers = groupMeta.filter((meta) => meta.footer === true).map(toServerGroupFooterEntry);
-    const dataEntries = this.createEntries(rows, startRow + headers.length);
-    return Object.freeze([...headers, ...dataEntries, ...footers]);
+  private async expandLoadResult(
+    result: ServerLoadResult<TData>,
+    refresh: boolean
+  ): Promise<ServerLoadResult<TData>> {
+    if (result.entries.every((entry) => entry.kind !== "group")) {
+      return result;
+    }
+
+    const entries = await this.expandEntries(result.entries, refresh);
+    const visibleEntries = reindexVisibleEntries(entries);
+    return Object.freeze({
+      ...result,
+      entries: visibleEntries,
+      rowCount: visibleEntries.length
+    });
+  }
+
+  private async expandEntries(
+    entries: readonly ServerRowEntry<TData>[],
+    refresh: boolean,
+    parentGroupKey?: string
+  ): Promise<readonly ServerRowEntry<TData>[]> {
+    const output: ServerRowEntry<TData>[] = [];
+    for (const entry of entries) {
+      if (entry.kind !== "group") {
+        output.push(entry);
+        continue;
+      }
+      if (entry.key === parentGroupKey) {
+        continue;
+      }
+
+      const clientExpanded = this.expandedGroupKeys.has(entry.key) && !this.collapsedGroupKeys.has(entry.key);
+      const expanded = !this.collapsedGroupKeys.has(entry.key) && (clientExpanded || entry.expanded);
+      output.push(withGroupExpanded(entry, expanded));
+      if (clientExpanded) {
+        const childEntries = await this.loadExpandedGroupEntries(entry.key, refresh);
+        output.push(...await this.expandEntries(childEntries, refresh, entry.key));
+      }
+    }
+    return Object.freeze(output);
+  }
+
+  private async loadExpandedGroupEntries(
+    groupKey: string,
+    refresh: boolean
+  ): Promise<readonly ServerRowEntry<TData>[]> {
+    const result = await this.loadRequest(0, refresh, getGroupRequestPath(groupKey));
+    return result.entries;
+  }
+
+  private async refreshCurrentResultFromCache(): Promise<void> {
+    if (this.currentBaseCacheKey === undefined) {
+      return;
+    }
+
+    const cacheEntry = getServerCacheEntry(this.cache, this.currentBaseCacheKey);
+    if (!cacheEntry) {
+      return;
+    }
+
+    const baseResult = this.toLoadResult(cacheEntry, true);
+    this.currentResult = await this.expandLoadResult(baseResult, false);
   }
 
   private patchCachedRows(rows: readonly TData[]): void {
@@ -183,7 +261,12 @@ export class ServerRowModel<TData = unknown> {
       const nextEntry = Object.freeze({
         ...cacheEntry,
         result: Object.freeze({ ...cacheEntry.result, rows: Object.freeze(nextRows) }),
-        entries: this.createEntries(nextRows, cacheEntry.request.startRow, cacheEntry.result.groupMeta),
+        entries: createServerEntries(
+          nextRows,
+          cacheEntry.request.startRow,
+          this.options.rowKey,
+          cacheEntry.result.groupMeta
+        ),
         lastAccess: ++this.accessSequence
       });
       setServerCacheEntry(this.cache, nextEntry);
@@ -241,28 +324,25 @@ function normalizePageSize(value: number | undefined): number {
     : Math.trunc(value);
 }
 
-function toServerGroupEntry(meta: GroupMeta): ServerGroupRowEntry {
-  return Object.freeze({
-    kind: "group",
-    key: meta.key,
-    field: meta.field ?? "group",
-    value: meta.value ?? meta.key,
-    level: meta.level,
-    childCount: meta.childCount ?? 0,
-    expanded: meta.expanded === true,
-    aggregateValues: meta.aggregateValues ?? {}
-  });
+function createRequestId(sequence: number, page: number, groupKeys: readonly string[] | undefined): string {
+  return groupKeys === undefined || groupKeys.length === 0
+    ? `server:${sequence}:${page}`
+    : `server:${sequence}:group:${groupKeys.join("/")}:${page}`;
 }
 
-function toServerGroupFooterEntry(meta: GroupMeta): ServerGroupFooterRowEntry {
-  return Object.freeze({
-    kind: "groupFooter",
-    key: `${meta.key}:footer`,
-    groupKey: meta.key,
-    field: meta.field ?? "group",
-    value: meta.value ?? meta.key,
-    level: meta.level,
-    childCount: meta.childCount ?? 0,
-    aggregateValues: meta.aggregateValues ?? {}
-  });
+function getGroupRequestPath(groupKey: string): readonly string[] {
+  const normalized = groupKey.startsWith("group:") ? groupKey.slice("group:".length) : groupKey;
+  return Object.freeze(normalized.split("/").filter(Boolean));
+}
+
+function withGroupExpanded(entry: ServerGroupRowEntry, expanded: boolean): ServerGroupRowEntry {
+  return entry.expanded === expanded ? entry : Object.freeze({ ...entry, expanded });
+}
+
+function reindexVisibleEntries<TData>(
+  entries: readonly ServerRowEntry<TData>[]
+): readonly ServerRowEntry<TData>[] {
+  return Object.freeze(entries.map((entry, rowIndex) =>
+    entry.kind === "data" ? Object.freeze({ ...entry, rowIndex }) : entry
+  ));
 }

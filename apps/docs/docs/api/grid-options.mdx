@@ -194,6 +194,7 @@ const options: GridOptions<OrderRow> = {
     format: "csv",
     mode: "replace",
     hasHeaders: true,
+    headerRowCount: 1,
     columns: ["id", "region", "amount"],
     parseRow: (record) => ({
       id: String(record.id),
@@ -205,12 +206,16 @@ const options: GridOptions<OrderRow> = {
 ```
 
 CSV uses blank covered cells for visual merge preservation. XLSX and print HTML also preserve merge
-ranges. PDF export is a lightweight text-table document intended for quick review, while print HTML
-is the richer layout path for browser printing.
+ranges. XLSX files include frozen exported header rows, autofilter metadata, numeric cells, borders,
+fills, and print setup. PDF export is a lightweight paginated text-table document with repeated
+headers and horizontal column pages, while print HTML is the richer layout path for browser printing.
 
 Import uses `mode: "replace"` by default so a file import clears the current client rows before
 rendering imported rows. `mode: "append"` is opt-in for workflows that intentionally add imported
-rows beneath the current dataset.
+rows beneath the current dataset. `headerRowCount` controls how many visual header rows are skipped
+before parsing body records, which is required when importing a OneGrid XLSX export with merged
+multi-row headers. XLSX import reads shared strings, inline strings, cached formula values, formula
+text without a cached value, and date-formatted numeric cells before `parseRow` receives the record.
 
 Localization options select the active locale for renderer chrome and formatter context helpers:
 

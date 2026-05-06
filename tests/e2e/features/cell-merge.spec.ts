@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 test("cell merge layout renders value, custom, and server spans", async ({ page }) => {
   await page.goto("/#LAY-004");
@@ -80,3 +81,24 @@ test("cell merge keeps headers and pinned panes stable during horizontal body sc
   expect(geometry.memoRight).toBeLessThanOrEqual(geometry.rightPaneLeft);
   expect(geometry.bodyProgramHeight).toBeLessThanOrEqual(37);
 });
+
+test("cell merge range selection suppresses native shift-click text selection", async ({ page }) => {
+  await page.goto("/#LAY-004");
+
+  await cell(page, "CM-0002", "id").click();
+  await page.keyboard.down("Shift");
+  await cell(page, "CM-0002", "status").click();
+  await page.keyboard.up("Shift");
+
+  await expect(cell(page, "CM-0002", "id")).toHaveAttribute("aria-selected", "true");
+  await expect(cell(page, "CM-0001", "region")).toHaveClass(/og-grid__cell--selection-range/);
+  await expect(cell(page, "CM-0001", "agency")).toHaveClass(/og-grid__cell--selection-range/);
+  await expect(cell(page, "CM-0002", "program")).toHaveAttribute("aria-selected", "true");
+  await expect(cell(page, "CM-0002", "status")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Selection controls")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+});
+
+function cell(page: Page, rowKey: string, field: string) {
+  return page.locator(`[data-edit-row-key="${rowKey}"][data-field="${field}"]`).first();
+}

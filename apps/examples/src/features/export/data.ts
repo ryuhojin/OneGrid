@@ -19,6 +19,8 @@ export interface ExportRow {
   readonly status: "Approved" | "Review" | "Hold";
 }
 
+export type ExportWideRow = Readonly<Record<string, string | number>>;
+
 export const exportColumns: readonly ColumnDef<ExportRow>[] = [
   { field: "id", headerName: "ID", width: 120 },
   { field: "region", headerName: "Region", width: 140, merge: { mode: "value" } },
@@ -52,6 +54,52 @@ export const exportRows: readonly ExportRow[] = [
   createRow("EXP-0005", "Regional", "Welfare Office", "Care staffing", 530, "Regional hold", "Choi", "Hold")
 ];
 
+export const exportPagedRows: readonly ExportRow[] = Array.from({ length: 64 }, (_, index) => {
+  const rowNumber = index + 1;
+  const region = ["Capital", "Regional", "Digital", "Harbor"][index % 4] ?? "Capital";
+  const agency = ["Treasury Office", "Welfare Office", "Platform Team", "Procurement Hub"][index % 4] ?? "Treasury Office";
+  const program = ["Budget approval", "Road upgrade", "Identity sync", "Audit trail"][index % 4] ?? "Budget approval";
+  const status = (["Approved", "Review", "Hold"] as const)[index % 3] ?? "Review";
+  return createRow(
+    `PAG-${String(rowNumber).padStart(4, "0")}`,
+    region,
+    agency,
+    `${program} ${rowNumber}`,
+    500 + rowNumber * 17,
+    rowNumber % 5 === 0 ? "Cross office approval" : "Operational review",
+    ["Han", "Lee", "Kang", "Seo"][index % 4] ?? "Han",
+    status
+  );
+});
+
+const wideMetricFields = Array.from({ length: 16 }, (_, index) => `m${String(index + 1).padStart(2, "0")}`);
+
+export const exportWideColumns: readonly ColumnDef<ExportWideRow>[] = [
+  { field: "id", headerName: "ID", width: 120 },
+  { field: "desk", headerName: "Desk", width: 150 },
+  ...wideMetricFields.map((field, index) => ({
+    field,
+    headerName: `Metric ${index + 1}`,
+    type: "number" as const,
+    width: 120
+  })),
+  { field: "owner", headerName: "Owner", width: 120 },
+  { field: "status", headerName: "Status", width: 140 }
+];
+
+export const exportWideRows: readonly ExportWideRow[] = Array.from({ length: 8 }, (_, rowIndex) => {
+  const record: Record<string, string | number> = {
+    id: `WIDE-${String(rowIndex + 1).padStart(4, "0")}`,
+    desk: ["Treasury", "Public Funds", "Audit", "Procurement"][rowIndex % 4] ?? "Treasury",
+    owner: ["Han", "Lee", "Kang", "Seo"][rowIndex % 4] ?? "Han",
+    status: ["Approved", "Review", "Blocked"][rowIndex % 3] ?? "Review"
+  };
+  wideMetricFields.forEach((field, columnIndex) => {
+    record[field] = 1000 + rowIndex * 19 + columnIndex * 11;
+  });
+  return Object.freeze(record);
+});
+
 export const exportSelection: SelectionOptions = {
   mode: "range",
   multiple: true
@@ -80,6 +128,7 @@ const importFields = ["id", "region", "agency", "program", "memo", "owner", "amo
 
 export const exportImportOptions: ImportOptions<ExportRow> = {
   hasHeaders: true,
+  headerRowCount: 1,
   columns: importFields,
   parseRow: (record) => createRow(
     String(record.id ?? ""),
@@ -105,6 +154,37 @@ export const exportGridOptions: Pick<
   export: exportOptions,
   import: exportImportOptions,
   layout: { width: "100%", height: 360, bodyHeight: 360 }
+};
+
+export const exportPagedGridOptions: Pick<
+  GridOptions<ExportRow>,
+  "rowKey" | "rowModel" | "selection" | "merge" | "layout" | "headerMerge" | "export"
+> = {
+  rowKey: "id",
+  rowModel: "client",
+  selection: exportSelection,
+  merge: { enabled: true },
+  headerMerge: exportHeaderMerge,
+  export: {
+    ...exportOptions,
+    title: "OneGrid Paged Export",
+    sheetName: "Paged Export"
+  },
+  layout: { width: "100%", height: 320, bodyHeight: 320 }
+};
+
+export const exportWideGridOptions: Pick<
+  GridOptions<ExportWideRow>,
+  "rowKey" | "rowModel" | "layout" | "export"
+> = {
+  rowKey: "id",
+  rowModel: "client",
+  export: {
+    ...exportOptions,
+    title: "OneGrid Wide Export",
+    sheetName: "Wide Export"
+  },
+  layout: { width: "100%", height: 320, bodyHeight: 320 }
 };
 
 export const sampleCsvImport = [

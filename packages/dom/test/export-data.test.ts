@@ -94,6 +94,51 @@ describe("DOM export matrix", () => {
 
     grid.destroy();
   });
+
+  it("imports visual XLSX exports through the DOM API without header rows becoming data", async () => {
+    const host = document.createElement("div");
+    const grid = new OneGrid<ExportTestRow>({
+      el: host,
+      columns,
+      data: [
+        createRow("EXP-1", "Capital", "Treasury Office", "Budget approval"),
+        createRow("EXP-2", "Capital", "Treasury Office", "Bond issuance")
+      ],
+      rowKey: "id",
+      merge: { enabled: true },
+      headerMerge: {
+        enabled: true,
+        rules: [{
+          headerName: "Export review window",
+          columnIds: ["agency", "program", "memo", "owner"],
+          presentation: "row"
+        }]
+      },
+      export: {
+        includeHeaders: true,
+        includeHeaderMerges: true,
+        includeCellMerges: true,
+        preserveVisualLayout: true
+      },
+      import: {
+        format: "xlsx",
+        hasHeaders: true,
+        headerRowCount: 3,
+        columns: ["id", "region", "agency", "program", "memo", "owner", "amount", "status"],
+        parseRow: parseExportTestRow
+      }
+    });
+
+    const exported = await grid.exportData({ format: "xlsx" });
+    const result = await grid.importData(exported.content as Uint8Array);
+
+    expect(result.rowCount).toBe(2);
+    expect(result.rows.map((row) => row.id)).toEqual(["EXP-1", "EXP-2"]);
+    expect(host.textContent).toContain("EXP-2");
+    expect(host.textContent).toContain("Capital");
+
+    grid.destroy();
+  });
 });
 
 function visibleHeaderValues(row: readonly { readonly value: unknown; readonly covered?: boolean }[]): string[] {
@@ -126,6 +171,19 @@ interface SimpleImportRow {
 function parseSimpleImportRow(record: Readonly<Record<string, unknown>>): SimpleImportRow {
   return {
     id: String(record.id ?? ""),
+    status: String(record.status ?? "")
+  };
+}
+
+function parseExportTestRow(record: Readonly<Record<string, unknown>>): ExportTestRow {
+  return {
+    id: String(record.id ?? ""),
+    region: String(record.region ?? ""),
+    agency: String(record.agency ?? ""),
+    program: String(record.program ?? ""),
+    memo: String(record.memo ?? ""),
+    owner: String(record.owner ?? ""),
+    amount: Number(record.amount ?? 0),
     status: String(record.status ?? "")
   };
 }

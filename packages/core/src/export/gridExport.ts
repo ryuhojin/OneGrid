@@ -6,7 +6,8 @@ import { buildImportedRows } from "./importBuild.js";
 import { exportPdf } from "./pdfExport.js";
 import { exportPrintHtml } from "./printExport.js";
 import { decodeUtf8 } from "./textEncoding.js";
-import { exportXlsx, importXlsx } from "./xlsxExport.js";
+import { exportXlsx } from "./xlsxExport.js";
+import { importXlsx } from "./xlsxImport.js";
 
 export function createGridExport(
   matrix: GridExportMatrix,

@@ -1,6 +1,6 @@
-import type { GridExportMatrix, GridImportMatrix } from "./exportTypes.js";
-import { decodeUtf8, encodeUtf8 } from "./textEncoding.js";
-import { createZip, readZip } from "./xlsxZip.js";
+import type { GridExportMatrix } from "./exportTypes.js";
+import { encodeUtf8 } from "./textEncoding.js";
+import { createZip } from "./xlsxZip.js";
 
 export function exportXlsx(matrix: GridExportMatrix, options: { readonly sheetName?: string } = {}): Uint8Array {
   const sheetName = sanitizeSheetName(options.sheetName ?? "OneGrid");
@@ -14,18 +14,11 @@ export function exportXlsx(matrix: GridExportMatrix, options: { readonly sheetNa
   ]);
 }
 
-export function importXlsx(data: Uint8Array): GridImportMatrix {
-  const zip = readZip(data);
-  const sheet = zip.get("xl/worksheets/sheet1.xml");
-  if (!sheet) {
-    return Object.freeze({ rows: Object.freeze([]) });
-  }
-  return Object.freeze({ rows: Object.freeze(parseWorksheetXml(decodeUtf8(sheet))) });
-}
-
 function worksheetXml(matrix: GridExportMatrix): string {
   const rows = [...matrix.headerRows, ...matrix.bodyRows];
   const headerRowCount = matrix.headerRows.length;
+  const lastRow = Math.max(rows.length, 1);
+  const lastColumn = Math.max(matrix.columns.length, 1);
   const merges = rows.flatMap((row, rowIndex) =>
     row.flatMap((cell, columnIndex) => {
       if (cell.covered === true || ((cell.rowSpan ?? 1) <= 1 && (cell.colSpan ?? 1) <= 1)) {
@@ -37,17 +30,24 @@ function worksheetXml(matrix: GridExportMatrix): string {
     })
   );
   const sheetRows = rows.map((row, rowIndex) =>
-    `<row r="${rowIndex + 1}">${row.map((cell, columnIndex) =>
+    `<row r="${rowIndex + 1}" ht="${rowHeight(rowIndex, headerRowCount)}" customHeight="1">${row.map((cell, columnIndex) =>
       createWorksheetCell(cell, rowIndex, columnIndex, headerRowCount)
     ).join("")}</row>`
   ).join("");
 
   return xml(
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`
-    + `<dimension ref="A1:${cellRef(Math.max(rows.length, 1), Math.max(matrix.columns.length, 1))}"/>`
+    + `<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>`
+    + `<dimension ref="A1:${cellRef(lastRow, lastColumn)}"/>`
+    + sheetViewsXml(headerRowCount)
+    + `<sheetFormatPr defaultRowHeight="21"/>`
     + columnsXml(matrix)
     + `<sheetData>${sheetRows}</sheetData>`
+    + autoFilterXml(headerRowCount, lastRow, lastColumn)
     + (merges.length === 0 ? "" : `<mergeCells count="${merges.length}">${merges.join("")}</mergeCells>`)
+    + `<printOptions horizontalCentered="1"/>`
+    + `<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>`
+    + `<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>`
     + `</worksheet>`
   );
 }
@@ -58,8 +58,15 @@ function createWorksheetCell(
   columnIndex: number,
   headerRowCount: number
 ): string {
-  const value = cell.covered === true ? "" : formatCell(cell.value);
-  return `<c r="${cellRef(rowIndex + 1, columnIndex + 1)}" s="${cellStyleId(cell, rowIndex, headerRowCount)}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+  const reference = cellRef(rowIndex + 1, columnIndex + 1);
+  const styleId = cellStyleId(cell, rowIndex, headerRowCount);
+  if (cell.covered === true) {
+    return `<c r="${reference}" s="${styleId}" t="inlineStr"><is><t></t></is></c>`;
+  }
+  if (isFiniteNumber(cell.value)) {
+    return `<c r="${reference}" s="${styleId}"><v>${cell.value}</v></c>`;
+  }
+  return `<c r="${reference}" s="${styleId}" t="inlineStr"><is><t>${escapeXml(formatCell(cell.value))}</t></is></c>`;
 }
 
 function cellStyleId(
@@ -84,31 +91,27 @@ function columnsXml(matrix: GridExportMatrix): string {
   return cols.length === 0 ? "" : `<cols>${cols.join("")}</cols>`;
 }
 
-function parseWorksheetXml(xmlText: string): readonly (readonly string[])[] {
-  const rows: string[][] = [];
-  const rowPattern = /<row\b[^>]*>([\s\S]*?)<\/row>/gu;
-  let rowMatch: RegExpExecArray | null;
-  while ((rowMatch = rowPattern.exec(xmlText)) !== null) {
-    const rowXml = rowMatch[1] ?? "";
-    const cells: string[] = [];
-    const cellPattern = /<c\b([^>]*)>([\s\S]*?)<\/c>/gu;
-    let cellMatch: RegExpExecArray | null;
-    while ((cellMatch = cellPattern.exec(rowXml)) !== null) {
-      const attrs = cellMatch[1] ?? "";
-      const ref = /r="([A-Z]+)(\d+)"/u.exec(attrs)?.[1];
-      const columnIndex = ref ? columnNameToIndex(ref) : cells.length;
-      while (cells.length < columnIndex) cells.push("");
-      cells[columnIndex] = unescapeXml(readCellText(cellMatch[2] ?? ""));
-    }
-    rows.push(cells);
+function sheetViewsXml(headerRowCount: number): string {
+  if (headerRowCount <= 0) {
+    return `<sheetViews><sheetView workbookViewId="0"/></sheetViews>`;
   }
-  return Object.freeze(rows.map((row) => Object.freeze(row)));
+  const topLeftCell = cellRef(headerRowCount + 1, 1);
+  return `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${headerRowCount}" topLeftCell="${topLeftCell}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`;
 }
 
-function readCellText(xmlText: string): string {
-  const inline = /<t[^>]*>([\s\S]*?)<\/t>/u.exec(xmlText);
-  if (inline) return inline[1] ?? "";
-  return /<v[^>]*>([\s\S]*?)<\/v>/u.exec(xmlText)?.[1] ?? "";
+function autoFilterXml(
+  headerRowCount: number,
+  lastRow: number,
+  lastColumn: number
+): string {
+  if (headerRowCount <= 0 || lastColumn <= 0 || lastRow <= headerRowCount) {
+    return "";
+  }
+  return `<autoFilter ref="A${headerRowCount}:${cellRef(lastRow, lastColumn)}"/>`;
+}
+
+function rowHeight(rowIndex: number, headerRowCount: number): number {
+  return rowIndex < headerRowCount ? 24 : 21;
 }
 
 function contentTypesXml(): string {
@@ -160,9 +163,9 @@ function stylesXml(): string {
     + `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>`
     + `<cellXfs count="4">`
     + `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>`
-    + `<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>`
-    + `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>`
-    + `<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>`
+    + `<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>`
+    + `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`
+    + `<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`
     + `</cellXfs>`
     + `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>`
     + `</styleSheet>`
@@ -192,10 +195,6 @@ function columnName(column: number): string {
   return name;
 }
 
-function columnNameToIndex(name: string): number {
-  return [...name].reduce((sum, char) => sum * 26 + char.charCodeAt(0) - 64, 0) - 1;
-}
-
 function sanitizeSheetName(value: string): string {
   const cleaned = value.replace(/[\\/?*[\]:]/gu, " ").trim();
   return (cleaned.length === 0 ? "OneGrid" : cleaned).slice(0, 31);
@@ -205,18 +204,14 @@ function formatCell(value: unknown): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 function escapeXml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll("\"", "&quot;");
-}
-
-function unescapeXml(value: string): string {
-  return value
-    .replaceAll("&quot;", "\"")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&amp;", "&");
 }

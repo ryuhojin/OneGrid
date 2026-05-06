@@ -12,7 +12,7 @@ test("clipboard example copies selected merged range with covered blanks", async
   await page.keyboard.press(shortcut("C"));
 
   await expect.poll(() => readCopyProbe(page)).toBe(
-    "Capital\tTreasury Office\tBudget approval\r\n\t\tBond issuance"
+    "Capital\tTreasury Office\tBudget approval\r\n\t\tBond issuance\r\n\tAudit Bureau\tRisk sampling"
   );
 });
 

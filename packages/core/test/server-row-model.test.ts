@@ -188,6 +188,81 @@ describe("server row model", () => {
     });
   });
 
+  it("composes expanded server group blocks while preserving root groups", async () => {
+    const requests: GetRowsRequest[] = [];
+    const rowsByRegion = new Map<string, readonly ServerOrderRow[]>([
+      ["region=Seoul", createRows(0, 2).map((row) => ({ ...row, region: "Seoul" }))],
+      ["region=Busan", createRows(2, 3).map((row) => ({ ...row, region: "Busan" }))]
+    ]);
+    const model = new ServerRowModel<ServerOrderRow>({
+      pageSize: 10,
+      rowKey: "id",
+      groupModel: { fields: ["region"] },
+      dataSource: {
+        async getRows(request) {
+          requests.push(request);
+          if (request.groupKeys.length === 0) {
+            return {
+              rows: [],
+              rowCount: 2,
+              groupMeta: [
+                createRegionGroupMeta("group:region=Seoul", "Seoul", 2, false),
+                createRegionGroupMeta("group:region=Busan", "Busan", 1, false)
+              ]
+            };
+          }
+
+          const groupKey = request.groupKeys[0] ?? "";
+          const rows = rowsByRegion.get(groupKey) ?? [];
+          return {
+            rows,
+            rowCount: rows.length + 1,
+            groupMeta: [
+              createRegionGroupMeta(
+                `group:${groupKey}`,
+                groupKey.split("=")[1] ?? groupKey,
+                rows.length,
+                true
+              )
+            ]
+          };
+        }
+      }
+    });
+
+    const root = await model.loadPage(0);
+    const seoul = await model.expandGroup("group:region=Seoul");
+    const both = await model.expandGroup("group:region=Busan");
+    const collapsed = await model.collapseGroup("group:region=Seoul");
+
+    expect(root.entries.map((entry) => entry.key)).toEqual(["group:region=Seoul", "group:region=Busan"]);
+    expect(seoul.entries.map((entry) => entry.kind)).toEqual(["group", "data", "data", "group"]);
+    expect(seoul.entries.map((entry) => entry.key)).toEqual([
+      "group:region=Seoul",
+      "ORD-0",
+      "ORD-1",
+      "group:region=Busan"
+    ]);
+    expect(both.entries.map((entry) => entry.key)).toEqual([
+      "group:region=Seoul",
+      "ORD-0",
+      "ORD-1",
+      "group:region=Busan",
+      "ORD-2"
+    ]);
+    expect(collapsed.entries.map((entry) => entry.key)).toEqual([
+      "group:region=Seoul",
+      "group:region=Busan",
+      "ORD-2"
+    ]);
+    expect(requests.map((request) => request.groupKeys)).toEqual([
+      [],
+      ["region=Seoul"],
+      ["region=Busan"]
+    ]);
+    expect(model.expandedGroups).toEqual(["group:region=Busan"]);
+  });
+
   it("applies server transaction updates to cached rows", async () => {
     const updates: RowUpdate<ServerOrderRow>[] = [
       { rowKey: "ORD-0", row: { status: "Approved" } }
@@ -218,3 +293,20 @@ describe("server row model", () => {
     }
   });
 });
+
+function createRegionGroupMeta(
+  key: string,
+  value: string,
+  childCount: number,
+  expanded: boolean
+) {
+  return {
+    key,
+    field: "region",
+    value,
+    level: 0,
+    childCount,
+    expanded,
+    aggregateValues: { rowCount: childCount }
+  };
+}

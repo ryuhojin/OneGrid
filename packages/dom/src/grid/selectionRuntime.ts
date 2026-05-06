@@ -36,6 +36,22 @@ export function attachGridSelectionForHost(host: HTMLElement, input: GridSelecti
   selectionHandles.set(host, abortController);
   applyGridSelection(input.grid, input.runtime);
 
+  host.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || isToolbarActionTarget(event) || isCheckboxTarget(event)) {
+      return;
+    }
+
+    const suppressNativeSelection = isGridRangeGesture(input.runtime, event);
+    if (suppressNativeSelection) {
+      event.preventDefault();
+    }
+
+    handleCellSelection(input.grid, input.runtime, event);
+    if (suppressNativeSelection) {
+      clearNativeTextSelection(input.grid);
+    }
+  }, { signal: abortController.signal });
+
   host.addEventListener("click", (event) => {
     if (handleToolbarClick(input.grid, input.runtime, event)) {
       return;
@@ -45,7 +61,9 @@ export function attachGridSelectionForHost(host: HTMLElement, input: GridSelecti
       return;
     }
 
-    handleCellClick(input.grid, input.runtime, event);
+    if (!isBodyCellTarget(input.grid, event)) {
+      handleCellSelection(input.grid, input.runtime, event);
+    }
   }, { signal: abortController.signal });
 }
 
@@ -75,7 +93,7 @@ export function applyGridSelection(grid: HTMLElement, runtime: GridSelectionRunt
 
     const rowSelected = selectedRows.has(String(target.rowKey));
     const cellSelected = isSelectedCell(state, target);
-    const rangeSelected = isCellInSelectedRange(state, target);
+    const rangeSelected = isCellInSelectedRange(state, target, cell);
     if (rowSelected) {
       cell.classList.add("og-grid__cell--row-selected");
       markRowSelected(cell);
@@ -194,7 +212,7 @@ function handleCheckboxClick(
   return true;
 }
 
-function handleCellClick(
+function handleCellSelection(
   grid: HTMLElement,
   runtime: GridSelectionRuntime,
   event: MouseEvent
@@ -322,13 +340,37 @@ function isSelectedCell(state: GridSelectionState, target: SelectedCell): boolea
   );
 }
 
-function isCellInSelectedRange(state: GridSelectionState, target: SelectedCell): boolean {
+function isCellInSelectedRange(
+  state: GridSelectionState,
+  target: SelectedCell,
+  cell: HTMLElement
+): boolean {
+  const cellRange = getCellRenderedRange(target, cell);
   return state.ranges.some((range) =>
-    target.rowIndex >= range.firstRow
-    && target.rowIndex <= range.lastRow
-    && target.columnIndex >= range.firstColumn
-    && target.columnIndex <= range.lastColumn
+    cellRange.firstRow <= range.lastRow
+    && cellRange.lastRow >= range.firstRow
+    && cellRange.firstColumn <= range.lastColumn
+    && cellRange.lastColumn >= range.firstColumn
   );
+}
+
+function getCellRenderedRange(
+  target: SelectedCell,
+  cell: HTMLElement
+): {
+  readonly firstRow: number;
+  readonly lastRow: number;
+  readonly firstColumn: number;
+  readonly lastColumn: number;
+} {
+  const rowSpan = readPositiveInteger(cell.getAttribute("aria-rowspan")) ?? 1;
+  const colSpan = readPositiveInteger(cell.getAttribute("aria-colspan")) ?? 1;
+  return {
+    firstRow: target.rowIndex,
+    lastRow: target.rowIndex + rowSpan - 1,
+    firstColumn: target.columnIndex,
+    lastColumn: target.columnIndex + colSpan - 1
+  };
 }
 
 function isRangeNavigationKey(key: string): boolean {
@@ -348,6 +390,27 @@ function getElement(target: EventTarget | null): Element | undefined {
   return target instanceof Element ? target : undefined;
 }
 
+function isToolbarActionTarget(event: MouseEvent): boolean {
+  return getElement(event.target)?.closest("[data-selection-action]") !== null;
+}
+
+function isCheckboxTarget(event: MouseEvent): boolean {
+  return getElement(event.target)?.closest(".og-grid__selection-checkbox") !== null;
+}
+
+function isBodyCellTarget(grid: HTMLElement, event: MouseEvent): boolean {
+  const cell = getElement(event.target)?.closest<HTMLElement>('[role="gridcell"]');
+  return cell !== undefined && cell !== null && grid.contains(cell) && cell.getAttribute("aria-hidden") !== "true";
+}
+
+function isGridRangeGesture(runtime: GridSelectionRuntime, event: MouseEvent): boolean {
+  return runtime.mode === "range" && event.shiftKey && runtime.getAnchor() !== undefined;
+}
+
+function clearNativeTextSelection(grid: HTMLElement): void {
+  grid.ownerDocument.defaultView?.getSelection()?.removeAllRanges();
+}
+
 function readNumber(value: string | undefined | null): number | undefined {
   if (value === undefined || value === null || value === "") {
     return undefined;
@@ -355,4 +418,9 @@ function readNumber(value: string | undefined | null): number | undefined {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function readPositiveInteger(value: string | undefined | null): number | undefined {
+  const parsed = readNumber(value);
+  return parsed === undefined || parsed < 1 ? undefined : Math.trunc(parsed);
 }

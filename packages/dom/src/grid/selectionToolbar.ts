@@ -9,6 +9,10 @@ export function createSelectionToolbar(
     return undefined;
   }
 
+  if (runtime.selectAllMode === "none") {
+    return undefined;
+  }
+
   const toolbar = document.createElement("div");
   toolbar.className = "og-grid__selection-toolbar";
   toolbar.setAttribute("aria-label", "Selection controls");

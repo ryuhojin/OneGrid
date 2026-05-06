@@ -22,7 +22,7 @@ import { invalidate } from "./renderInvalidation.js";
 
 export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
   startEdit(position: CellPosition): void {
-    const cell = this.findCellElement(position);
+    const cell = this.findCellElement(this.resolveMergedEditPosition(position));
     if (cell) {
       this.startEditFromCell(cell, "api");
     }

@@ -23,13 +23,26 @@ test("server row model sends server models and applies transactions", async ({ p
   await page.getByRole("button", { name: "Expand Daejeon group" }).click();
   await expect(summary).toContainText("2");
   await expect(summary).toContainText("region=Daejeon");
-  await expect(grid).toHaveAttribute("aria-rowcount", "8");
+  await expect(grid).toHaveAttribute("aria-rowcount", "11");
   await expect(page.getByRole("button", { name: "Collapse Daejeon group" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Expand Seoul group" })).toBeVisible();
   await expect(grid).toContainText("ORD-SRV-0040");
   await expect(grid).toContainText("Public Sector 40");
 
-  await page.getByRole("button", { name: "Refresh server rows" }).click();
+  await page.getByRole("button", { name: "Expand Seoul group" }).click();
   await expect(summary).toContainText("3");
+  await expect(summary).toContainText("region=Seoul");
+  await expect(grid).toHaveAttribute("aria-rowcount", "18");
+  await expect(page.getByRole("button", { name: "Collapse Seoul group" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Collapse Daejeon group" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Collapse Seoul group" }).click();
+  await expect(grid).toHaveAttribute("aria-rowcount", "11");
+  await expect(page.getByRole("button", { name: "Expand Seoul group" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Collapse Daejeon group" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Refresh server rows" }).click();
+  await expect(summary).toContainText("5");
 
   await page.getByRole("button", { name: "Apply transaction" }).click();
   await expect(grid).toContainText("Public Sector 40 (updated)");

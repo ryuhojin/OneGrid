@@ -31,8 +31,10 @@ const imported = await grid.importData(csv.content as string, {
 covered cells in CSV and merge ranges in XLSX/print HTML.
 
 XLSX export includes the visual basics needed for handoff files: header fills, bold headers,
-cell borders, merged-cell fills, and calculated column widths. PDF export renders a lightweight
-one-page table with the same header/body distinction and visible cell boundaries.
+cell borders, merged-cell fills, calculated column widths, frozen header rows, autofilter metadata,
+landscape print setup, and numeric cells emitted as spreadsheet numbers instead of text. PDF export
+renders a lightweight paginated table with repeated headers, page numbers, horizontal column pages,
+header/body distinction, and visible cell boundaries.
 
 `exportData()` returns the payload instead of forcing a browser download. This keeps the core API
 usable in server-side jobs, custom save flows, and audited enterprise workflows. Browser examples
@@ -44,5 +46,54 @@ converted back into typed application rows.
 Import replaces the current client rows by default. Use `mode: "append"` only when imported rows
 should be added beneath the existing dataset.
 
+When importing a visual OneGrid export that contains multi-row merged headers, set
+`headerRowCount` to the number of exported header rows so the header rows are skipped before data
+parsing:
+
+```ts
+await grid.importData(xlsx.content as Uint8Array, {
+  format: "xlsx",
+  mode: "replace",
+  hasHeaders: true,
+  headerRowCount: 3,
+  columns: ["id", "region", "agency", "program", "memo", "owner", "amount", "status"],
+  parseRow: (record) => ({
+    id: String(record.id),
+    region: String(record.region),
+    agency: String(record.agency),
+    program: String(record.program),
+    memo: String(record.memo),
+    owner: String(record.owner),
+    amount: Number(record.amount),
+    status: String(record.status)
+  })
+});
+```
+
+XLSX import preserves row-oriented merged values by filling vertically merged covered cells with
+their anchor value. Horizontal body merges are not expanded across fields because that would copy one
+field value into a different column.
+
+XLSX import also reads shared string tables, inline strings, cached formula values, uncached formula
+text, and date-formatted numeric cells. Date cells are returned as ISO-like strings so application
+`parseRow` functions can decide whether to keep strings or construct `Date` objects.
+
+## Adapter Boundary
+
+The built-in exporter/importer is intentionally dependency-free. It targets OneGrid-generated
+handoff files, lightweight PDF output, print HTML, and explicit CSV/JSON workflows without adding
+font, compression, or spreadsheet-engine dependencies to `@onegrid/core`.
+
+CJK/custom font embedded PDF and full compatibility with arbitrary deflate-compressed XLSX files
+belong in explicit export/import adapters or plugins. That keeps the core bundle, CSP review, and
+security surface stable while still leaving a supported path for SI projects that require deeper
+document fidelity.
+
 The vanilla example uses actual file inputs for CSV and XLSX import. Its downloadable test fixtures
 are available as `/export-testFile.csv` and `/export-testFile.xlsx` in the examples app.
+
+The examples app splits export verification into three visible scenarios:
+
+- standard visual merge export/import
+- paged row export with enough rows to create multi-page PDF output
+- wide column export with enough columns to create horizontal PDF pages and a wide XLSX worksheet

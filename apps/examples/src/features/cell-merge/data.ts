@@ -1,4 +1,11 @@
-import type { ColumnDef, DataSource, GetRowsRequest, GridOptions, MergeMeta } from "@onegrid/core";
+import type {
+  ColumnDef,
+  DataSource,
+  GetRowsRequest,
+  GridOptions,
+  MergeMeta,
+  SelectionOptions
+} from "@onegrid/core";
 
 export interface CellMergeBudgetRow {
   readonly id: string;
@@ -51,6 +58,12 @@ export const cellMergeServerMeta: readonly MergeMeta[] = Object.freeze([
   }
 ]);
 
+export const cellMergeSelection: SelectionOptions = {
+  mode: "range",
+  multiple: true,
+  selectAll: "none"
+};
+
 export const cellMergeOptions: GridOptions<CellMergeBudgetRow> = {
   columns: cellMergeColumns,
   rowKey: "id",
@@ -65,7 +78,8 @@ export const cellMergeOptions: GridOptions<CellMergeBudgetRow> = {
   },
   merge: {
     enabled: true
-  }
+  },
+  selection: cellMergeSelection
 };
 
 export function createCellMergeDataSource(

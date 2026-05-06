@@ -7,10 +7,17 @@ import {
   selectServerDataset
 } from "@onegrid/core";
 import type {
+  CellPosition,
   GridSelectionState,
   RowKey,
   SelectedCell
 } from "@onegrid/core";
+import {
+  createDomCellSpanSnapshot,
+  resolveMergedCellPosition,
+  resolveMergedSelectedCell
+} from "./cellSpanRuntime.js";
+import type { DomCellSpanSnapshot } from "./cellSpanRuntime.js";
 import { invalidate } from "./renderInvalidation.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
 import { OneGridSortingFiltering } from "./oneGridSortingFiltering.js";
@@ -32,14 +39,22 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
   }
 
   selectCell(cell: SelectedCell): void {
-    this.selectionAnchor = cell;
-    this.updateSelection(selectCell(this.selectionState, cell), "selection-api-cell");
+    const target = this.resolveSelectionCell(cell);
+    this.selectionAnchor = target;
+    this.updateSelection(selectCell(this.selectionState, target), "selection-api-cell");
   }
 
   selectCellRange(anchor: SelectedCell, focus: SelectedCell): void {
-    this.selectionAnchor = anchor;
+    const snapshot = this.createCurrentCellSpanSnapshot();
+    const resolvedAnchor = resolveMergedSelectedCell(snapshot, anchor);
+    const resolvedFocus = resolveMergedSelectedCell(snapshot, focus);
+    this.selectionAnchor = resolvedAnchor;
     this.updateSelection(
-      selectCellRange(this.selectionState, { anchor, focus }),
+      selectCellRange(this.selectionState, {
+        anchor: resolvedAnchor,
+        focus: resolvedFocus,
+        cellSpanModel: snapshot.cellSpanModel
+      }),
       "selection-api-range"
     );
   }
@@ -71,7 +86,7 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
       getState: () => this.selectionState,
       getAnchor: () => this.selectionAnchor,
       setAnchor: (cell) => {
-        this.selectionAnchor = cell;
+        this.selectionAnchor = this.resolveSelectionCell(cell);
       },
       selectRows: (rowKeys) => {
         this.updateSelection(
@@ -94,11 +109,12 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
         );
       },
       selectCell: (cell, additive) => {
-        this.selectionAnchor = cell;
+        const target = this.resolveSelectionCell(cell);
+        this.selectionAnchor = target;
         this.updateSelection(
           selectCell(
             this.selectionState,
-            cell,
+            target,
             additive === true && this.options.selection?.multiple !== false
           ),
           "selection-runtime-cell",
@@ -106,11 +122,15 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
         );
       },
       selectRange: (anchor, focus, additive) => {
-        this.selectionAnchor = anchor;
+        const snapshot = this.createCurrentCellSpanSnapshot();
+        const resolvedAnchor = resolveMergedSelectedCell(snapshot, anchor);
+        const resolvedFocus = resolveMergedSelectedCell(snapshot, focus);
+        this.selectionAnchor = resolvedAnchor;
         this.updateSelection(
           selectCellRange(this.selectionState, {
-            anchor,
-            focus,
+            anchor: resolvedAnchor,
+            focus: resolvedFocus,
+            cellSpanModel: snapshot.cellSpanModel,
             additive: additive === true && this.options.selection?.multiple !== false
           }),
           "selection-runtime-range",
@@ -131,6 +151,10 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
         this.updateSelection(clearSelection(this.selectionState), "selection-runtime-clear", false);
       }
     };
+  }
+
+  protected resolveMergedEditPosition(position: CellPosition): CellPosition {
+    return resolveMergedCellPosition(this.createCurrentCellSpanSnapshot(), position);
   }
 
   protected updateSelection(state: GridSelectionState, reason: string, render = true): void {
@@ -163,6 +187,14 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
         ? {}
         : { tokenPrefix: this.options.selection.serverSelectionToken })
     });
+  }
+
+  private resolveSelectionCell(cell: SelectedCell): SelectedCell {
+    return resolveMergedSelectedCell(this.createCurrentCellSpanSnapshot(), cell);
+  }
+
+  private createCurrentCellSpanSnapshot(): DomCellSpanSnapshot<TData> {
+    return createDomCellSpanSnapshot(this.getRenderOptions(), this.createRowRenderState());
   }
 
   private findRowsByKeys(rowKeys: readonly RowKey[]): readonly TData[] {

@@ -249,9 +249,12 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
   protected findCellElement(position: CellPosition): HTMLElement | undefined {
     const cells = this.root.querySelectorAll<HTMLElement>('[data-layout-section="body"] [role="gridcell"]');
     for (const cell of cells) {
+      const rowMatches = position.rowKey === undefined
+        ? cell.dataset.rowIndex === String(position.rowIndex)
+        : cell.dataset.editRowKey === String(position.rowKey);
       if (
         cell.dataset.field === position.field
-        && (position.rowKey === undefined || cell.dataset.editRowKey === String(position.rowKey))
+        && rowMatches
       ) {
         return cell;
       }

@@ -1,5 +1,6 @@
 import type {
   RowUpdate,
+  ServerLoadResult,
   ScrollToRowAlign,
   ViewportLiveUpdate
 } from "@onegrid/core";
@@ -17,8 +18,15 @@ interface PendingServerLoad {
   readonly page: number;
 }
 
+interface PendingServerGroupExpansion {
+  readonly groupKey: string;
+  readonly expanded: boolean;
+  readonly reason: string;
+}
+
 export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrolling<TData> {
   private pendingServerLoad: PendingServerLoad | undefined;
+  private pendingServerGroupExpansion: PendingServerGroupExpansion | undefined;
 
   async refreshServerRows(): Promise<void> {
     await this.loadServerRows(true);
@@ -154,9 +162,7 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
       if (this.serverRowModel !== rowModel) {
         return;
       }
-      this.serverEntries = result.entries;
-      this.serverMergeMeta = result.mergeMeta ?? [];
-      this.serverAggregate = result.aggregate;
+      this.applyServerLoadResult(result);
     } catch (error) {
       this.renderError = error;
     } finally {
@@ -167,9 +173,65 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
         this.pendingServerLoad = undefined;
         if (pending) {
           await this.loadServerRows(pending.refresh, pending.page);
+        } else {
+          await this.flushPendingServerGroupExpansion();
         }
       }
     }
+  }
+
+  protected async setServerGroupExpanded(
+    groupKey: string,
+    expanded: boolean,
+    reason: string
+  ): Promise<void> {
+    const rowModel = this.serverRowModel;
+    if (!rowModel || this.destroyed) {
+      return;
+    }
+
+    if (this.serverLoading) {
+      this.pendingServerGroupExpansion = { groupKey, expanded, reason };
+      return;
+    }
+
+    this.serverLoading = true;
+    this.renderError = undefined;
+    await this.render(invalidate(["rows", "overlay"], `${reason}-loading`));
+
+    try {
+      const result = expanded
+        ? await rowModel.expandGroup(groupKey)
+        : await rowModel.collapseGroup(groupKey);
+      if (this.serverRowModel !== rowModel) {
+        return;
+      }
+      this.applyServerLoadResult(result);
+    } catch (error) {
+      this.renderError = error;
+    } finally {
+      if (!this.destroyed) {
+        this.serverLoading = false;
+        await this.render(invalidate(["rows", "overlay"], reason));
+        await this.flushPendingServerGroupExpansion();
+      }
+    }
+  }
+
+  private applyServerLoadResult(result: ServerLoadResult<TData>): void {
+    this.serverEntries = result.entries;
+    this.serverMergeMeta = result.mergeMeta ?? [];
+    this.serverAggregate = result.aggregate;
+  }
+
+  private async flushPendingServerGroupExpansion(): Promise<void> {
+    const pending = this.pendingServerGroupExpansion;
+    if (!pending) {
+      return;
+    }
+
+    this.pendingServerGroupExpansion = undefined;
+    await this.setServerGroupExpanded(pending.groupKey, pending.expanded, pending.reason);
   }
 
   protected async loadViewportRows(rowIndex: number): Promise<void> {

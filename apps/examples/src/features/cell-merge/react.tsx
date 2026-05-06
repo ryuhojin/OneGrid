@@ -2,6 +2,7 @@ import { OneGrid } from "@onegrid/react";
 import {
   cellMergeColumns,
   cellMergeRows,
+  cellMergeSelection,
   createCellMergeDataSource
 } from "./data.js";
 
@@ -17,6 +18,7 @@ export function CellMergeReactExample() {
         rowHeight={36}
         layout={{ width: "100%", height: 392, bodyHeight: 392 }}
         merge={{ enabled: true }}
+        selection={cellMergeSelection}
       />
       <dl className="example-inspector" aria-label="Cell merge summary">
         <dt>Merge sources</dt>

@@ -123,6 +123,22 @@ section {
   padding-block-start: 14px;
 }
 
+.export-example-stack {
+  display: grid;
+  gap: 24px;
+}
+
+.export-example-section {
+  border-block-start: 1px solid #d7dbe0;
+  min-height: 0;
+  padding-block-start: 14px;
+}
+
+.export-example-section:first-child {
+  border-block-start: 0;
+  padding-block-start: 0;
+}
+
 .pagination-example-section:first-child {
   border-block-start: 0;
   padding-block-start: 0;

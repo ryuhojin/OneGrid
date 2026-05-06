@@ -8,6 +8,8 @@ export default tseslint.config(
       "**/dist/**",
       "**/build/**",
       "**/.docusaurus/**",
+      "test-results/**",
+      "playwright-report/**",
       "node_modules/**",
       "pnpm-lock.yaml"
     ]

@@ -1,4 +1,4 @@
-import { expandCellSpanRange } from "../merge/cellSpanWindow.js";
+import { expandCellSpanRangeFromEndpoints } from "../merge/cellSpanWindow.js";
 import type { CellSpanModel, CellSpanRange } from "../merge/cellSpanTypes.js";
 import type { FilterModel, RowKey, RowModelKind, SortModel } from "../types/shared.js";
 
@@ -191,7 +191,9 @@ function createRange(
     firstColumn: Math.min(anchor.columnIndex, focus.columnIndex),
     lastColumn: Math.max(anchor.columnIndex, focus.columnIndex)
   };
-  const expanded = cellSpanModel ? expandCellSpanRange(cellSpanModel, base) : base;
+  const expanded = cellSpanModel
+    ? expandCellSpanRangeFromEndpoints(cellSpanModel, base, [anchor, focus])
+    : base;
   return Object.freeze({
     id: `range:${expanded.firstRow}:${expanded.firstColumn}:${expanded.lastRow}:${expanded.lastColumn}`,
     anchor,

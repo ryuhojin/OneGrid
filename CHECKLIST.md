@@ -833,6 +833,29 @@
     - pnpm test:perf:smoke
     - pnpm build
     - pnpm docs:build
+- [x] ROW-003-009 server group expansion composition 구현
+  - Evidence:
+    - packages/core/src/row/serverRowModel.ts
+    - packages/core/src/row/serverEntries.ts
+    - packages/core/src/row/serverRequest.ts
+    - packages/dom/src/grid/oneGridRemoteRows.ts
+    - packages/dom/src/grid/oneGridRows.ts
+    - packages/dom/src/grid/groupExpansionState.ts
+    - packages/core/test/server-row-model.test.ts
+    - tests/e2e/features/server-row-model.spec.ts
+    - tests/a11y/server-row-model-a11y.spec.ts
+    - apps/docs/docs/features/server-row-model.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit -- packages/core/test/server-row-model.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/server-row-model.spec.ts tests/a11y/server-row-model-a11y.spec.ts --project=chromium
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-05-06: Server Row Model group expansion을 scoped page replace 방식에서 root-preserving child block composition 방식으로 변경했다.
+    - 여러 그룹을 동시에 펼칠 수 있고, refresh는 root와 현재 expanded group block을 재요청하며, collapse는 root 그룹 목록을 유지한다.
+    - ServerRowModel 본체는 entry 생성 로직을 `serverEntries.ts`로 분리해 core LOC 기준 내로 유지한다.
 
 ### ROW-004 Viewport Row Model
 
@@ -1265,25 +1288,61 @@
     - pnpm docs:build
   - Notes:
     - 2026-04-29: column virtualization이 꺼진 cell merge 화면에서도 body horizontal scroll을 header/summary에 동기화하고, pinned pane z-index를 merged center cells보다 높여 pinned 침범을 방지했다. 일반 cell height를 row height로 고정해 vertical span anchor가 같은 행의 non-merged cell을 늘리지 않도록 했다. Popover/tool panel z-index는 header/footer/pinned pane보다 위에 유지한다.
-- [~] LAY-004-007 merge + selection 연동
+- [x] LAY-004-007 merge + selection 연동
   - Evidence:
     - packages/core/src/merge/cellSpanWindow.ts
+    - packages/core/src/selection/selectionModel.ts
+    - packages/dom/src/grid/cellSpanRuntime.ts
+    - packages/dom/src/grid/oneGridSelection.ts
+    - packages/dom/src/grid/selectionRuntime.ts
+    - packages/dom/test/cell-merge-integration.test.ts
+    - tests/e2e/features/selection.spec.ts
+    - tests/e2e/features/clipboard.spec.ts
     - packages/core/test/cell-span-model.test.ts
   - Verified:
+    - pnpm lint
+    - pnpm typecheck
     - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/selection.spec.ts tests/e2e/features/clipboard.spec.ts tests/e2e/features/export.spec.ts --project=chromium
   - Notes:
     - 2026-04-29: `resolveCellSpanAnchor`와 `expandCellSpanRange`로 selection anchor/range 확장 contract를 추가했다. 실제 cell/range selection UI는 별도 selection phase에서 연결한다.
     - 2026-04-29: DOM-002 Keyboard / Focus 이후 Phase 7 `F-SELECT-001~007`에서 cell/range selection UI가 들어간 뒤 완료 가능하다.
-- [!] LAY-004-008 merge + editing 연동
+    - 2026-05-06: DOM selection runtime과 public API가 현재 cell span model을 사용해 covered cell 입력을 anchor cell로 정규화하고, range가 intersect한 merge span 전체로 확장되도록 연결했다. 선택된 merge 범위를 clipboard로 복사할 때 covered cell은 blank로 보존된다.
+    - 2026-05-06: 일반 셀에서 병합 셀로 이동할 때 선택 paint가 mouseup/click까지 늦어지지 않도록 body cell selection을 `pointerdown`에서 반영하고, toolbar/checkbox action은 기존 click 경로로 분리했다.
+    - 2026-05-06: LAY-004 Cell Merge example에도 `selection: { mode: "range", selectAll: "none" }`를 연결해 Shift+cell click이 브라우저 텍스트 블록이 아니라 grid range gesture로 처리되도록 했다. 일반 텍스트 드래그 선택은 유지한다.
+    - 2026-05-06: range selection 표시가 DOM cell의 `aria-rowspan`/`aria-colspan`과 교차하는지 확인하도록 보강했다. LAY-004에서 CM-0002 ID부터 Status까지 Shift+click해도 CM-0001에 anchor로 표시되는 Region/Agency row-merge cell이 range 선택 상태로 보인다.
+- [x] LAY-004-008 merge + editing 연동
   - Evidence:
+    - packages/dom/src/grid/cellSpanRuntime.ts
+    - packages/dom/src/grid/oneGridEditing.ts
+    - packages/dom/src/grid/oneGridEditStore.ts
+    - packages/dom/test/cell-merge-integration.test.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
   - Notes:
     - 2026-04-29: editing subsystem이 아직 구현되지 않아 merge anchor routing만 선행 가능하다. Editing phase에서 covered cell 편집 요청을 anchor cell로 라우팅해야 한다.
     - 2026-04-29: Phase 7 editing 항목과 DOM editor overlay/focus trap 이후 완료 가능하다.
-- [!] LAY-004-009 merge + copy/export 연동
+    - 2026-05-06: public `startEdit` 요청이 covered cell 위치로 들어와도 merge anchor position으로 라우팅해 anchor editor를 연다. `findCellElement`는 rowKey/rowIndex까지 확인해 동일 field의 잘못된 행을 편집하지 않도록 고정했다.
+- [x] LAY-004-009 merge + copy/export 연동
   - Evidence:
+    - packages/dom/src/grid/clipboardData.ts
+    - packages/dom/src/grid/exportData.ts
+    - packages/dom/src/grid/cellSpanRuntime.ts
+    - packages/dom/test/cell-merge-integration.test.ts
+    - packages/dom/test/export-data.test.ts
+    - tests/e2e/features/clipboard.spec.ts
+    - tests/e2e/features/export.spec.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/selection.spec.ts tests/e2e/features/clipboard.spec.ts tests/e2e/features/export.spec.ts --project=chromium
   - Notes:
     - 2026-04-29: clipboard/export subsystem이 아직 구현되지 않아 `CellSpanModel`의 anchor/range contract를 후속 copy/export 구현에서 사용한다.
     - 2026-04-29: Phase 7 `F-CLIP-001~007` 및 `F-EXPORT-001~009` 구현 이후 완료 가능하다.
+    - 2026-05-06: selected merged range copy는 merge span 전체를 선택 범위로 확장하고 covered cells를 빈 값으로 직렬화한다. DOM export matrix는 header/body merge 정보를 rowSpan/colSpan/covered cell로 유지한다.
 
 ---
 
@@ -1898,12 +1957,17 @@
 - [x] F-SELECT-007 merge cell selection
   - Evidence:
     - packages/core/src/selection/selectionModel.ts
+    - packages/core/src/merge/cellSpanWindow.ts
     - packages/dom/src/grid/selectionRuntime.ts
     - packages/dom/src/grid/mergedSelectionOverlay.ts
+    - packages/themes/src/body.css
     - packages/core/test/selection.test.ts
     - tests/e2e/features/selection.spec.ts
   - Notes:
     - 2026-04-30: SEL-0002처럼 merged anchor 아래에 덮인 row를 선택해도 Region/Agency 병합 셀 전체에 `og-grid__cell--merged-row-selected`가 적용되는 E2E를 추가했다.
+    - 2026-05-06: 일반 셀에서 병합 셀로 마우스를 누르는 순간 `aria-selected`가 갱신되는 E2E를 추가해 selection feedback 지연을 방지했다.
+    - 2026-05-06: `Shift + cell click` range gesture에서만 native text selection을 억제해 한 줄/범위 선택 시 브라우저 텍스트 블록이 섞이지 않도록 했다. 일반 텍스트 드래그 선택은 전역 CSS로 막지 않는다.
+    - 2026-05-06: range가 병합 셀과 교차한다는 이유만으로 행 범위를 확장하지 않고, anchor/focus endpoint가 병합 셀일 때만 span을 확장하도록 조정했다. SEL-0001 ID에서 Status까지 shift-click하면 SEL-0001 한 줄만 선택되고 Region/Agency 병합 anchor도 range 색으로 표시된다.
 - [x] F-SELECT-008 select all visible
   - Evidence:
     - packages/dom/src/grid/selectionToolbar.ts
@@ -2648,8 +2712,11 @@
     - packages/core/test/export-import.test.ts
 - [x] F-EXPORT-004 XLSX import
   - Evidence:
+    - packages/core/src/export/xlsxImport.ts
     - packages/core/src/export/xlsxExport.ts
     - packages/core/src/export/xlsxZip.ts
+    - packages/core/src/export/importBuild.ts
+    - packages/dom/test/export-data.test.ts
     - tests/e2e/features/export.spec.ts
 - [x] F-EXPORT-005 PDF export
   - Evidence:
@@ -2716,6 +2783,22 @@
     - 2026-05-02: PDF rowSpan 셀의 y 좌표를 span 높이 기준으로 보정해 병합 셀이 표 위로 튀는 문제를 수정했다. XLSX는 merge covered cell도 빈 값과 스타일을 기록해 header/body 병합 범위의 오른쪽/아래쪽 경계선이 Excel에서 유지되도록 했다.
     - 2026-05-02: Import UI는 실제 파일 입력 방식으로 변경했고 `/export-testFile.csv`, `/export-testFile.xlsx` 예제 fixture를 추가했다. 기본 import는 기존 rows를 replace하며 append는 `ImportOptions.mode: "append"`에서만 수행한다.
     - 2026-05-02: XLSX는 추가 런타임 의존성 없이 OneGrid 생성 workbook을 export/import하는 OpenXML 최소 호환 구현이다. 압축 XLSX, sharedStrings 기반 외부 workbook 호환성 확대는 이후 hardening 항목으로 분리한다.
+    - 2026-05-06: XLSX export는 frozen header pane, autofilter metadata, landscape print setup, numeric cell output, row height, header/body/merged-cell alignment를 포함하도록 강화했다.
+    - 2026-05-06: XLSX import는 `ImportOptions.headerRowCount`로 multi-row visual header를 명시적으로 스킵하고, row-oriented merge covered cell은 anchor 값으로 채워 데이터 의미를 복원한다. horizontal body merge는 다른 field 오염을 막기 위해 확장하지 않는다.
+    - 2026-05-06: XLSX import parser를 `xlsxImport.ts`로 분리하고 sharedStrings, inline strings, cached formula value, uncached formula text, date style numeric cell 변환을 추가했다.
+    - 2026-05-06: PDF export는 단일 페이지 truncate 방식에서 paginated table 방식으로 변경해 header 반복, page number, body chunking을 지원한다. rowSpan body block은 가능한 한 같은 PDF page에 배치해 병합 셀이 page boundary에서 분리되는 리스크를 줄였다.
+    - 2026-05-06: PDF export는 wide-column 산출물을 8컬럼 단위 horizontal page로 분할해 많은 컬럼이 한 페이지에 과도하게 압축되는 리스크를 줄였다.
+    - 2026-05-06: print HTML은 `thead` 반복, page landscape, break-inside 방지, merged body cell styling을 포함하도록 보강했다.
+    - 2026-05-06: F-EXPORT 예제는 standard export/import, paged row export, wide column export의 3개 scenario로 분리했고 vanilla/React/Vue 모두 동일 시나리오를 렌더링한다.
+    - 2026-05-06: CJK/custom font embedded PDF와 임의 외부 XLSX의 deflate 압축 호환성은 core 내장 기능이 아니라 `D-20260506-001`의 adapter/plugin 후속 범위로 기록한다.
+    - 2026-05-06 Verified:
+      - pnpm test:unit -- packages/core/test/export-import.test.ts packages/dom/test/export-data.test.ts
+      - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/export.spec.ts --project=chromium
+      - pnpm typecheck
+      - pnpm lint
+      - pnpm build
+      - pnpm docs:build
+      - pnpm test:perf:smoke
 
 ### F-I18N Localization
 
@@ -3640,6 +3723,19 @@
 ## 18. Risk / Decision Log
 
 작업 중 방향이 흔들릴 수 있는 결정은 여기에 기록한다.
+
+#### D-20260506-001 Advanced Export/Import는 adapter/plugin 경계로 분리
+
+- Date: 2026-05-06
+- Status: accepted
+- Context: F-EXPORT는 dependency-free core 안에서 CSV/JSON, OneGrid 생성 OpenXML XLSX, lightweight PDF, print HTML의 상용 기본 산출물 품질을 제공한다. 다만 CJK/custom font embedded PDF와 임의 외부 XLSX의 deflate 압축/복잡한 workbook 호환성은 font embedding, compression inflate, workbook compatibility engine이 필요한 영역이다.
+- Decision: OneGrid core는 내장 exporter/importer를 dependency-free 기본 경로로 유지하고, CJK/custom font PDF와 arbitrary compressed XLSX full compatibility는 명시적인 export/import adapter 또는 plugin으로 제공한다.
+- Risk: 한국어/CJK 글꼴을 PDF에 반드시 embed해야 하는 SI 산출물이나 Excel/LibreOffice 등 외부 도구가 생성한 복잡한 XLSX를 그대로 수입해야 하는 프로젝트는 adapter/plugin 완료 전까지 별도 구현이 필요하다.
+- Mitigation: `GridApi.exportData()` / `GridApi.importData()`의 public contract는 유지하고, adapter가 core export matrix와 import parser를 교체하거나 확장할 수 있게 후속 hardening 항목으로 추적한다. 기본 core는 bundle weight, CSP/security review scope, dependency risk를 키우지 않는다.
+- Follow-up checklist items:
+  - F-EXPORT Export / Import hardening
+  - packages/adapters export/import adapters
+  - REL-004 Final Gates
 
 #### D-20260504-001 Markup-preserving sanitizer는 앱 주입 정책으로 유지
 

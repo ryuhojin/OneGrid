@@ -33,6 +33,7 @@ export interface ServerRowRequestState {
   readonly pageSize: number;
   readonly requestId: string;
   readonly cursor?: string;
+  readonly groupKeys?: readonly string[];
 }
 
 export interface ServerRowCacheEntry<TData = unknown> {

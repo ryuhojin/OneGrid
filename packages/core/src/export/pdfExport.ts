@@ -1,22 +1,33 @@
 import type { GridExportMatrix } from "./exportTypes.js";
 import { encodeUtf8 } from "./textEncoding.js";
 
+type ExportRows = GridExportMatrix["bodyRows"];
+interface ColumnRange {
+  readonly first: number;
+  readonly last: number;
+}
+
 export function exportPdf(
   matrix: GridExportMatrix,
   options: { readonly title?: string } = {}
 ): Uint8Array {
-  const stream = createPdfTableStream(matrix, options.title ?? "OneGrid Export");
+  const streams = createPdfPageStreams(matrix, options.title ?? "OneGrid Export");
+  const pageIds = streams.map((_, index) => 3 + index);
+  const fontId = 3 + streams.length;
+  const contentIds = streams.map((_, index) => fontId + 1 + index);
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${streams.length} >>`,
+    ...streams.map((_, index) =>
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentIds[index]} 0 R >>`
+    ),
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`
+    ...streams.map((stream) => `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`)
   ];
   return encodeUtf8(createPdfDocument(objects));
 }
 
-function createPdfTableStream(matrix: GridExportMatrix, title: string): string {
+function createPdfPageStreams(matrix: GridExportMatrix, title: string): readonly string[] {
   const pageWidth = 842;
   const pageHeight = 595;
   const margin = 40;
@@ -25,27 +36,63 @@ function createPdfTableStream(matrix: GridExportMatrix, title: string): string {
   const tableTop = titleY - 26;
   const tableWidth = pageWidth - margin * 2;
   const columnCount = Math.max(matrix.columns.length, 1);
-  const columnWidth = tableWidth / columnCount;
-  const rows = [...matrix.headerRows, ...matrix.bodyRows].slice(0, Math.floor((tableTop - margin) / rowHeight));
+  const ranges = chunkColumns(columnCount, 8);
+  const pages = ranges.flatMap((range) => {
+    const headerRows = sliceRows(matrix.headerRows, range);
+    const bodyRows = sliceRows(matrix.bodyRows, range);
+    const rowCapacity = Math.max(1, Math.floor((tableTop - margin) / rowHeight));
+    const bodyCapacity = Math.max(1, rowCapacity - headerRows.length);
+    return chunkRows(bodyRows, bodyCapacity).map((chunk) => ({
+      columnWidth: tableWidth / Math.max(1, range.last - range.first + 1),
+      headerRowCount: headerRows.length,
+      rows: [...headerRows, ...chunk]
+    }));
+  });
+  return pages.map((page, pageIndex) =>
+    createPdfTableStream({
+      ...page,
+      title,
+      pageIndex,
+      pageCount: pages.length,
+      margin,
+      rowHeight,
+      titleY,
+      tableTop
+    })
+  );
+}
+
+function createPdfTableStream(input: {
+  readonly title: string;
+  readonly pageIndex: number;
+  readonly pageCount: number;
+  readonly margin: number;
+  readonly rowHeight: number;
+  readonly titleY: number;
+  readonly tableTop: number;
+  readonly columnWidth: number;
+  readonly headerRowCount: number;
+  readonly rows: ExportRows;
+}): string {
   const commands = [
     "BT",
     "/F1 16 Tf",
     "0.066 0.094 0.153 rg",
-    `${margin} ${titleY} Td`,
-    `(${escapePdfText(title)}) Tj`,
+    `${input.margin} ${input.titleY} Td`,
+    `(${escapePdfText(input.title)}) Tj`,
     "ET"
   ];
 
-  rows.forEach((row, rowIndex) => {
-    const isHeader = rowIndex < matrix.headerRows.length;
+  input.rows.forEach((row, rowIndex) => {
+    const isHeader = rowIndex < input.headerRowCount;
     row.forEach((cell, columnIndex) => {
       if (cell.covered === true) {
         return;
       }
-      const x = margin + columnIndex * columnWidth;
-      const width = columnWidth * (cell.colSpan ?? 1);
-      const height = rowHeight * (cell.rowSpan ?? 1);
-      const y = tableTop - (rowIndex + (cell.rowSpan ?? 1)) * rowHeight;
+      const x = input.margin + columnIndex * input.columnWidth;
+      const width = input.columnWidth * (cell.colSpan ?? 1);
+      const height = input.rowHeight * (cell.rowSpan ?? 1);
+      const y = input.tableTop - (rowIndex + (cell.rowSpan ?? 1)) * input.rowHeight;
       commands.push(...createPdfCell({
         x,
         y,
@@ -57,7 +104,86 @@ function createPdfTableStream(matrix: GridExportMatrix, title: string): string {
       }));
     });
   });
+  commands.push(...createPageNumberCommands(input.pageIndex, input.pageCount, input.margin));
   return commands.join("\n");
+}
+
+function chunkRows(
+  rows: ExportRows,
+  size: number
+): readonly ExportRows[] {
+  if (rows.length === 0) {
+    return [Object.freeze([])];
+  }
+  const chunks: ExportRows[] = [];
+  let current: ExportRows = [];
+  let index = 0;
+  while (index < rows.length) {
+    const blockEnd = findRowSpanBlockEnd(rows, index);
+    const block = rows.slice(index, blockEnd + 1);
+    if (current.length > 0 && current.length + block.length > size) {
+      chunks.push(current);
+      current = [];
+    }
+    if (block.length > size) {
+      chunks.push(block);
+    } else {
+      current = [...current, ...block];
+    }
+    index = blockEnd + 1;
+  }
+  if (current.length > 0) {
+    chunks.push(current);
+  }
+  return chunks;
+}
+
+function chunkColumns(columnCount: number, size: number): readonly ColumnRange[] {
+  const ranges: ColumnRange[] = [];
+  for (let first = 0; first < columnCount; first += size) {
+    ranges.push({ first, last: Math.min(columnCount - 1, first + size - 1) });
+  }
+  return ranges.length === 0 ? [{ first: 0, last: 0 }] : ranges;
+}
+
+function sliceRows(rows: ExportRows, range: ColumnRange): ExportRows {
+  return rows.map((row) => Object.freeze(row.slice(range.first, range.last + 1).map((cell, offset) => {
+    const sourceColumn = range.first + offset;
+    if (cell.covered === true) {
+      return cell;
+    }
+    const remaining = range.last - sourceColumn + 1;
+    const colSpan = Math.min(cell.colSpan ?? 1, remaining);
+    return colSpan === (cell.colSpan ?? 1) ? cell : { ...cell, colSpan };
+  })));
+}
+
+function findRowSpanBlockEnd(rows: ExportRows, startIndex: number): number {
+  let blockEnd = startIndex;
+  for (let rowIndex = startIndex; rowIndex <= blockEnd && rowIndex < rows.length; rowIndex += 1) {
+    rows[rowIndex]?.forEach((cell) => {
+      if (cell.covered === true) {
+        return;
+      }
+      blockEnd = Math.max(blockEnd, rowIndex + (cell.rowSpan ?? 1) - 1);
+    });
+  }
+  return Math.min(blockEnd, rows.length - 1);
+}
+
+function createPageNumberCommands(
+  pageIndex: number,
+  pageCount: number,
+  margin: number
+): readonly string[] {
+  return [
+    "BT",
+    "/F1 8 Tf",
+    "0.400 0.459 0.533 rg",
+    `${margin} 24 Td`,
+    `(Page ${pageIndex + 1} of ${pageCount}) Tj`,
+    "ET"
+  ];
 }
 
 function createPdfCell(input: {

@@ -9,4 +9,9 @@ test("server row model exposes grid roles and server actions @a11y", async ({ pa
   await expect(page.getByRole("button", { name: "Expand Daejeon group" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh server rows" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply transaction" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Expand Daejeon group" }).click();
+  await expect(grid).toHaveAttribute("aria-rowcount", "11");
+  await expect(page.getByRole("button", { name: "Collapse Daejeon group" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Expand Seoul group" })).toBeVisible();
 });

@@ -1,95 +1,174 @@
-import type { GridExportResult } from "@onegrid/core";
+import type { ExportOptions, GridExportResult } from "@onegrid/core";
 import { OneGrid } from "@onegrid/dom";
 import {
   exportColumns,
   exportGridOptions,
   exportImportOptions,
-  exportRows
+  exportPagedGridOptions,
+  exportPagedRows,
+  exportRows,
+  exportWideColumns,
+  exportWideGridOptions,
+  exportWideRows
 } from "./data.js";
-import type { ExportRow } from "./data.js";
+import type { ExportRow, ExportWideRow } from "./data.js";
 
-export function mountExportExample(el: HTMLElement): OneGrid<ExportRow> {
-  const actions = document.createElement("div");
-  actions.className = "example-actions";
-  const gridHost = document.createElement("div");
-  const inspector = document.createElement("dl");
-  inspector.className = "example-inspector";
-  inspector.setAttribute("aria-label", "Export import summary");
+interface ExportInspector {
+  readonly format: HTMLElement;
+  readonly media: HTMLElement;
+  readonly size: HTMLElement;
+  readonly imported: HTMLElement;
+  readonly preview: HTMLElement;
+}
 
-  const format = appendValue(inspector, "Format", "none");
-  const media = appendValue(inspector, "Media type", "none");
-  const size = appendValue(inspector, "Payload size", "0");
-  const imported = appendValue(inspector, "Imported rows", "0");
-  const preview = appendValue(inspector, "Preview", "none");
+export function mountExportExample(el: HTMLElement): { destroy(): void } {
+  const standard = createScenario("Standard export", "Export import summary");
+  const paged = createScenario("Paged row export", "Paged export summary");
+  const wide = createScenario("Wide column export", "Wide export summary");
 
-  const grid = new OneGrid<ExportRow>({
-    el: gridHost,
+  const standardInspector = createExportInspector(standard.inspector);
+  const pagedInspector = createExportInspector(paged.inspector);
+  const wideInspector = createExportInspector(wide.inspector);
+
+  const standardGrid = new OneGrid<ExportRow>({
+    el: standard.gridHost,
     columns: exportColumns,
     data: exportRows,
     accessibility: { label: "Export import grid" },
     ...exportGridOptions
   });
+  const pagedGrid = new OneGrid<ExportRow>({
+    el: paged.gridHost,
+    columns: exportColumns,
+    data: exportPagedRows,
+    accessibility: { label: "Paged export grid" },
+    ...exportPagedGridOptions
+  });
+  const wideGrid = new OneGrid<ExportWideRow>({
+    el: wide.gridHost,
+    columns: exportWideColumns,
+    data: exportWideRows,
+    accessibility: { label: "Wide export grid" },
+    ...exportWideGridOptions
+  });
 
-  actions.append(
+  standard.actions.append(
     createButton("Export CSV", () => {
-      void runExport(grid, { format: "csv" }, format, media, size, preview);
+      void runExport(standardGrid, { format: "csv" }, standardInspector);
     }),
     createButton("Export selected CSV", () => {
-      grid.selectCellRange(
+      standardGrid.selectCellRange(
         { rowIndex: 0, rowKey: "EXP-0001", field: "program", columnIndex: 3 },
         { rowIndex: 1, rowKey: "EXP-0002", field: "memo", columnIndex: 4 }
       );
-      void runExport(grid, { format: "csv", selectedOnly: true }, format, media, size, preview);
+      void runExport(standardGrid, { format: "csv", selectedOnly: true }, standardInspector);
     }),
     createButton("Export XLSX", () => {
-      void runExport(grid, { format: "xlsx" }, format, media, size, preview);
+      void runExport(standardGrid, { format: "xlsx" }, standardInspector);
     }),
     createButton("Export PDF", () => {
-      void runExport(grid, { format: "pdf" }, format, media, size, preview);
+      void runExport(standardGrid, { format: "pdf" }, standardInspector);
     }),
     createButton("Print layout", () => {
-      void runExport(grid, { format: "print" }, format, media, size, preview);
+      void runExport(standardGrid, { format: "print" }, standardInspector);
     }),
     createFileImport("Import CSV file", ".csv,text/csv", async (file) => {
-      const result = await grid.importData(await file.text(), {
+      const result = await standardGrid.importData(await file.text(), {
         ...exportImportOptions,
         format: "csv",
         mode: "replace"
       });
-      imported.textContent = String(result.rowCount);
-      preview.textContent = `Imported CSV file: ${file.name}`;
+      standardInspector.imported.textContent = String(result.rowCount);
+      standardInspector.preview.textContent = `Imported CSV file: ${file.name}`;
     }),
     createFileImport("Import XLSX file", ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", async (file) => {
-      const result = await grid.importData(new Uint8Array(await file.arrayBuffer()), {
+      const result = await standardGrid.importData(new Uint8Array(await file.arrayBuffer()), {
         ...exportImportOptions,
         format: "xlsx",
         mode: "replace"
       });
-      imported.textContent = String(result.rowCount);
-      preview.textContent = `Imported XLSX file: ${file.name}`;
+      standardInspector.imported.textContent = String(result.rowCount);
+      standardInspector.preview.textContent = `Imported XLSX file: ${file.name}`;
     }),
     createAssetLink("CSV test file", "/export-testFile.csv"),
     createAssetLink("XLSX test file", "/export-testFile.xlsx")
   );
 
-  el.replaceChildren(actions, gridHost, inspector);
-  return grid;
+  paged.actions.append(
+    createButton("Export paged PDF", () => {
+      void runExport(pagedGrid, { format: "pdf", filename: "onegrid-paged-export.pdf" }, pagedInspector);
+    }),
+    createButton("Export paged XLSX", () => {
+      void runExport(pagedGrid, { format: "xlsx", filename: "onegrid-paged-export.xlsx" }, pagedInspector);
+    }),
+    createButton("Print paged layout", () => {
+      void runExport(pagedGrid, { format: "print", filename: "onegrid-paged-export.html" }, pagedInspector);
+    })
+  );
+
+  wide.actions.append(
+    createButton("Export wide XLSX", () => {
+      void runExport(wideGrid, { format: "xlsx", filename: "onegrid-wide-export.xlsx" }, wideInspector);
+    }),
+    createButton("Export wide PDF", () => {
+      void runExport(wideGrid, { format: "pdf", filename: "onegrid-wide-export.pdf" }, wideInspector);
+    }),
+    createButton("Print wide layout", () => {
+      void runExport(wideGrid, { format: "print", filename: "onegrid-wide-export.html" }, wideInspector);
+    })
+  );
+
+  const stack = document.createElement("div");
+  stack.className = "export-example-stack";
+  stack.append(standard.section, paged.section, wide.section);
+  el.replaceChildren(stack);
+
+  return {
+    destroy() {
+      standardGrid.destroy();
+      pagedGrid.destroy();
+      wideGrid.destroy();
+    }
+  };
 }
 
-async function runExport(
-  grid: OneGrid<ExportRow>,
-  options: Parameters<OneGrid<ExportRow>["exportData"]>[0],
-  format: HTMLElement,
-  media: HTMLElement,
-  size: HTMLElement,
-  preview: HTMLElement
+async function runExport<TData>(
+  grid: OneGrid<TData>,
+  options: ExportOptions,
+  inspector: ExportInspector
 ): Promise<void> {
   const result = await grid.exportData(options);
-  format.textContent = options?.format ?? "csv";
-  media.textContent = result.mediaType;
-  size.textContent = String(getPayloadSize(result));
-  preview.textContent = createPreview(result);
+  inspector.format.textContent = options?.format ?? "csv";
+  inspector.media.textContent = result.mediaType;
+  inspector.size.textContent = String(getPayloadSize(result));
+  inspector.preview.textContent = createPreview(result);
   downloadExportResult(result);
+}
+
+function createScenario(title: string, inspectorLabel: string) {
+  const section = document.createElement("section");
+  section.className = "export-example-section";
+  const heading = document.createElement("h3");
+  heading.className = "export-example-heading";
+  heading.textContent = title;
+  const actions = document.createElement("div");
+  actions.className = "example-actions";
+  const gridHost = document.createElement("div");
+  const inspector = document.createElement("dl");
+  inspector.className = "example-inspector";
+  inspector.setAttribute("aria-label", inspectorLabel);
+  section.append(heading, actions, gridHost, inspector);
+  return { section, actions, gridHost, inspector };
+}
+
+function createExportInspector(inspector: HTMLDListElement): ExportInspector {
+  return {
+    format: appendValue(inspector, "Format", "none"),
+    media: appendValue(inspector, "Media type", "none"),
+    size: appendValue(inspector, "Payload size", "0"),
+    imported: appendValue(inspector, "Imported rows", "0"),
+    preview: appendValue(inspector, "Preview", "none")
+  };
 }
 
 function getPayloadSize(result: GridExportResult): number {

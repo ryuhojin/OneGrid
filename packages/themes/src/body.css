@@ -219,6 +219,17 @@
   background: var(--og-color-merge-pinned-bg);
 }
 
+.og-grid__cell--merged.og-grid__cell--row-selected,
+.og-grid__cell--merged.og-grid__cell--selected {
+  background: var(--og-color-selected-bg);
+  box-shadow: inset 0 0 0 2px var(--og-color-focus-ring);
+}
+
+.og-grid__cell--merged.og-grid__cell--selection-range {
+  background: var(--og-color-range-bg);
+  box-shadow: inset 0 0 0 1px var(--og-color-range-ring);
+}
+
 .og-grid__virtual-spacer {
   grid-column: 1 / -1;
   min-height: 0;

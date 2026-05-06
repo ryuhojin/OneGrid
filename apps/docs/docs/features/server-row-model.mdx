@@ -23,6 +23,8 @@ const model = new ServerRowModel({
 });
 
 await model.loadPage(0);
+await model.expandGroup("region=Seoul");
+await model.collapseGroup("region=Seoul");
 await model.refresh();
 await model.applyTransaction([{ rowKey: "ORD-1", row: { status: "Approved" } }]);
 ```
@@ -46,7 +48,8 @@ new OneGrid({
 ```
 
 The example route `ROW-003` renders server-owned region groups at the root level. Expanding a group
-sends that group's `groupKeys` back to the `DataSource`; the server response keeps the selected group
-header expanded and returns the matching leaf rows for the current server page. The page also exposes
-request model metadata, refreshes the server cache, and applies a transaction update through
-`DataSource.updateRows`.
+keeps the root group list in place, sends that group's `groupKeys` back to the `DataSource`, and
+composes the returned child block under the matching group header. Multiple groups can remain expanded
+at the same time; cached child blocks are reused until `refresh()` purges the cache and reloads the
+root plus currently expanded groups. The page also exposes request model metadata, refreshes the server
+cache, and applies a transaction update through `DataSource.updateRows`.

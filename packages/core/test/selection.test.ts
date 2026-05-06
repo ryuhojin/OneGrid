@@ -94,6 +94,30 @@ describe("selection model", () => {
     expect(isCellSelected(state, cell("SEL-0001", 0, "owner", 4))).toBe(true);
   });
 
+  it("does not expand a row range through merged cells that are not range endpoints", () => {
+    const columnModel = createColumnModel(columns);
+    const cellSpanModel = createCellSpanModel({
+      rows: spanRows,
+      columns: columnModel.visibleLeafColumns,
+      options: { enabled: true }
+    });
+
+    const state = selectCellRange(createSelectionState({ mode: "range" }), {
+      anchor: cell("SEL-0001", 0, "id", 0),
+      focus: cell("SEL-0001", 0, "agency", 2),
+      cellSpanModel
+    });
+
+    expect(state.ranges[0]).toMatchObject({
+      firstRow: 0,
+      lastRow: 0,
+      firstColumn: 0,
+      lastColumn: 2
+    });
+    expect(isCellSelected(state, cell("SEL-0001", 0, "region", 1))).toBe(true);
+    expect(isCellSelected(state, cell("SEL-0002", 1, "region", 1))).toBe(false);
+  });
+
   it("selects visible rows and server dataset tokens without materializing data", () => {
     let state = createSelectionState({ mode: "row" });
     state = selectAllVisibleRows(state, ["SEL-0001", "SEL-0003"]);

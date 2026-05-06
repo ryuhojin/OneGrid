@@ -16,6 +16,7 @@ export function createServerRowsRequest<TData>(
 ): ServerRowsRequest {
   const startRow = state.page * state.pageSize;
   const endRow = startRow + state.pageSize;
+  const groupKeys = state.groupKeys ?? options.groupKeys;
   const cacheKey = createServerRequestKey({
     page: state.page,
     pageSize: state.pageSize,
@@ -23,7 +24,7 @@ export function createServerRowsRequest<TData>(
     ...(options.sortModel === undefined ? {} : { sortModel: options.sortModel }),
     ...(options.filterModel === undefined ? {} : { filterModel: options.filterModel }),
     ...(options.groupModel === undefined ? {} : { groupModel: options.groupModel }),
-    ...(options.groupKeys === undefined ? {} : { groupKeys: options.groupKeys }),
+    ...(groupKeys === undefined ? {} : { groupKeys }),
     ...(options.aggregateModel === undefined ? {} : { aggregateModel: options.aggregateModel }),
     ...(options.pivotModel === undefined ? {} : { pivotModel: options.pivotModel }),
     ...(options.snapshotVersion === undefined ? {} : { snapshotVersion: options.snapshotVersion })
@@ -41,7 +42,7 @@ export function createServerRowsRequest<TData>(
       sortModel: options.sortModel ?? [],
       filterModel: options.filterModel ?? EMPTY_FILTER_MODEL,
       groupModel: options.groupModel ?? EMPTY_GROUP_MODEL,
-      groupKeys: options.groupKeys ?? [],
+      groupKeys: groupKeys ?? [],
       ...(options.pivotModel === undefined ? {} : { pivotModel: options.pivotModel }),
       ...(options.aggregateModel === undefined ? {} : { aggregateModel: options.aggregateModel }),
       requestId: state.requestId,

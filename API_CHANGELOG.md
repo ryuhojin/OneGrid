@@ -295,6 +295,7 @@
 - Change:
   - `GridOptions.import` was added and `GridOptions.export` now includes CSV/XLSX/PDF/JSON/print options.
   - `ImportOptions.mode` was added with default `"replace"` and opt-in `"append"`.
+  - `ImportOptions.headerRowCount` was added for importing visual exports with multi-row merged headers.
   - `GridApi.importData(content, options)` was added alongside `GridApi.exportData(options)`.
   - Core exports converters for CSV, dependency-free XLSX OpenXML, lightweight PDF, print HTML, JSON, and typed import row parsing.
   - DOM export/import uses visible rows, header merge, cell merge, and selected range state without wrapper reimplementation.

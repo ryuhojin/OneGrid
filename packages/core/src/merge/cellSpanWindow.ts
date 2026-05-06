@@ -8,6 +8,11 @@ import type {
 } from "./cellSpanTypes.js";
 import { createCellKey } from "./cellSpanModel.js";
 
+export interface CellSpanRangeEndpoint {
+  readonly rowIndex: number;
+  readonly columnIndex: number;
+}
+
 export function getCellSpanState(
   model: CellSpanModel,
   rowIndex: number,
@@ -77,6 +82,21 @@ export function expandCellSpanRange(
     }
   }
 
+  return expanded;
+}
+
+export function expandCellSpanRangeFromEndpoints(
+  model: CellSpanModel,
+  range: CellSpanRange,
+  endpoints: readonly CellSpanRangeEndpoint[]
+): CellSpanRange {
+  let expanded = normalizeRange(range);
+  for (const endpoint of endpoints) {
+    const span = model.byCell.get(createCellKey(endpoint.rowIndex, endpoint.columnIndex));
+    if (span) {
+      expanded = union(expanded, toRange(span));
+    }
+  }
   return expanded;
 }
 
