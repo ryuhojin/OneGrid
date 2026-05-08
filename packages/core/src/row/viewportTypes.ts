@@ -38,11 +38,20 @@ export interface ViewportLoadInput {
   readonly nowMs?: number;
 }
 
-export interface ViewportRowEntry<TData = unknown> {
+export type ViewportRowEntry<TData = unknown> =
+  | ViewportDataRowEntry<TData>
+  | ViewportSkeletonRowEntry;
+
+export interface ViewportDataRowEntry<TData = unknown> {
   readonly kind: "data";
   readonly rowIndex: number;
   readonly key: RowKey;
   readonly data: TData;
+}
+
+export interface ViewportSkeletonRowEntry {
+  readonly kind: "skeleton";
+  readonly rowIndex: number;
 }
 
 export interface ViewportCacheRange {

@@ -1,0 +1,122 @@
+---
+title: Plugins
+---
+
+OneGrid plugins are lifecycle-bound integration modules. They can validate their
+dependencies, register cleanup handlers, and contribute typed extension records
+without reaching into DOM internals or framework wrappers.
+
+## Lifecycle
+
+Plugins are passed through `GridOptions.plugins` and are set up by the DOM grid
+before the first render. Cleanup runs when the grid is destroyed or when a plugin
+is unregistered from an internal registry.
+
+```ts
+import type { GridPlugin } from "@onegrid/core";
+
+const auditPlugin: GridPlugin<OrderRow> = {
+  id: "audit",
+  dependencies: ["menus"],
+  setup(context) {
+    const unsubscribe = context.registerExtension({
+      point: "menu.context",
+      id: "audit-row",
+      order: 20,
+      payload: { label: "Audit row" }
+    });
+
+    context.addCleanup(unsubscribe);
+    return undefined;
+  }
+};
+```
+
+## Extension Points
+
+An extension point is a stable string such as `menu.context`,
+`menu.header`, `export.adapter`, or `theme`. Plugins register contributions by
+`id`, `point`, optional `order`, and optional typed `payload`.
+
+```ts
+const extensions = grid.getPluginExtensions<{ label: string }>("menu.context");
+
+for (const extension of extensions) {
+  console.log(extension.pluginId, extension.payload.label);
+}
+```
+
+Extension records are ordered by `order` and then registration order. Duplicate
+`point:id` pairs are rejected so different plugins cannot silently override one
+another.
+
+`menu.header` and `menu.context` are consumed by the DOM renderer:
+
+```ts
+context.registerExtension({
+  point: "menu.header",
+  id: "audit-column",
+  payload: {
+    label: "Audit column",
+    visible: ({ columnId }) => columnId === "amount",
+    onSelect: ({ columnId }) => console.log(columnId)
+  }
+});
+
+context.registerExtension({
+  point: "menu.context",
+  id: "audit-cell",
+  payload: {
+    item: {
+      id: "audit-cell",
+      label: "Audit cell",
+      onSelect: ({ rowKey, field }) => console.log(rowKey, field)
+    }
+  }
+});
+```
+
+`export.adapter` lets a plugin provide a custom export format after the DOM grid has built the
+visual export matrix:
+
+```ts
+context.registerExtension({
+  point: "export.adapter",
+  id: "audit-json",
+  payload: {
+    format: "audit-json",
+    export: ({ matrix }) => ({
+      content: JSON.stringify(matrix),
+      mediaType: "application/json",
+      filename: "audit.json"
+    })
+  }
+});
+```
+
+`theme` extensions are merged into the active theme before the CSP-aware runtime style is applied:
+
+```ts
+context.registerExtension({
+  point: "theme",
+  id: "brand-focus",
+  payload: {
+    theme: {
+      variables: { "--og-color-focus-ring": "#d7191f" }
+    }
+  }
+});
+```
+
+## API Surface
+
+- `context.registerExtension(extension)` registers a lifecycle-bound extension.
+- `context.getExtensions(point?)` lets a plugin inspect extensions that were
+  already registered by dependencies or earlier setup steps.
+- `grid.hasPlugin(pluginId)` checks whether a plugin is registered.
+- `grid.getPluginExtensions(point?)` exposes extension records to vanilla,
+  React, and Vue without wrapper-specific behavior.
+
+HTML rendering, DOM mutation, and framework rendering still belong to the
+existing renderer contracts. Plugin extension payloads are metadata and adapter
+hooks; they do not bypass CSP, XSS, or sanitizer policy.

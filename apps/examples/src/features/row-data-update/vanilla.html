@@ -1,0 +1,11 @@
+<section id="EX-001-003" aria-label="Row data update example"></section>
+<script type="module">
+  import { mountRowDataUpdateExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#EX-001-003");
+  if (!host) {
+    throw new Error("Row data update example host was not found.");
+  }
+
+  mountRowDataUpdateExample(host);
+</script>

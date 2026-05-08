@@ -37,7 +37,7 @@ const columns: readonly ColumnDef<SortTestRow>[] = [
         - statusRank[right as SortTestRow["status"]]
   },
   {
-    field: "total",
+    columnId: "total",
     headerName: "Total",
     valueGetter: ({ row }) => row.amount * 2
   }
@@ -80,5 +80,15 @@ describe("sorting", () => {
 
     expect(byStatus.sortedRows.map((row) => row.key)).toEqual(["S-2", "S-4", "S-3", "S-1"]);
     expect(byComputedValue.sortedRows.map((row) => row.key)).toEqual(["S-4", "S-1", "S-3", "S-2"]);
+  });
+
+  it("sorts fieldless valueGetter columns by columnId", () => {
+    const byComputedValue = createClientRowModel(rows, {
+      columns,
+      rowKey: "id",
+      sortModel: [{ field: "total", direction: "asc" }]
+    });
+
+    expect(byComputedValue.sortedRows.map((row) => row.key)).toEqual(["S-2", "S-3", "S-1", "S-4"]);
   });
 });

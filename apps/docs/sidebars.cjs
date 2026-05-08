@@ -14,7 +14,14 @@ module.exports = {
     {
       type: "category",
       label: "API",
-      items: ["api/grid-options", "api/column-def", "api/datasource", "api/grid-api", "api/events"]
+      items: [
+        "api/grid-options",
+        "api/column-def",
+        "api/datasource",
+        "api/grid-api",
+        "api/events",
+        "api/plugins"
+      ]
     },
     {
       type: "category",
@@ -56,7 +63,8 @@ module.exports = {
         "features/export",
         "features/localization",
         "features/theme-foundation",
-        "features/si-customization"
+        "features/si-customization",
+        "features/quality-security-performance"
       ]
     },
     {

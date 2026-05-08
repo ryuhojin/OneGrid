@@ -50,6 +50,7 @@ export function mountGroupingExample(el: HTMLElement): { destroy(): void } {
     }),
     createAction("Show server groups", () => {
       serverGrid.collapseGroup("Capital");
+      serverGroupKeys.textContent = "root (region)";
     })
   );
 

@@ -3,6 +3,7 @@ import type {
   AggregationOptions,
   ClipboardOptions,
   ColumnDef,
+  ColumnTypeRegistry,
   ColumnUiOptions,
   ColumnUiState,
   ContextMenuOptions,
@@ -12,9 +13,11 @@ import type {
   FilteringOptions,
   FrozenColumnOptions,
   FrozenRowOptions,
+  GridBeforeEventHandlers,
   GridEventHandlers,
   GridOptions,
   GridPlugin,
+  GridStateSnapshot,
   GroupingOptions,
   HeaderMergeOptions,
   ImportOptions,
@@ -32,15 +35,19 @@ import type {
   SummaryOptions,
   ThemeOptions,
   TreeOptions,
+  DataColumnDefaults,
   VirtualizationOptions,
   ViewportRowOptions
 } from "@onegrid/core";
-import { createVueGridEventHandlers } from "./vueEvents.js";
-import type { VueGridEmit } from "./vueEvents.js";
+import { createVueGridBeforeEventHandlers, createVueGridEventHandlers } from "./vueEvents.js";
+import type { VueGridBeforeEmit, VueGridEmit } from "./vueEvents.js";
 import type { VueRendererBridge } from "./vueRendererBridge.js";
 
 export interface OneGridProps {
   readonly columns: readonly ColumnDef<unknown>[];
+  readonly defaultColumnDef?: DataColumnDefaults<unknown> | undefined;
+  readonly columnTypes?: ColumnTypeRegistry<unknown> | undefined;
+  readonly initialState?: GridStateSnapshot | undefined;
   readonly columnOrder?: readonly string[] | undefined;
   readonly columnState?: ColumnUiState | undefined;
   readonly columnUi?: ColumnUiOptions | undefined;
@@ -81,17 +88,23 @@ export interface OneGridProps {
   readonly locale?: string | undefined;
   readonly theme?: ThemeOptions | undefined;
   readonly events?: GridEventHandlers<unknown> | undefined;
+  readonly beforeEvents?: GridBeforeEventHandlers<unknown> | undefined;
   readonly plugins?: readonly GridPlugin<unknown>[] | undefined;
 }
 
 export function toGridOptions(
   props: OneGridProps,
   bridge?: VueRendererBridge<unknown>,
-  emit?: VueGridEmit<unknown>
+  emit?: VueGridEmit<unknown>,
+  beforeEmit?: VueGridBeforeEmit<unknown>
 ): GridOptions<unknown> {
   const events = createVueGridEventHandlers(props.events, emit);
+  const beforeEvents = createVueGridBeforeEventHandlers(props.beforeEvents, beforeEmit);
   const options: {
     columns: readonly ColumnDef<unknown>[];
+    defaultColumnDef?: DataColumnDefaults<unknown>;
+    columnTypes?: ColumnTypeRegistry<unknown>;
+    initialState?: GridStateSnapshot;
     columnOrder?: readonly string[];
     columnState?: ColumnUiState;
     columnUi?: ColumnUiOptions;
@@ -132,9 +145,19 @@ export function toGridOptions(
     locale?: string;
     theme?: ThemeOptions;
     events?: GridEventHandlers<unknown>;
+    beforeEvents?: GridBeforeEventHandlers<unknown>;
     plugins?: readonly GridPlugin<unknown>[];
   } = { columns: bridge?.enhanceColumns(props.columns) ?? props.columns };
 
+  if (props.defaultColumnDef !== undefined) {
+    options.defaultColumnDef = props.defaultColumnDef;
+  }
+  if (props.columnTypes !== undefined) {
+    options.columnTypes = props.columnTypes;
+  }
+  if (props.initialState !== undefined) {
+    options.initialState = props.initialState;
+  }
   if (props.columnOrder !== undefined) {
     options.columnOrder = props.columnOrder;
   }
@@ -254,6 +277,9 @@ export function toGridOptions(
   }
   if (events !== undefined) {
     options.events = events;
+  }
+  if (beforeEvents !== undefined) {
+    options.beforeEvents = beforeEvents;
   }
   if (props.plugins !== undefined) {
     options.plugins = props.plugins;

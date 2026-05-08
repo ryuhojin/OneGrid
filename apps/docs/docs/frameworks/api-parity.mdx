@@ -11,11 +11,11 @@ component props.
 
 | Area | Shared option keys |
 | --- | --- |
-| Columns | `columns`, `columnOrder`, `columnState`, `columnUi`, `headerMerge` |
+| Columns | `columns`, `defaultColumnDef`, `columnTypes`, `columnOrder`, `columnState`, `columnUi`, `headerMerge` |
 | Rows | `data`, `dataSource`, `rowModel`, `infinite`, `server`, `viewport`, `rowKey` |
 | Layout | `width`, `height`, `bodyHeight`, `layout`, `virtualization`, `rowHeight`, `headerHeight`, `frozenRows`, `frozenColumns` |
 | Features | `selection`, `editing`, `filtering`, `sorting`, `grouping`, `aggregation`, `pivot`, `summary`, `tree`, `merge`, `pagination`, `clipboard`, `export`, `import`, `contextMenu` |
-| Platform | `accessibility`, `security`, `theme`, `locale`, `plugins`, `events` |
+| Platform | `accessibility`, `security`, `theme`, `locale`, `plugins`, `events`, `beforeEvents` |
 
 Framework-specific renderer bridges are intentionally separate:
 
@@ -43,13 +43,34 @@ The shared event names are identical across runtimes.
 | `pageChanged` | `events.pageChanged` | `events.pageChanged`, `onPageChanged` | `events.pageChanged`, `@page-changed` |
 | `cellEditStarted` | `events.cellEditStarted` | `events.cellEditStarted`, `onCellEditStarted` | `events.cellEditStarted`, `@cell-edit-started` |
 | `cellEditStaged` | `events.cellEditStaged` | `events.cellEditStaged`, `onCellEditStaged` | `events.cellEditStaged`, `@cell-edit-staged` |
+| `cellEditRequested` | `events.cellEditRequested` | `events.cellEditRequested`, `onCellEditRequested` | `events.cellEditRequested`, `@cell-edit-requested` |
 | `cellEditCommitted` | `events.cellEditCommitted` | `events.cellEditCommitted`, `onCellEditCommitted` | `events.cellEditCommitted`, `@cell-edit-committed` |
 | `cellEditCancelled` | `events.cellEditCancelled` | `events.cellEditCancelled`, `onCellEditCancelled` | `events.cellEditCancelled`, `@cell-edit-cancelled` |
+| `batchEditSessionStarted` | `events.batchEditSessionStarted` | `events.batchEditSessionStarted`, `onBatchEditSessionStarted` | `events.batchEditSessionStarted`, `@batch-edit-session-started` |
+| `batchEditSessionCommitted` | `events.batchEditSessionCommitted` | `events.batchEditSessionCommitted`, `onBatchEditSessionCommitted` | `events.batchEditSessionCommitted`, `@batch-edit-session-committed` |
+| `batchEditSessionCancelled` | `events.batchEditSessionCancelled` | `events.batchEditSessionCancelled`, `onBatchEditSessionCancelled` | `events.batchEditSessionCancelled`, `@batch-edit-session-cancelled` |
+| `editUndo` | `events.editUndo` | `events.editUndo`, `onEditUndo` | `events.editUndo`, `@edit-undo` |
+| `editRedo` | `events.editRedo` | `events.editRedo`, `onEditRedo` | `events.editRedo`, `@edit-redo` |
+| `editHistoryChanged` | `events.editHistoryChanged` | `events.editHistoryChanged`, `onEditHistoryChanged` | `events.editHistoryChanged`, `@edit-history-changed` |
 | `validationFailed` | `events.validationFailed` | `events.validationFailed`, `onValidationFailed` | `events.validationFailed`, `@validation-failed` |
 | `error` | `events.error` | `events.error`, `onError` | `events.error`, `@error` |
 
 React event props and Vue emits are chained after `events`, so applications can
 use the framework bridge and a core event object at the same time.
+
+Cancellable before-event names are identical across runtimes and run before the corresponding
+mutation. React props and Vue emits receive the same `GridCancellableEvent<T>` object, so calling
+`preventDefault()` in either bridge blocks the operation:
+
+| Before event | Vanilla | React | Vue |
+| --- | --- | --- | --- |
+| `beforeCellEditStart` | `beforeEvents.beforeCellEditStart`, `api.onBefore` | `beforeEvents.beforeCellEditStart`, `onBeforeCellEditStart` | `beforeEvents.beforeCellEditStart`, `@before-cell-edit-start` |
+| `beforeCellEditCommit` | `beforeEvents.beforeCellEditCommit`, `api.onBefore` | `beforeEvents.beforeCellEditCommit`, `onBeforeCellEditCommit` | `beforeEvents.beforeCellEditCommit`, `@before-cell-edit-commit` |
+| `beforeSelectionChange` | `beforeEvents.beforeSelectionChange`, `api.onBefore` | `beforeEvents.beforeSelectionChange`, `onBeforeSelectionChange` | `beforeEvents.beforeSelectionChange`, `@before-selection-change` |
+| `beforeSortChange` | `beforeEvents.beforeSortChange`, `api.onBefore` | `beforeEvents.beforeSortChange`, `onBeforeSortChange` | `beforeEvents.beforeSortChange`, `@before-sort-change` |
+| `beforeFilterChange` | `beforeEvents.beforeFilterChange`, `api.onBefore` | `beforeEvents.beforeFilterChange`, `onBeforeFilterChange` | `beforeEvents.beforeFilterChange`, `@before-filter-change` |
+| `beforePageChange` | `beforeEvents.beforePageChange`, `api.onBefore` | `beforeEvents.beforePageChange`, `onBeforePageChange` | `beforeEvents.beforePageChange`, `@before-page-change` |
+| `beforeColumnStateChange` | `beforeEvents.beforeColumnStateChange`, `api.onBefore` | `beforeEvents.beforeColumnStateChange`, `onBeforeColumnStateChange` | `beforeEvents.beforeColumnStateChange`, `@before-column-state-change` |
 
 ## Method Matrix
 
@@ -65,13 +86,13 @@ The same command surface is available from:
 | --- | --- |
 | Lifecycle and data | `destroy`, `refresh`, `setData`, `appendRows`, `updateRows`, `removeRows`, `getRow` |
 | Selection | `getSelectionState`, `getSelectedRows`, `selectRows`, `selectCell`, `selectCellRange`, `selectAllVisibleRows`, `selectServerDataset`, `clearSelection` |
-| Editing | `startEdit`, `stopEdit`, `getPendingEdits`, `commitPendingEdits`, `cancelPendingEdits`, `validate` |
+| Editing | `startEdit`, `stopEdit`, `startBatchEditSession`, `getBatchEditSession`, `commitBatchEditSession`, `cancelBatchEditSession`, `undoEdit`, `redoEdit`, `getEditHistoryState`, `clearEditHistory`, `getPendingEdits`, `commitPendingEdits`, `cancelPendingEdits`, `validate` |
 | Columns | `setColumns`, `showColumn`, `hideColumn`, `pinColumn`, `autoSizeColumn` |
 | Models | `setFilterModel`, `getFilterModel`, `setSortModel`, `getSortModel`, `setGroupModel`, `getGroupModel` |
 | Tree and grouping | `expandGroup`, `collapseGroup`, `toggleGroup`, `expandTreeNode`, `collapseTreeNode`, `toggleTreeNode`, `selectTreeNode`, `getTreeSelection` |
 | Paging and scroll | `setPage`, `getPage`, `setPageSize`, `getPageSize`, `scrollToRow`, `scrollToColumn` |
 | I/O | `exportData`, `importData`, `copyToClipboard`, `pasteFromClipboard` |
-| Platform | `applyTheme`, `setLocale`, `getLocale`, `on`, `off` |
+| Platform | `applyTheme`, `setLocale`, `getLocale`, `on`, `off`, `onBefore`, `offBefore` |
 
 The automated parity tests use the exported core parity keys and fail when a
 React prop, Vue prop, event bridge, or exposed method drifts from the shared

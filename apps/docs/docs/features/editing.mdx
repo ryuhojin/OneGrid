@@ -27,7 +27,17 @@ new OneGrid({
   rowModel: "client",
   editing: {
     enabled: true,
+    startMode: "doubleClick",
     commitMode: "batch",
+    undoRedo: { enabled: true, limit: 100 },
+    keyboard: {
+      startOnEnter: true,
+      commitOnEnter: true,
+      moveOnTab: true,
+      commitOnTab: true,
+      cancelOnEscape: true,
+      clearOnBackspace: true
+    },
     blurAction: "cancel",
     validateOnCommit: true
   }
@@ -41,19 +51,59 @@ Boolean fields can use the checkbox editor, and enum-style fields can use the ra
 `EditorOption` values. The DOM renderer keeps checkbox and radio editors as basic form controls so
 they match the grid's inline editing behavior without a separate custom widget contract.
 
-The DOM renderer starts editing with Enter, F2, printable keys, double click, or
-`GridApi.startEdit()`. Enter commits single-line editors, Ctrl/Cmd+Enter commits textarea editors,
+The DOM renderer starts overlay editors with Enter, F2, printable keys, pointer edit start policy, or
+`GridApi.startEdit()`. `editing.startMode` controls the grid-wide pointer policy:
+`doubleClick` keeps the enterprise grid default, `singleClick` starts editing from a primary click,
+and `manual` suppresses pointer-started editing while keeping keyboard and API entry points. Columns
+can override the grid policy with `ColumnDef.editTrigger`.
+
+Checkbox editors default to `singleClick` when no explicit policy is supplied. They use inline
+pointer toggles instead of opening an overlay, so boolean cells can be changed with a single click
+while still flowing through the same staged edit history. Enter commits single-line editors,
+Ctrl/Cmd+Enter commits textarea editors,
 Escape cancels, and IME composition suppresses premature Enter commits. Blur behavior is explicit:
 `blurAction: "commit"` commits when focus leaves the editor, while `blurAction: "cancel"` keeps
 commit under Enter or `GridApi.stopEdit({ commit: true })`.
 
+`editing.keyboard` documents the exact key contract:
+
+| Key | Focused cell default | Active editor default |
+|---|---|---|
+| Enter | Start edit | Commit single-line editor |
+| Tab / Shift+Tab | Move focused cell | Commit and move to next / previous cell |
+| Escape | No-op | Cancel editor |
+| Backspace | Clear and start edit | Native editor deletion |
+
+F2 remains a standard keyboard entry point for starting edit. Textarea editors keep native newline
+behavior and use Ctrl/Cmd+Enter for commit.
+
 `commitMode: "cell"` applies each accepted editor value immediately. `commitMode: "batch"` stages
 accepted editor values in pending history; applications finalize them with
-`GridApi.commitPendingEdits()` or discard them with `GridApi.cancelPendingEdits()`.
+`GridApi.commitBatchEditSession()` or discard them with `GridApi.cancelBatchEditSession()`.
+Applications can call `GridApi.startBatchEditSession({ id, label, metadata })` before the first edit
+to bind all staged values to a named session. If they do not, the DOM renderer creates an implicit
+session on the first staged edit. `GridApi.getBatchEditSession()` returns the active session with
+`editCount` and `pendingEdits`; `GridApi.getPendingEdits()` remains available as a list-only helper.
+
+Undo/redo is cell-edit scoped. `GridApi.undoEdit()` restores the previous accepted edit step and
+`GridApi.redoEdit()` reapplies it. In batch mode, undo/redo updates the pending edit map relative to
+the original row value, so toolbar pending counts and later `commitBatchEditSession()` still reflect
+the visible data. `GridApi.getEditHistoryState()` exposes stack availability for buttons, and
+`editing.undoRedo.limit` bounds retained row snapshots.
+
+Use `editing.readOnly: true` when the application owns row state externally. In this mode the
+renderer still opens editors, parses values, validates values, and supports inline checkbox and
+clipboard edits, but it does not mutate the grid's row store and does not stage pending edits.
+Accepted values emit `cellEditRequested` with `previousValue`, `nextValue`, `nextRow`, and
+`trigger`; the application should update its source of truth and then pass the new rows back with
+`setData()`, `updateRows()`, React props, or Vue props.
 
 Commit, staged, and cancel events include timing metadata. `cellEditStaged.trigger` and
-`cellEditCommitted.trigger` are `enter`, `blur`, or `api`; `cellEditCancelled.reason` is `escape`,
-`blur`, `api`, or `replace`.
+`cellEditCommitted.trigger` are `enter`, `tab`, `blur`, `api`, or `pointer`; `cellEditCancelled.reason`
+is `escape`, `blur`, `api`, or `replace`.
+Batch sessions emit `batchEditSessionStarted`, `batchEditSessionCommitted`, and
+`batchEditSessionCancelled` with a session snapshot and the edits included in that session.
+Undo/redo emits `editUndo`, `editRedo`, and `editHistoryChanged`.
 
 The executable example is available as `F-EDIT` in the examples app and includes vanilla, React,
 and Vue variants.

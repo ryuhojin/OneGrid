@@ -197,6 +197,15 @@ export class OneGridClipboard<TData = unknown> extends OneGridEditing<TData> {
       return false;
     }
 
+    if (!this.canCommitCellEdit(result, trigger)) {
+      return false;
+    }
+
+    if (this.isReadOnlyEdit()) {
+      this.emitCellEditRequested(result, trigger);
+      return true;
+    }
+
     if (this.getEditCommitMode() === "batch") {
       this.stageCommittedRow(result, trigger);
       return true;

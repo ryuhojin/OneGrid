@@ -286,11 +286,13 @@ function createCellContext<TData>(
     rowIndex: row.rowIndex,
     rowKey: row.rowKey,
     column: column.source,
+    columnId: column.id,
     field: column.field,
     value,
     position: {
       rowIndex: row.rowIndex,
       rowKey: row.rowKey,
+      columnId: column.id,
       field: column.field
     }
   };

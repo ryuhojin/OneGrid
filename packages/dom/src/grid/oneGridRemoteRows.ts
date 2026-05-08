@@ -2,7 +2,8 @@ import type {
   RowUpdate,
   ServerLoadResult,
   ScrollToRowAlign,
-  ViewportLiveUpdate
+  ViewportLiveUpdate,
+  ViewportRowEntry
 } from "@onegrid/core";
 import { invalidate } from "./renderInvalidation.js";
 import { createDomInfiniteRowModel, createDomServerRowModel, createDomViewportRowModel } from "./rowModelFactory.js";
@@ -10,6 +11,7 @@ import {
   getViewportHeight,
   getViewportRowHeight
 } from "./rowModelOptions.js";
+import type { DomGridOptions } from "./OneGrid.js";
 import { resolveScrollTopForRow } from "./scrollPosition.js";
 import { OneGridScrolling } from "./oneGridScrolling.js";
 
@@ -24,9 +26,27 @@ interface PendingServerGroupExpansion {
   readonly reason: string;
 }
 
+interface PendingViewportLoad {
+  readonly rowIndex: number;
+  readonly scrollTop: number;
+}
+
 export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrolling<TData> {
   private pendingServerLoad: PendingServerLoad | undefined;
   private pendingServerGroupExpansion: PendingServerGroupExpansion | undefined;
+  private pendingViewportLoad: PendingViewportLoad | undefined;
+
+  protected override createVirtualScrollRuntime() {
+    const runtime = super.createVirtualScrollRuntime();
+    return {
+      ...runtime,
+      onLogicalRowScroll: (rowIndex: number, scrollTop?: number) => {
+        if (this.viewportRowModel) {
+          void this.loadViewportRows(rowIndex, scrollTop);
+        }
+      }
+    };
+  }
 
   async refreshServerRows(): Promise<void> {
     await this.loadServerRows(true);
@@ -44,13 +64,13 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
 
   async scrollViewportTo(rowIndex: number): Promise<void> {
     this.setVirtualScrollToRow(rowIndex, "start");
-    await this.loadViewportRows(rowIndex);
+    await this.loadViewportRows(rowIndex, this.virtualScrollTop);
   }
 
   async scrollToRow(rowIndex: number, align: ScrollToRowAlign = "start"): Promise<void> {
     this.setVirtualScrollToRow(rowIndex, align);
     if (this.viewportRowModel) {
-      await this.loadViewportRows(rowIndex);
+      await this.loadViewportRows(rowIndex, this.virtualScrollTop);
       return;
     }
 
@@ -234,30 +254,102 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
     await this.setServerGroupExpanded(pending.groupKey, pending.expanded, pending.reason);
   }
 
-  protected async loadViewportRows(rowIndex: number): Promise<void> {
-    if (!this.viewportRowModel || this.viewportLoading) {
+  protected async loadViewportRows(rowIndex: number, scrollTop?: number): Promise<void> {
+    const rowHeight = getViewportRowHeight(this.options);
+    const viewportHeight = this.virtualViewportHeight ?? getViewportHeight(this.options);
+    const targetScrollTop = Math.max(0, scrollTop ?? Math.max(0, Math.trunc(rowIndex)) * rowHeight);
+    const normalizedRowIndex = Math.max(0, Math.trunc(targetScrollTop / rowHeight));
+    if (!this.viewportRowModel) {
+      return;
+    }
+
+    this.virtualScrollTop = targetScrollTop;
+    if (this.viewportLoading) {
+      this.pendingViewportLoad = { rowIndex: normalizedRowIndex, scrollTop: targetScrollTop };
       return;
     }
 
     this.viewportLoading = true;
     this.renderError = undefined;
-    await this.render(invalidate(["rows", "overlay"], "viewport-loading"));
+    let shouldRender = false;
+    let nextViewportLoad: PendingViewportLoad | undefined;
+    const skeletonEntries = this.createViewportSkeletonEntries(normalizedRowIndex, viewportHeight);
+    if (skeletonEntries.length > 0 && !hasViewportVisibleRange(
+      this.viewportEntries,
+      normalizedRowIndex,
+      this.options,
+      viewportHeight
+    )) {
+      this.viewportEntries = skeletonEntries;
+      await this.render(invalidate(["rows", "overlay"], "viewport-skeleton"));
+    }
 
     try {
       const result = await this.viewportRowModel.loadViewport({
-        scrollTop: Math.max(0, Math.trunc(rowIndex)) * getViewportRowHeight(this.options),
-        viewportHeight: getViewportHeight(this.options)
+        scrollTop: targetScrollTop,
+        viewportHeight
       });
-      if (!result.stale) {
+      const pending = this.pendingViewportLoad;
+      if (!result.stale && (pending === undefined || pending.rowIndex === normalizedRowIndex)) {
         this.viewportEntries = result.entries;
+        shouldRender = true;
       }
     } catch (error) {
       this.renderError = error;
+      shouldRender = true;
     } finally {
       if (!this.destroyed) {
+        const pending = this.pendingViewportLoad;
+        this.pendingViewportLoad = undefined;
         this.viewportLoading = false;
-        await this.render(invalidate(["rows", "overlay"], "viewport-loaded"));
+        if (pending !== undefined && pending.rowIndex !== normalizedRowIndex) {
+          nextViewportLoad = pending;
+        } else if (shouldRender) {
+          this.virtualScrollTop = targetScrollTop;
+          await this.render(invalidate(["rows", "overlay"], "viewport-loaded"));
+        }
       }
     }
+
+    if (nextViewportLoad !== undefined) {
+      await this.loadViewportRows(nextViewportLoad.rowIndex, nextViewportLoad.scrollTop);
+    }
   }
+
+  private createViewportSkeletonEntries(
+    rowIndex: number,
+    viewportHeight: number
+  ): readonly ViewportRowEntry<TData>[] {
+    const rowModel = this.viewportRowModel;
+    if (!rowModel) {
+      return Object.freeze([]);
+    }
+
+    const rowHeight = getViewportRowHeight(this.options);
+    const overscan = normalizeViewportOverscan(this.options.viewport?.overscan);
+    const visibleCount = Math.max(1, Math.ceil(viewportHeight / rowHeight));
+    const firstRow = Math.max(0, rowIndex - overscan);
+    const lastRow = Math.min(rowModel.rowCount - 1, rowIndex + visibleCount - 1 + overscan);
+    const entries: ViewportRowEntry<TData>[] = [];
+    for (let nextRowIndex = firstRow; nextRowIndex <= lastRow; nextRowIndex += 1) {
+      entries.push(Object.freeze({ kind: "skeleton", rowIndex: nextRowIndex }));
+    }
+    return Object.freeze(entries);
+  }
+}
+
+function normalizeViewportOverscan(value: number | undefined): number {
+  return Number.isFinite(value) && value !== undefined && value > 0 ? Math.trunc(value) : 0;
+}
+
+function hasViewportVisibleRange<TData>(
+  entries: readonly ViewportRowEntry<TData>[],
+  firstRow: number,
+  options: DomGridOptions<TData>,
+  viewportHeight = getViewportHeight(options)
+): boolean {
+  const rowHeight = getViewportRowHeight(options);
+  const lastRow = firstRow + Math.max(1, Math.ceil(viewportHeight / rowHeight)) - 1;
+  return entries.some((entry) => entry.rowIndex <= firstRow)
+    && entries.some((entry) => entry.rowIndex >= lastRow);
 }

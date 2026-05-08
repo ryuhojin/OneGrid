@@ -87,7 +87,7 @@ function addHandler<THandler>(
   };
 }
 
-function createCancellableEvent<TEvent>(event: TEvent): CancellableEvent<TEvent> {
+export function createCancellableEvent<TEvent>(event: TEvent): CancellableEvent<TEvent> {
   let prevented = false;
   let reason: string | undefined;
 

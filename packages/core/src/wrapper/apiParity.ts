@@ -1,9 +1,12 @@
 import type { GridApi } from "../types/grid-api.js";
 import type { GridOptions } from "../types/grid-options.js";
-import type { GridEventMap } from "../types/events.js";
+import type { GridBeforeEventMap, GridEventMap } from "../types/events.js";
 
 export const gridOptionParityKeys = [
   "columns",
+  "defaultColumnDef",
+  "columnTypes",
+  "initialState",
   "columnOrder",
   "columnState",
   "columnUi",
@@ -44,7 +47,8 @@ export const gridOptionParityKeys = [
   "theme",
   "locale",
   "plugins",
-  "events"
+  "events",
+  "beforeEvents"
 ] as const satisfies readonly (keyof GridOptions<unknown> & string)[];
 
 export const gridEventParityNames = [
@@ -60,15 +64,34 @@ export const gridEventParityNames = [
   "pageChanged",
   "cellEditStarted",
   "cellEditStaged",
+  "cellEditRequested",
   "cellEditCommitted",
   "cellEditCancelled",
+  "batchEditSessionStarted",
+  "batchEditSessionCommitted",
+  "batchEditSessionCancelled",
+  "editUndo",
+  "editRedo",
+  "editHistoryChanged",
   "validationFailed",
   "error"
 ] as const satisfies readonly (keyof GridEventMap<unknown> & string)[];
 
+export const gridBeforeEventParityNames = [
+  "beforeCellEditStart",
+  "beforeCellEditCommit",
+  "beforeSelectionChange",
+  "beforeSortChange",
+  "beforeFilterChange",
+  "beforePageChange",
+  "beforeColumnStateChange"
+] as const satisfies readonly (keyof GridBeforeEventMap<unknown> & string)[];
+
 export const gridApiMethodParityNames = [
   "destroy",
   "refresh",
+  "getState",
+  "setState",
   "setData",
   "appendRows",
   "updateRows",
@@ -84,11 +107,22 @@ export const gridApiMethodParityNames = [
   "clearSelection",
   "startEdit",
   "stopEdit",
+  "startBatchEditSession",
+  "getBatchEditSession",
+  "commitBatchEditSession",
+  "cancelBatchEditSession",
+  "undoEdit",
+  "redoEdit",
+  "getEditHistoryState",
+  "clearEditHistory",
   "getPendingEdits",
   "commitPendingEdits",
   "cancelPendingEdits",
   "validate",
   "setColumns",
+  "getColumnState",
+  "setColumnState",
+  "resetColumnState",
   "showColumn",
   "hideColumn",
   "pinColumn",
@@ -120,10 +154,15 @@ export const gridApiMethodParityNames = [
   "applyTheme",
   "setLocale",
   "getLocale",
+  "hasPlugin",
+  "getPluginExtensions",
   "on",
-  "off"
+  "off",
+  "onBefore",
+  "offBefore"
 ] as const satisfies readonly (keyof GridApi<unknown> & string)[];
 
 export type GridOptionParityKey = typeof gridOptionParityKeys[number];
 export type GridEventParityName = typeof gridEventParityNames[number];
+export type GridBeforeEventParityName = typeof gridBeforeEventParityNames[number];
 export type GridApiMethodParityName = typeof gridApiMethodParityNames[number];

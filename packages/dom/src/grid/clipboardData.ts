@@ -2,7 +2,6 @@ import {
   createCellKey,
   createCellSpanModel,
   createClipboardText,
-  createColumnModel,
   createLocaleFormatter,
   isCellEditable
 } from "@onegrid/core";
@@ -21,6 +20,7 @@ import {
   getRows
 } from "./renderGridData.js";
 import type { BodyRowEntry } from "./bodyRowRenderer.js";
+import { createDomColumnModel } from "./domColumnModel.js";
 import type { DomGridOptions } from "./oneGridTypes.js";
 import type { RowRenderState } from "./renderGridTypes.js";
 
@@ -42,10 +42,7 @@ export function createClipboardSnapshot<TData>(
   options: DomGridOptions<TData>,
   rowRenderState: RowRenderState<TData> | undefined
 ): ClipboardDataSnapshot<TData> {
-  const columnModel = createColumnModel(options.columns, {
-    ...(options.columnOrder === undefined ? {} : { columnOrder: options.columnOrder }),
-    ...(options.columnState === undefined ? {} : { columnState: options.columnState })
-  });
+  const columnModel = createDomColumnModel(options);
   const rows = getRows(options, rowRenderState);
   const columns = [
     ...columnModel.pinnedLeafColumns.left,
@@ -101,9 +98,10 @@ export function isClipboardCellEditable<TData>(
     rowIndex: row.rowIndex,
     rowKey: row.rowKey,
     column: column.source,
+    columnId: column.id,
     field: column.field,
     value,
-    position: { rowIndex: row.rowIndex, rowKey: row.rowKey, field: column.field }
+    position: { rowIndex: row.rowIndex, rowKey: row.rowKey, columnId: column.id, field: column.field }
   }, editing);
 }
 
@@ -239,9 +237,10 @@ function formatCopyValue<TData>(
       rowIndex: row.rowIndex,
       rowKey: row.rowKey,
       column: column.source,
+      columnId: column.id,
       field: column.field,
       value,
-      position: { rowIndex: row.rowIndex, rowKey: row.rowKey, field: column.field }
+      position: { rowIndex: row.rowIndex, rowKey: row.rowKey, columnId: column.id, field: column.field }
     });
   }
 

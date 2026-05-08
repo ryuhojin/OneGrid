@@ -39,6 +39,7 @@ import type { GridEditRuntime } from "./editRuntime.js";
 import type { GroupRowRuntime } from "./groupRowRenderer.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
 import type { RowRenderState } from "./renderGridShell.js";
+import { createBodyRowHeightResolver } from "./rowHeightRuntime.js";
 import type { HeaderSortRuntime } from "./sortRuntime.js";
 
 type PaneRecord<TData> = Readonly<Record<LayoutPaneKey, LayoutPane<TData>>>;
@@ -250,6 +251,7 @@ function replaceCenterPanes<TData>(
     readonly columnWindow: FixedColumnVirtualWindow;
   }
 ): void {
+  const rowHeight = createBodyRowHeightResolver(input.options);
   replacePane(
     input.grid,
     "header",
@@ -286,6 +288,7 @@ function replaceCenterPanes<TData>(
         ...(input.groupRuntime === undefined ? {} : { groupRuntime: input.groupRuntime }),
         cellSpanModel: input.cellSpanModel,
         i18n: createLocaleFormatter(input.options.locale),
+        ...(rowHeight === undefined ? {} : { rowHeight }),
         rowIndexOffset: input.rowIndexOffset,
         ...(input.options.editing === undefined ? {} : { editing: input.options.editing }),
         ...(input.security === undefined ? {} : { security: input.security })

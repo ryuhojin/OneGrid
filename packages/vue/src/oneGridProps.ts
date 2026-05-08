@@ -3,18 +3,22 @@ import type {
   AggregationOptions,
   ClipboardOptions,
   ColumnDef,
+  ColumnTypeRegistry,
   ColumnUiOptions,
   ColumnUiState,
   ContextMenuOptions,
   DataSource,
+  DataColumnDefaults,
   EditingOptions,
   ExportOptions,
   FilteringOptions,
   FrozenColumnOptions,
   FrozenRowOptions,
+  GridBeforeEventHandlers,
   GridOptions,
   GridEventHandlers,
   GridPlugin,
+  GridStateSnapshot,
   GroupingOptions,
   HeaderMergeOptions,
   ImportOptions,
@@ -41,6 +45,18 @@ export const oneGridProps = {
   columns: {
     type: Array as PropType<readonly ColumnDef<unknown>[]>,
     required: true
+  },
+  defaultColumnDef: {
+    type: Object as PropType<DataColumnDefaults<unknown> | undefined>,
+    default: undefined
+  },
+  columnTypes: {
+    type: Object as PropType<ColumnTypeRegistry<unknown> | undefined>,
+    default: undefined
+  },
+  initialState: {
+    type: Object as PropType<GridStateSnapshot | undefined>,
+    default: undefined
   },
   columnOrder: {
     type: Array as PropType<readonly string[] | undefined>,
@@ -206,6 +222,10 @@ export const oneGridProps = {
   },
   events: {
     type: Object as PropType<GridEventHandlers<unknown> | undefined>,
+    default: undefined
+  },
+  beforeEvents: {
+    type: Object as PropType<GridBeforeEventHandlers<unknown> | undefined>,
     default: undefined
   },
   plugins: {

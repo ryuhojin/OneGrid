@@ -78,7 +78,11 @@ export class VueRendererBridge<TData = unknown> {
 
   private enhanceGroupColumn(column: ColumnGroupDef<TData>): ColumnGroupDef<TData> {
     const { children, headerRenderer: originalHeaderRenderer, ...rest } = column;
-    const slot = findRendererSlot(this.slots, "header", column.groupId ?? column.headerName);
+    const slot = findRendererSlot(
+      this.slots,
+      "header",
+      column.columnId ?? column.groupId ?? column.headerName
+    );
     const headerRenderer = slot === undefined
       ? originalHeaderRenderer
       : this.createHeaderRenderer((context) => slot(context));
@@ -95,7 +99,7 @@ export class VueRendererBridge<TData = unknown> {
       renderer: originalRenderer,
       ...rest
     } = column;
-    const key = column.id ?? column.field;
+    const key = column.columnId ?? column.id ?? column.field ?? column.headerName ?? "column";
     const cellSlot = findRendererSlot(this.slots, "cell", key);
     const headerSlot = findRendererSlot(this.slots, "header", key);
     const renderer = cellSlot === undefined

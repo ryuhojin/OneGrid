@@ -1,7 +1,6 @@
 import {
   createCellKey,
   createCellSpanModel,
-  createColumnModel,
   createGridExport,
   createGridImport,
   createHeaderModel
@@ -23,6 +22,7 @@ import {
   getRows
 } from "./renderGridData.js";
 import type { BodyRowEntry } from "./bodyRowRenderer.js";
+import { createDomColumnModel } from "./domColumnModel.js";
 import type { DomGridOptions } from "./oneGridTypes.js";
 import type { RowRenderState } from "./renderGridTypes.js";
 
@@ -60,10 +60,7 @@ export function createDomExportMatrix<TData>(
   input: DomGridExportInput<TData>,
   options: ExportOptions = {}
 ): GridExportMatrix {
-  const columnModel = createColumnModel(input.options.columns, {
-    ...(input.options.columnOrder === undefined ? {} : { columnOrder: input.options.columnOrder }),
-    ...(input.options.columnState === undefined ? {} : { columnState: input.options.columnState })
-  });
+  const columnModel = createDomColumnModel(input.options);
   const headerModel = createHeaderModel(columnModel, {
     ...(input.options.headerMerge === undefined ? {} : { merge: input.options.headerMerge })
   });

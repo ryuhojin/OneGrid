@@ -260,8 +260,14 @@ function resolveFilterKind<TData>(column: NormalizedDataColumn<TData>): FilterKi
   if (filter && typeof filter === "object") {
     return filter.kind;
   }
-  if (column.source.type === "number" || column.source.type === "date" || column.source.type === "boolean") {
-    return column.source.type;
+  if (column.source.type === "number") {
+    return "number";
+  }
+  if (column.source.type === "date" || column.source.type === "datetime") {
+    return "date";
+  }
+  if (column.source.type === "boolean") {
+    return "boolean";
   }
   return "text";
 }

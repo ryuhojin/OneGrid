@@ -18,6 +18,18 @@ export abstract class OneGridPagination<TData = unknown> extends OneGridApiBase<
       return;
     }
 
+    const before = this.emitGridBeforeEvent("beforePageChange", {
+      type: "beforePageChange",
+      previousPage: this.paginationPage,
+      previousPageSize: this.paginationPageSize,
+      page: nextPage,
+      pageSize: this.paginationPageSize,
+      reason: "pagination-page"
+    });
+    if (before.defaultPrevented) {
+      return;
+    }
+
     this.paginationPage = nextPage;
     this.virtualScrollTop = 0;
     this.emitGridEvent("pageChanged", {
@@ -44,6 +56,18 @@ export abstract class OneGridPagination<TData = unknown> extends OneGridApiBase<
 
     const nextPageSize = normalizePageSize(pageSize);
     if (nextPageSize === this.paginationPageSize) {
+      return;
+    }
+
+    const before = this.emitGridBeforeEvent("beforePageChange", {
+      type: "beforePageChange",
+      previousPage: this.paginationPage,
+      previousPageSize: this.paginationPageSize,
+      page: 1,
+      pageSize: nextPageSize,
+      reason: "pagination-page-size"
+    });
+    if (before.defaultPrevented) {
       return;
     }
 

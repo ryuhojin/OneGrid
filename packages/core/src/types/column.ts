@@ -1,7 +1,9 @@
 import type {
   CellPosition,
-  ColumnType,
+  ColumnId,
+  ColumnTypeReference,
   EditorKind,
+  EditStartMode,
   FilterKind,
   PinnedSide,
   RowKey,
@@ -11,13 +13,22 @@ import type { LocaleFormatterBridge } from "../i18n/localeTypes.js";
 
 export type ColumnDef<TData = unknown> = DataColumnDef<TData> | ColumnGroupDef<TData>;
 
+export type DataColumnDefaults<TData = unknown> = Partial<
+  Omit<DataColumnDef<TData>, "columnId" | "id" | "field">
+>;
+
+export type ColumnTypeDef<TData = unknown> = DataColumnDefaults<TData>;
+
+export type ColumnTypeRegistry<TData = unknown> = Readonly<Record<string, ColumnTypeDef<TData>>>;
+
 export interface DataColumnDef<TData = unknown> {
-  readonly id?: string;
-  readonly field: string;
+  readonly columnId?: ColumnId;
+  readonly id?: ColumnId;
+  readonly field?: string;
   readonly headerName?: string;
   readonly headerTooltip?: string;
   readonly headerRenderer?: HeaderRendererDef<TData>;
-  readonly type?: ColumnType;
+  readonly type?: ColumnTypeReference;
   readonly width?: number;
   readonly minWidth?: number;
   readonly maxWidth?: number;
@@ -32,6 +43,7 @@ export interface DataColumnDef<TData = unknown> {
   readonly filter?: FilterKind | FilterOptions<TData>;
   readonly editable?: boolean | EditablePredicate<TData>;
   readonly editor?: EditorKind | EditorDef<TData>;
+  readonly editTrigger?: EditStartMode;
   readonly renderer?: CellRendererDef<TData>;
   readonly formatter?: ValueFormatter<TData>;
   readonly parser?: ValueParser<TData>;
@@ -46,7 +58,8 @@ export interface DataColumnDef<TData = unknown> {
 }
 
 export interface ColumnGroupDef<TData = unknown> {
-  readonly groupId?: string;
+  readonly columnId?: ColumnId;
+  readonly groupId?: ColumnId;
   readonly headerName: string;
   readonly children: readonly ColumnDef<TData>[];
   readonly marryChildren?: boolean;
@@ -64,6 +77,7 @@ export interface RowContext<TData = unknown> {
 
 export interface CellContext<TData = unknown> extends RowContext<TData>, LocaleFormatterBridge {
   readonly column: DataColumnDef<TData>;
+  readonly columnId: ColumnId;
   readonly field: string;
   readonly value: unknown;
   readonly position: CellPosition;
@@ -71,6 +85,7 @@ export interface CellContext<TData = unknown> extends RowContext<TData>, LocaleF
 
 export interface HeaderContext<TData = unknown> {
   readonly column: ColumnDef<TData>;
+  readonly columnId?: ColumnId;
   readonly depth: number;
 }
 
@@ -85,6 +100,7 @@ export type SortComparator<TData = unknown> = (
 ) => number;
 
 export interface SortComparatorContext<TData = unknown> {
+  readonly columnId?: ColumnId;
   readonly field: string;
   readonly leftRow: TData;
   readonly rightRow: TData;
@@ -119,6 +135,7 @@ export type FilterPredicate<TData = unknown> = (
 ) => boolean;
 
 export interface FilterPredicateContext<TData = unknown> extends RowContext<TData> {
+  readonly columnId: ColumnId;
   readonly field: string;
   readonly column: DataColumnDef<TData>;
   readonly value: unknown;

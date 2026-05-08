@@ -3,6 +3,7 @@ import { h } from "vue";
 import { describe, expect, it, vi } from "vitest";
 import {
   gridApiMethodParityNames,
+  gridBeforeEventParityNames,
   gridEventParityNames,
   gridOptionParityKeys
 } from "@onegrid/core";
@@ -11,7 +12,12 @@ import { toGridOptions } from "../src/gridOptions.js";
 import type { OneGridProps } from "../src/gridOptions.js";
 import { OneGrid } from "../src/index.js";
 import { oneGridProps } from "../src/oneGridProps.js";
-import { createVueGridEventHandlers, vueGridEmits } from "../src/vueEvents.js";
+import {
+  createVueGridBeforeEventHandlers,
+  createVueGridEventHandlers,
+  vueGridBeforeEmits,
+  vueGridEmits
+} from "../src/vueEvents.js";
 import { VueRendererBridge } from "../src/vueRendererBridge.js";
 
 describe("@onegrid/vue shell", () => {
@@ -21,10 +27,13 @@ describe("@onegrid/vue shell", () => {
 
   it("keeps the enterprise option props on the Vue bridge", () => {
     expect(oneGridProps.columns.required).toBe(true);
+    expect(oneGridProps.defaultColumnDef.default).toBeUndefined();
+    expect(oneGridProps.columnTypes.default).toBeUndefined();
     expect(oneGridProps.security.default).toBeUndefined();
     expect(oneGridProps.accessibility.default).toBeUndefined();
     expect(oneGridProps.locale.default).toBeUndefined();
     expect(oneGridProps.events.default).toBeUndefined();
+    expect(oneGridProps.beforeEvents.default).toBeUndefined();
   });
 
   it("returns stable fallbacks before the DOM grid is mounted", async () => {
@@ -71,7 +80,7 @@ describe("@onegrid/vue shell", () => {
     expect([...Object.keys(oneGridProps)].sort()).toEqual([...gridOptionParityKeys].sort());
     expect(gridOptionParityKeys.filter((key) => !(key in options))).toEqual([]);
     for (const key of gridOptionParityKeys) {
-      if (key === "columns" || key === "events") {
+      if (key === "columns" || key === "events" || key === "beforeEvents") {
         continue;
       }
       expect(optionRecord[key]).toBe(propRecord[key]);
@@ -80,6 +89,7 @@ describe("@onegrid/vue shell", () => {
 
   it("keeps Vue emits and exposed methods aligned with the shared API", () => {
     expect(vueGridEmits).toEqual(gridEventParityNames);
+    expect(vueGridBeforeEmits).toEqual(gridBeforeEventParityNames);
 
     const exposed = createGridExpose(() => undefined);
     expect(gridApiMethodParityNames.filter((name) => typeof exposed[name] !== "function")).toEqual([]);
@@ -94,6 +104,28 @@ describe("@onegrid/vue shell", () => {
 
     expect(coreReady).toHaveBeenCalledWith({ type: "ready" });
     expect(emit).toHaveBeenCalledWith("ready", { type: "ready" });
+  });
+
+  it("chains cancellable before events into Vue emits until prevented", () => {
+    const coreBefore = vi.fn();
+    const emit = vi.fn();
+    const handlers = createVueGridBeforeEventHandlers({ beforeSortChange: coreBefore }, emit);
+    const event = {
+      event: {
+        type: "beforeSortChange" as const,
+        previousSortModel: [],
+        sortModel: [{ field: "id", direction: "asc" as const }],
+        reason: "test"
+      },
+      defaultPrevented: false,
+      reason: undefined,
+      preventDefault: vi.fn()
+    };
+
+    handlers?.beforeSortChange?.(event);
+
+    expect(coreBefore).toHaveBeenCalledWith(event);
+    expect(emit).toHaveBeenCalledWith("beforeSortChange", event);
   });
 
   it("maps Vue cell and header slots into element renderer columns", () => {
@@ -121,6 +153,11 @@ function createParityProps(): OneGridProps {
   const rows = Object.freeze([{ id: "V1", amount: 20 }]);
   return {
     columns: Object.freeze([{ field: "id", headerName: "ID" }]),
+    defaultColumnDef: Object.freeze({ resizable: true }),
+    columnTypes: Object.freeze({
+      money: Object.freeze({ type: "number" as const, width: 140 })
+    }),
+    initialState: Object.freeze({ locale: "en-US", scroll: Object.freeze({ top: 0, left: 0 }) }),
     columnOrder: Object.freeze(["id"]),
     columnState: Object.freeze({}),
     columnUi: Object.freeze({ resize: true }),
@@ -163,6 +200,7 @@ function createParityProps(): OneGridProps {
     locale: "en-US",
     theme: Object.freeze({ name: "clean" }),
     events: Object.freeze({ ready: () => undefined }),
+    beforeEvents: Object.freeze({ beforeSortChange: () => undefined }),
     plugins: Object.freeze([])
   };
 }

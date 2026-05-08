@@ -1,4 +1,5 @@
 export { validateGridPlugins } from "./lifecycle.js";
+export { createPluginExtensionRegistry } from "./pluginExtensions.js";
 export { GridPluginRuntimeContext } from "./pluginContext.js";
 export { createPluginRegistry } from "./pluginRegistry.js";
 export type {
@@ -7,6 +8,9 @@ export type {
   PluginValidationIssue,
   PluginValidationResult
 } from "./lifecycle.js";
+export type {
+  GridPluginExtensionRegistry
+} from "./pluginExtensions.js";
 export type {
   CreatePluginRegistryOptions,
   GridPluginRegistry

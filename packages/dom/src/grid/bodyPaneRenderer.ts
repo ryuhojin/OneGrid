@@ -13,8 +13,9 @@ import type {
 import { createLocaleFormatter } from "@onegrid/core";
 import type { BodyRowEntry } from "./bodyRowRenderer.js";
 import type { TreeRowRuntime } from "./treeRowRenderer.js";
+import type { BodyRowHeightResolver } from "./rowHeightRuntime.js";
 
-export interface BodyPaneRuntime {
+export interface BodyPaneRuntime<TData = unknown> {
   readonly treeRuntime?: TreeRowRuntime;
   readonly groupRuntime?: GroupRowRuntime;
   readonly cellSpanModel?: CellSpanModel;
@@ -23,18 +24,20 @@ export interface BodyPaneRuntime {
   readonly security?: SecurityOptions;
   readonly editing?: EditingOptions;
   readonly i18n: LocaleFormatterBridge;
+  readonly rowHeight?: BodyRowHeightResolver<TData>;
 }
 
 export function createBodyPane<TData>(
   pane: LayoutPane<TData>,
   rows: readonly BodyRowEntry<TData>[],
-  runtime: BodyPaneRuntime | undefined,
+  runtime: BodyPaneRuntime<TData> | undefined,
   centerOwnsTreeControls: boolean,
   virtualWindow: FixedRowVirtualWindow | undefined
 ): HTMLElement {
   const body = document.createElement("div");
   body.className = "og-grid__body";
   applyPaneVirtualInlineWindow(body, pane);
+  applyRowVirtualOffset(body, virtualWindow);
   const rowIndexOffset = runtime?.rowIndexOffset ?? 0;
   const i18n = runtime?.i18n ?? createLocaleFormatter();
   const cellSpanWindow = createPaneCellSpanWindow(pane, rows, virtualWindow, rowIndexOffset);
@@ -60,12 +63,28 @@ export function createBodyPane<TData>(
       ...(runtime?.security === undefined ? {} : { security: runtime.security }),
       ...(runtime?.editing === undefined ? {} : { editing: runtime.editing }),
       i18n,
+      ...(runtime?.rowHeight === undefined ? {} : { rowHeight: runtime.rowHeight }),
       ...(cellSpanWindow === undefined ? {} : { cellSpanWindow })
     }));
   });
 
   appendVirtualSpacer(body, "bottom", virtualWindow?.afterHeight ?? 0);
   return body;
+}
+
+function applyRowVirtualOffset(
+  body: HTMLElement,
+  virtualWindow: FixedRowVirtualWindow | undefined
+): void {
+  if (!virtualWindow || virtualWindow.offsetTop >= 0) {
+    return;
+  }
+
+  const rowOffset = `translateY(${virtualWindow.offsetTop}px)`;
+  body.style.transform = body.style.transform
+    ? `${body.style.transform} ${rowOffset}`
+    : rowOffset;
+  body.style.transformOrigin = "0 0";
 }
 
 function appendVirtualSpacer(

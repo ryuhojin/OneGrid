@@ -2,6 +2,8 @@ export type EditTrigger = "api" | "keyboard" | "pointer";
 
 export interface GridEditRuntime {
   startEditFromCell(cell: HTMLElement, trigger: EditTrigger, initialValue?: string): boolean;
+  toggleCheckboxCell(cell: HTMLElement, trigger: "pointer"): boolean;
+  syncActiveEditOnScroll(viewport: HTMLElement): void;
   stopEdit(options?: GridStopEditOptions): void;
   isEditingCell(cell: HTMLElement): boolean;
 }

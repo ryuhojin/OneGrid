@@ -3,6 +3,66 @@
 `ColumnDef<TData>` supports data columns and grouped columns. Group headers and merge-aware layout
 are first-class design constraints even though the initial renderer shell only paints leaf columns.
 
+Use `columnId` as the stable UI/API identity for a column. Keep `field` as the optional row data
+binding key. This matters when multiple columns read the same field, a column is generated from
+`valueGetter`, or state must survive reorder, pinning, wrapper slots, and header merge rules.
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  { columnId: "order-id", field: "id", headerName: "ID" },
+  { columnId: "risk-score", field: "score", headerName: "Risk" },
+  {
+    columnId: "risk-band",
+    headerName: "Risk Band",
+    valueGetter: ({ row }) => row.score >= 80 ? "high" : "normal"
+  },
+  {
+    columnId: "row-actions",
+    headerName: "Actions",
+    renderer: { kind: "text", render: () => "Open" }
+  },
+  {
+    columnId: "workflow",
+    headerName: "Workflow",
+    children: [
+      { columnId: "workflow-status", field: "status" },
+      { columnId: "workflow-owner", field: "owner" }
+    ]
+  }
+];
+```
+
+When `field` is omitted, provide `columnId` for stable state, events, sort/filter model references,
+renderer slots, and export/import mapping. Fieldless columns should use `valueGetter`, `renderer`,
+or `valueSetter` when they need data access or editing behavior.
+
+Legacy `id` and `groupId` remain supported as compatibility aliases, but new code should prefer
+`columnId` for column state, menu actions, wrapper renderer slots, and `GridApi` column methods.
+
+Use `GridOptions.defaultColumnDef` and `GridOptions.columnTypes` when many columns share the same
+sizing, filter, editor, formatter, or renderer behavior:
+
+```ts
+const columns: ColumnDef<OrderRow>[] = [
+  { columnId: "order-id", field: "id", headerName: "ID" },
+  { field: "amount", headerName: "Amount", type: "money", width: 180 },
+  { field: "status", headerName: "Status", type: ["text", "statusPill"] }
+];
+
+const options: GridOptions<OrderRow> = {
+  columns,
+  defaultColumnDef: { minWidth: 96, resizable: true, sortable: true },
+  columnTypes: {
+    money: { type: "number", filter: "number", editor: "number", width: 140 },
+    statusPill: { renderer: statusRenderer }
+  }
+};
+```
+
+Defaults are resolved in a stable order: `defaultColumnDef`, defaults referenced by
+`defaultColumnDef.type`, defaults referenced by `ColumnDef.type`, and finally explicit column
+properties. Explicit column properties always win.
+
 Columns can opt into body cell merge calculation:
 
 ```ts
@@ -74,6 +134,7 @@ const columns: ColumnDef<OrderRow>[] = [
   {
     field: "status",
     editable: true,
+    editTrigger: "singleClick",
     editor: {
       kind: "select",
       options: [
@@ -98,6 +159,11 @@ const columns: ColumnDef<OrderRow>[] = [
 
 Supported editor kinds are `text`, `number`, `date`, `datetime`, `checkbox`, `select`,
 `multi-select`, `radio`, `textarea`, `autocomplete`, and `custom`.
+
+`editTrigger` overrides `GridOptions.editing.startMode` for a single column. Supported values are
+`doubleClick`, `singleClick`, and `manual`. `manual` suppresses pointer-started editing for that
+column while keeping Enter, F2, printable-key, and `GridApi.startEdit()` entry points available.
+Checkbox editor columns default to `singleClick` when neither the grid nor column supplies a policy.
 
 Cell renderers are secure by default. Omitted renderers and `kind: "text"` renderers write strings
 with `textContent`. `kind: "element"` uses DOM node creation and filters unsafe tags, inline event

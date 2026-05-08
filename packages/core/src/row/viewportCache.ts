@@ -84,7 +84,11 @@ export function updateViewportCacheRow<TData>(
 export function listViewportCacheKeys<TData>(
   cache: ViewportRowCache<TData>
 ): readonly RowKey[] {
-  return Object.freeze([...cache.rows.values()].map((entry) => entry.key));
+  return Object.freeze(
+    [...cache.rows.values()]
+      .filter((entry) => entry.kind === "data")
+      .map((entry) => entry.key)
+  );
 }
 
 function sameRange(range: ViewportCacheRange, target: ViewportRange): boolean {

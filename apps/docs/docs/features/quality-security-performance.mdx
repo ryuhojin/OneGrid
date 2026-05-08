@@ -1,0 +1,26 @@
+---
+title: Quality, Security, And Performance Examples
+---
+
+# Quality, Security, And Performance Examples
+
+EX-005 collects production-readiness examples that combine existing OneGrid
+contracts instead of introducing wrapper-only behavior.
+
+| Example | Route | Focus |
+| --- | --- | --- |
+| CSP nonce setup | `/#EX-005-001` | Nonced style injection and disabled style injection |
+| XSS-safe renderer setup | `/#EX-005-002` | Text-by-default rendering, sanitizer, URL protocol allowlist |
+| Theme customization setup | `/#EX-005-003` | SI tenant palette and density switching |
+| Accessibility keyboard setup | `/#EX-005-004` | ARIA grid, live region, keyboard focus, header menu semantics |
+| 10M server rows setup | `/#EX-005-005` | Server row model with logical row count and bounded requested ranges |
+| 100M viewport rows setup | `/#EX-005-006` | Viewport row model with bounded DOM and request windows |
+| Financial SI setup | `/#EX-005-007` | Pinned panes, grouped headers, merge, summary, clipboard, BNK-style theme |
+| Public-sector SI setup | `/#EX-005-008` | CSP-safe defaults, merge-aware rows, quick filtering, ARIA semantics |
+
+The large-row examples generate only the current request window. They must not
+allocate 10M or 100M client arrays.
+
+The SI examples are intended as catalog fixtures for visual QA and user-facing
+regression tests. They reuse the public `GridOptions`, React wrapper, and Vue
+wrapper contracts so API parity remains visible.

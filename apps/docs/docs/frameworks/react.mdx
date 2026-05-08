@@ -23,6 +23,8 @@ export function OrdersGrid() {
         { field: "id", headerName: "ID" },
         { field: "status", headerName: "Status", editable: true, editor: "text" }
       ]}
+      defaultColumnDef={{ resizable: true, sortable: true }}
+      columnTypes={{ money: { type: "number", filter: "number", editor: "number" } }}
       data={[{ id: "ORD-1001", status: "Ready" }]}
       rowKey="id"
       rowModel="client"
@@ -32,22 +34,33 @@ export function OrdersGrid() {
 }
 ```
 
+`defaultColumnDef` and `columnTypes` use the same core contract as vanilla
+OneGrid. React does not resolve or reinterpret column defaults.
+
 ## Ref Bridge
 
 The component exposes the DOM GridApi surface through a React ref for user
 commands such as `selectRows`, `scrollToRow`, `startEdit`,
+`startBatchEditSession`, `commitBatchEditSession`, `cancelBatchEditSession`,
 `commitPendingEdits`, `cancelPendingEdits`, `exportData`, `importData`,
 `setLocale`, and `applyTheme`.
 
 ```tsx
 gridRef.current?.selectRows(["ORD-1001"]);
-await gridRef.current?.commitPendingEdits();
+gridRef.current?.startBatchEditSession({ id: "approval-draft" });
+gridRef.current?.undoEdit();
+gridRef.current?.redoEdit();
+await gridRef.current?.commitBatchEditSession();
 ```
 
 ## Event Props
 
 Core `events` remain supported. React event props are merged after core event
 handlers, so both paths can observe the same event.
+For controlled edit state, set `editing={{ readOnly: true }}` and update React
+state from `onCellEditRequested`.
+React also exposes `onEditUndo`, `onEditRedo`, and `onEditHistoryChanged` for
+edit history toolbar state.
 
 ```tsx
 <OneGrid
@@ -55,6 +68,7 @@ handlers, so both paths can observe the same event.
   data={rows}
   events={{ sortChanged: auditSort }}
   onSortChanged={syncReactState}
+  onCellEditRequested={({ nextRow }) => setRows((current) => replaceRow(current, nextRow))}
 />
 ```
 

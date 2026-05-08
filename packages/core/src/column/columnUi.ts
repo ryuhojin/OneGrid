@@ -1,5 +1,6 @@
 import type { ColumnModel, NormalizedDataColumn } from "./columnModel.js";
-import type { PinnedSide } from "../types/shared.js";
+import type { DataColumnDef } from "../types/column.js";
+import type { ColumnId, PinnedSide } from "../types/shared.js";
 
 export interface ColumnUiState {
   readonly order?: readonly string[];
@@ -10,6 +11,11 @@ export interface ColumnUiColumnState {
   readonly width?: number;
   readonly hidden?: boolean;
   readonly pinned?: PinnedSide | null;
+}
+
+export interface SetColumnStateOptions {
+  readonly render?: boolean;
+  readonly reason?: string;
 }
 
 export interface ColumnAutoSizeOptions<TData = unknown> {
@@ -40,6 +46,22 @@ export interface ColumnMenuModel {
   readonly columnId: string;
   readonly headerName: string;
   readonly items: readonly ColumnMenuItem[];
+}
+
+export interface ColumnMenuExtensionContext<TData = unknown> {
+  readonly columnId: ColumnId;
+  readonly headerName: string;
+  readonly column: DataColumnDef<TData>;
+}
+
+export type ColumnMenuExtensionPredicate<TData = unknown> =
+  (context: ColumnMenuExtensionContext<TData>) => boolean;
+
+export interface ColumnMenuExtensionPayload<TData = unknown> {
+  readonly label: string;
+  readonly visible?: boolean | ColumnMenuExtensionPredicate<TData>;
+  readonly disabled?: boolean | ColumnMenuExtensionPredicate<TData>;
+  onSelect?(context: ColumnMenuExtensionContext<TData>): void;
 }
 
 export interface ColumnsToolPanelModel {
@@ -132,6 +154,16 @@ export function pinColumn(
   pinned: PinnedSide | null
 ): ColumnUiState {
   return patchColumnState(state, columnId, { pinned });
+}
+
+export function freezeColumnUiState(state: ColumnUiState): ColumnUiState {
+  const columns = Object.fromEntries(
+    Object.entries(state.columns ?? {}).map(([columnId, column]) => [columnId, Object.freeze({ ...column })])
+  );
+  return Object.freeze({
+    ...(state.order === undefined ? {} : { order: Object.freeze([...state.order]) }),
+    ...(Object.keys(columns).length === 0 ? {} : { columns: Object.freeze(columns) })
+  });
 }
 
 export function createColumnMenuModel<TData>(

@@ -1,5 +1,11 @@
-import type { GridApi } from "@onegrid/core";
-import { createSelectionState } from "@onegrid/core";
+import type {
+  GridApi,
+  GridBatchEditSession,
+  GridEditHistoryState,
+  GridStateSnapshot,
+  StartBatchEditSessionOptions
+} from "@onegrid/core";
+import { createSelectionState, freezeColumnUiState, freezeGridStateSnapshot } from "@onegrid/core";
 import type { OneGrid as DomOneGrid } from "@onegrid/dom";
 
 export interface OneGridHandle<TData = unknown> extends GridApi<TData> {}
@@ -10,6 +16,8 @@ export function createGridHandle<TData>(
   return {
     destroy: () => getGrid()?.destroy(),
     refresh: (options) => getGrid()?.refresh(options) ?? Promise.resolve(),
+    getState: () => getGrid()?.getState() ?? createFallbackStateSnapshot(),
+    setState: (state, options) => getGrid()?.setState(state, options),
     setData: (rows) => getGrid()?.setData(rows),
     appendRows: (rows) => getGrid()?.appendRows(rows),
     updateRows: (rows) => getGrid()?.updateRows(rows),
@@ -19,6 +27,15 @@ export function createGridHandle<TData>(
     scrollToColumn: (field, align) => getGrid()?.scrollToColumn(field, align),
     startEdit: (position) => getGrid()?.startEdit(position),
     stopEdit: (options) => getGrid()?.stopEdit(options),
+    startBatchEditSession: (options) => getGrid()?.startBatchEditSession(options)
+      ?? createFallbackBatchSession(options),
+    getBatchEditSession: () => getGrid()?.getBatchEditSession(),
+    commitBatchEditSession: (options) => getGrid()?.commitBatchEditSession(options) ?? Promise.resolve(undefined),
+    cancelBatchEditSession: () => getGrid()?.cancelBatchEditSession(),
+    undoEdit: () => getGrid()?.undoEdit(),
+    redoEdit: () => getGrid()?.redoEdit(),
+    getEditHistoryState: () => getGrid()?.getEditHistoryState() ?? createFallbackEditHistoryState(),
+    clearEditHistory: () => getGrid()?.clearEditHistory(),
     getPendingEdits: () => getGrid()?.getPendingEdits() ?? [],
     commitPendingEdits: (options) => getGrid()?.commitPendingEdits(options) ?? Promise.resolve(),
     cancelPendingEdits: () => getGrid()?.cancelPendingEdits(),
@@ -31,6 +48,9 @@ export function createGridHandle<TData>(
     validate: () => getGrid()?.validate()
       ?? Object.freeze({ valid: true, issues: Object.freeze([]) }),
     setColumns: (columns) => getGrid()?.setColumns(columns),
+    getColumnState: () => getGrid()?.getColumnState() ?? freezeColumnUiState({}),
+    setColumnState: (state, options) => getGrid()?.setColumnState(state, options),
+    resetColumnState: (options) => getGrid()?.resetColumnState(options),
     showColumn: (field) => getGrid()?.showColumn(field),
     hideColumn: (field) => getGrid()?.hideColumn(field),
     pinColumn: (field, side) => getGrid()?.pinColumn(field, side),
@@ -64,7 +84,43 @@ export function createGridHandle<TData>(
     setLocale: (locale) => getGrid()?.setLocale(locale),
     getLocale: () => getGrid()?.getLocale() ?? "en-US",
     applyTheme: (theme) => getGrid()?.applyTheme(theme),
+    hasPlugin: (pluginId) => getGrid()?.hasPlugin(pluginId) ?? false,
+    getPluginExtensions: (point) => getGrid()?.getPluginExtensions(point) ?? [],
     on: (eventName, handler) => getGrid()?.on(eventName, handler) ?? (() => undefined),
-    off: (eventName, handler) => getGrid()?.off(eventName, handler)
+    off: (eventName, handler) => getGrid()?.off(eventName, handler),
+    onBefore: (eventName, handler) => getGrid()?.onBefore(eventName, handler) ?? (() => undefined),
+    offBefore: (eventName, handler) => getGrid()?.offBefore(eventName, handler)
   };
+}
+
+function createFallbackStateSnapshot(): GridStateSnapshot {
+  return freezeGridStateSnapshot({
+    selection: createSelectionState(),
+    pagination: { page: 1, pageSize: 50 },
+    scroll: { top: 0, left: 0 },
+    locale: "en-US"
+  });
+}
+
+function createFallbackEditHistoryState<TData>(): GridEditHistoryState<TData> {
+  return Object.freeze({
+    canUndo: false,
+    canRedo: false,
+    undoCount: 0,
+    redoCount: 0
+  });
+}
+
+function createFallbackBatchSession<TData>(
+  options: StartBatchEditSessionOptions | undefined
+): GridBatchEditSession<TData> {
+  return Object.freeze({
+    id: options?.id ?? "unmounted",
+    ...(options?.label === undefined ? {} : { label: options.label }),
+    ...(options?.metadata === undefined ? {} : { metadata: options.metadata }),
+    status: "active",
+    startedAt: Date.now(),
+    editCount: 0,
+    pendingEdits: Object.freeze([])
+  });
 }

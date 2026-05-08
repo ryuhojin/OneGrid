@@ -1,9 +1,11 @@
 import { validateGridPlugins } from "./lifecycle.js";
+import { createPluginExtensionRegistry } from "./pluginExtensions.js";
 import { GridPluginRuntimeContext } from "./pluginContext.js";
 import type { GridPluginDescriptor, GridPluginLifecycle, PluginValidationResult } from "./lifecycle.js";
+import type { GridPluginExtensionRegistry } from "./pluginExtensions.js";
 import type { GridApi } from "../types/grid-api.js";
 import type { GridOptions } from "../types/grid-options.js";
-import type { GridPlugin } from "../types/plugin.js";
+import type { GridPlugin, GridPluginExtension, GridPluginExtensionPoint } from "../types/plugin.js";
 import type { Unsubscribe } from "../types/shared.js";
 
 export interface CreatePluginRegistryOptions<TData = unknown> {
@@ -21,6 +23,9 @@ export interface GridPluginRegistry<TData = unknown> {
   get(pluginId: string): GridPluginDescriptor<TData> | undefined;
   has(pluginId: string): boolean;
   list(): readonly GridPluginDescriptor<TData>[];
+  getExtensions<TPayload = unknown>(
+    point?: GridPluginExtensionPoint
+  ): readonly GridPluginExtension<TPayload>[];
 }
 
 interface PluginRecord<TData = unknown> {
@@ -33,6 +38,7 @@ export function createPluginRegistry<TData = unknown>(
   options: CreatePluginRegistryOptions<TData>
 ): GridPluginRegistry<TData> {
   const records = new Map<string, PluginRecord<TData>>();
+  const extensions = createPluginExtensionRegistry();
   const setupOrder: string[] = [];
 
   const registry: GridPluginRegistry<TData> = {
@@ -47,7 +53,7 @@ export function createPluginRegistry<TData = unknown>(
       });
 
       return () => {
-        disposeRecord(plugin.id, records);
+        disposeRecord(plugin.id, records, extensions);
         records.delete(plugin.id);
       };
     },
@@ -68,7 +74,7 @@ export function createPluginRegistry<TData = unknown>(
           continue;
         }
 
-        setupRecord(record, options.api, options.gridOptions);
+        setupRecord(record, options.api, options.gridOptions, extensions);
         setupOrder.push(pluginId);
       }
     },
@@ -77,7 +83,7 @@ export function createPluginRegistry<TData = unknown>(
 
       for (const pluginId of [...setupOrder].reverse()) {
         try {
-          disposeRecord(pluginId, records);
+          disposeRecord(pluginId, records, extensions);
         } catch (error) {
           errors.push(error);
         }
@@ -102,6 +108,9 @@ export function createPluginRegistry<TData = unknown>(
     },
     list() {
       return [...records.entries()].map(([pluginId, record]) => toDescriptor(pluginId, record));
+    },
+    getExtensions(point) {
+      return extensions.list(point);
     }
   };
 
@@ -113,9 +122,10 @@ export function createPluginRegistry<TData = unknown>(
 function setupRecord<TData>(
   record: PluginRecord<TData>,
   api: GridApi<TData>,
-  gridOptions: GridOptions<TData>
+  gridOptions: GridOptions<TData>,
+  extensions: GridPluginExtensionRegistry
 ): void {
-  const context = new GridPluginRuntimeContext(api, gridOptions);
+  const context = new GridPluginRuntimeContext(record.plugin.id, api, gridOptions, extensions);
 
   try {
     const cleanup = record.plugin.setup(context);
@@ -132,16 +142,21 @@ function setupRecord<TData>(
 
 function disposeRecord<TData>(
   pluginId: string,
-  records: ReadonlyMap<string, PluginRecord<TData>>
+  records: ReadonlyMap<string, PluginRecord<TData>>,
+  extensions?: GridPluginExtensionRegistry
 ): void {
   const record = records.get(pluginId);
   if (!record || record.lifecycle === "disposed") {
     return;
   }
 
-  record.context?.dispose();
-  record.context = undefined;
-  record.lifecycle = "disposed";
+  try {
+    record.context?.dispose();
+  } finally {
+    extensions?.clearPlugin(pluginId);
+    record.context = undefined;
+    record.lifecycle = "disposed";
+  }
 }
 
 function toDescriptor<TData>(

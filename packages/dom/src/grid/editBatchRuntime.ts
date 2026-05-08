@@ -1,11 +1,15 @@
 import type {
   CellEditCommitResult,
   CellEditSession,
+  GridBatchEditSession,
+  GridBatchEditSessionStatus,
   GridPendingEdit,
   NormalizedDataColumn,
-  RowKey
+  RowKey,
+  StartBatchEditSessionOptions
 } from "@onegrid/core";
 import { readField } from "@onegrid/core";
+import type { DomEditHistoryEntry } from "./editHistoryRuntime.js";
 
 export interface PendingDomEdit<TData> extends GridPendingEdit<TData> {
   readonly field: string;
@@ -26,9 +30,19 @@ interface PendingSourceRow<TData> {
   readonly sourceIndex?: number;
 }
 
+interface InternalBatchEditSession {
+  readonly id: string;
+  readonly label?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly startedAt: number;
+}
+
+let nextBatchSessionId = 0;
+
 export class EditBatchRuntime<TData> {
   private readonly pendingEdits = new Map<string, PendingDomEdit<TData>>();
   private readonly pendingOriginalRows = new Map<string, PendingOriginalRow<TData>>();
+  private activeSession: InternalBatchEditSession | undefined;
 
   get size(): number {
     return this.pendingEdits.size;
@@ -56,6 +70,41 @@ export class EditBatchRuntime<TData> {
 
   getOriginalRow(rowKey: RowKey): PendingOriginalRow<TData> | undefined {
     return this.pendingOriginalRows.get(String(rowKey));
+  }
+
+  startSession(options: StartBatchEditSessionOptions = {}): GridBatchEditSession<TData> {
+    if (!this.activeSession) {
+      this.activeSession = Object.freeze({
+        id: options.id ?? `batch:${++nextBatchSessionId}`,
+        ...(options.label === undefined ? {} : { label: options.label }),
+        ...(options.metadata === undefined ? {} : { metadata: Object.freeze({ ...options.metadata }) }),
+        startedAt: Date.now()
+      });
+    }
+    return this.createSessionSnapshot(this.activeSession, "active");
+  }
+
+  ensureSession(): GridBatchEditSession<TData> {
+    return this.activeSession
+      ? this.createSessionSnapshot(this.activeSession, "active")
+      : this.startSession();
+  }
+
+  getSession(): GridBatchEditSession<TData> | undefined {
+    return this.activeSession
+      ? this.createSessionSnapshot(this.activeSession, "active")
+      : undefined;
+  }
+
+  closeSession(status: Exclude<GridBatchEditSessionStatus, "active">): GridBatchEditSession<TData> | undefined {
+    const session = this.activeSession;
+    if (!session) {
+      return undefined;
+    }
+
+    const snapshot = this.createSessionSnapshot(session, status, Date.now());
+    this.activeSession = undefined;
+    return snapshot;
   }
 
   clear(): void {
@@ -101,6 +150,7 @@ export class EditBatchRuntime<TData> {
       position: {
         rowIndex: result.session.rowIndex,
         rowKey,
+        columnId: result.session.columnId,
         field
       },
       previousValue,
@@ -125,6 +175,50 @@ export class EditBatchRuntime<TData> {
     return pendingEdit;
   }
 
+  syncHistoryEntry(
+    entry: DomEditHistoryEntry<TData>,
+    input: {
+      readonly row: TData;
+      readonly value: unknown;
+    }
+  ): PendingDomEdit<TData> | undefined {
+    const rowKeyId = String(entry.rowKey);
+    const editKey = createPendingEditKey(entry.rowKey, entry.field);
+    const existing = this.pendingEdits.get(editKey);
+    const previousValue = existing?.previousValue ?? entry.previousValue;
+
+    if (!this.pendingOriginalRows.has(rowKeyId)) {
+      this.pendingOriginalRows.set(rowKeyId, Object.freeze({
+        row: entry.rowBefore,
+        rowKey: entry.rowKey,
+        rowIndex: entry.rowIndex,
+        ...(entry.sourceIndex === undefined ? {} : { sourceIndex: entry.sourceIndex })
+      }));
+    }
+
+    if (Object.is(previousValue, input.value)) {
+      this.pendingEdits.delete(editKey);
+      if (!this.hasPendingEditsForRow(rowKeyId)) {
+        this.pendingOriginalRows.delete(rowKeyId);
+      }
+      return undefined;
+    }
+
+    const pendingEdit: PendingDomEdit<TData> = Object.freeze({
+      row: input.row,
+      rowKey: entry.rowKey,
+      position: entry.position,
+      previousValue,
+      nextValue: input.value,
+      stagedAt: Date.now(),
+      field: entry.field,
+      rowIndex: entry.rowIndex,
+      ...(entry.sourceIndex === undefined ? {} : { sourceIndex: entry.sourceIndex })
+    });
+    this.pendingEdits.set(editKey, pendingEdit);
+    return pendingEdit;
+  }
+
   private hasPendingEditsForRow(rowKeyId: string): boolean {
     for (const edit of this.pendingEdits.values()) {
       if (String(edit.rowKey) === rowKeyId) {
@@ -132,6 +226,24 @@ export class EditBatchRuntime<TData> {
       }
     }
     return false;
+  }
+
+  private createSessionSnapshot(
+    session: InternalBatchEditSession,
+    status: GridBatchEditSessionStatus,
+    completedAt?: number
+  ): GridBatchEditSession<TData> {
+    const pendingEdits = this.getPendingEdits();
+    return Object.freeze({
+      id: session.id,
+      ...(session.label === undefined ? {} : { label: session.label }),
+      ...(session.metadata === undefined ? {} : { metadata: session.metadata }),
+      status,
+      startedAt: session.startedAt,
+      ...(completedAt === undefined ? {} : { completedAt }),
+      editCount: pendingEdits.length,
+      pendingEdits
+    });
   }
 }
 

@@ -1,5 +1,11 @@
-import type { GridApi } from "@onegrid/core";
-import { createSelectionState } from "@onegrid/core";
+import type {
+  GridApi,
+  GridBatchEditSession,
+  GridEditHistoryState,
+  GridStateSnapshot,
+  StartBatchEditSessionOptions
+} from "@onegrid/core";
+import { createSelectionState, freezeColumnUiState, freezeGridStateSnapshot } from "@onegrid/core";
 import type { OneGrid as DomOneGrid } from "@onegrid/dom";
 
 export interface OneGridExpose extends GridApi<unknown> {}
@@ -13,6 +19,12 @@ export function createGridExpose(
     },
     refresh(options) {
       return getGrid()?.refresh(options) ?? Promise.resolve();
+    },
+    getState() {
+      return getGrid()?.getState() ?? createFallbackStateSnapshot();
+    },
+    setState(state, options) {
+      getGrid()?.setState(state, options);
     },
     setData(rows) {
       getGrid()?.setData(rows);
@@ -40,6 +52,30 @@ export function createGridExpose(
     },
     stopEdit(options) {
       getGrid()?.stopEdit(options);
+    },
+    startBatchEditSession(options) {
+      return getGrid()?.startBatchEditSession(options) ?? createFallbackBatchSession(options);
+    },
+    getBatchEditSession() {
+      return getGrid()?.getBatchEditSession();
+    },
+    commitBatchEditSession(options) {
+      return getGrid()?.commitBatchEditSession(options) ?? Promise.resolve(undefined);
+    },
+    cancelBatchEditSession() {
+      return getGrid()?.cancelBatchEditSession();
+    },
+    undoEdit() {
+      return getGrid()?.undoEdit();
+    },
+    redoEdit() {
+      return getGrid()?.redoEdit();
+    },
+    getEditHistoryState() {
+      return getGrid()?.getEditHistoryState() ?? createFallbackEditHistoryState();
+    },
+    clearEditHistory() {
+      getGrid()?.clearEditHistory();
     },
     getPendingEdits() {
       return getGrid()?.getPendingEdits() ?? [];
@@ -70,6 +106,15 @@ export function createGridExpose(
     },
     setColumns(columns) {
       getGrid()?.setColumns(columns);
+    },
+    getColumnState() {
+      return getGrid()?.getColumnState() ?? freezeColumnUiState({});
+    },
+    setColumnState(state, options) {
+      getGrid()?.setColumnState(state, options);
+    },
+    resetColumnState(options) {
+      getGrid()?.resetColumnState(options);
     },
     showColumn(field) {
       getGrid()?.showColumn(field);
@@ -170,11 +215,55 @@ export function createGridExpose(
     applyTheme(theme) {
       getGrid()?.applyTheme(theme);
     },
+    hasPlugin(pluginId) {
+      return getGrid()?.hasPlugin(pluginId) ?? false;
+    },
+    getPluginExtensions(point) {
+      return getGrid()?.getPluginExtensions(point) ?? [];
+    },
     on(eventName, handler) {
       return getGrid()?.on(eventName, handler) ?? (() => undefined);
     },
     off(eventName, handler) {
       getGrid()?.off(eventName, handler);
+    },
+    onBefore(eventName, handler) {
+      return getGrid()?.onBefore(eventName, handler) ?? (() => undefined);
+    },
+    offBefore(eventName, handler) {
+      getGrid()?.offBefore(eventName, handler);
     }
   };
+}
+
+function createFallbackStateSnapshot(): GridStateSnapshot {
+  return freezeGridStateSnapshot({
+    selection: createSelectionState(),
+    pagination: { page: 1, pageSize: 50 },
+    scroll: { top: 0, left: 0 },
+    locale: "en-US"
+  });
+}
+
+function createFallbackEditHistoryState(): GridEditHistoryState<unknown> {
+  return Object.freeze({
+    canUndo: false,
+    canRedo: false,
+    undoCount: 0,
+    redoCount: 0
+  });
+}
+
+function createFallbackBatchSession(
+  options: StartBatchEditSessionOptions | undefined
+): GridBatchEditSession<unknown> {
+  return Object.freeze({
+    id: options?.id ?? "unmounted",
+    ...(options?.label === undefined ? {} : { label: options.label }),
+    ...(options?.metadata === undefined ? {} : { metadata: options.metadata }),
+    status: "active",
+    startedAt: Date.now(),
+    editCount: 0,
+    pendingEdits: Object.freeze([])
+  });
 }

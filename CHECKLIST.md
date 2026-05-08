@@ -268,6 +268,29 @@
   - Evidence:
     - packages/core/src/types/plugin.ts
     - packages/core/test/public-types.test.ts
+- [x] C-001-010 `defaultColumnDef` / `columnTypes` contract 구현
+  - Evidence:
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/types/column.ts
+    - packages/core/src/types/shared.ts
+    - packages/core/src/column/columnDefaults.ts
+    - packages/core/src/column/columnModel.ts
+    - packages/dom/src/grid/domColumnModel.ts
+    - packages/react/src/gridOptions.ts
+    - packages/vue/src/gridOptions.ts
+    - apps/examples/src/features/column-types
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/column-def.mdx
+  - Verified:
+    - pnpm exec vitest run packages/core/test/column-model.test.ts packages/core/test/public-types.test.ts packages/react/test/react-shell.test.tsx packages/vue/test/vue-shell.test.ts
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm test:perf:smoke
+    - pnpm build
+    - pnpm docs:build
 
 ### C-002 State / Events / Commands
 
@@ -314,6 +337,65 @@
   - Verified:
     - pnpm --filter @onegrid/core typecheck
     - pnpm test:unit -- packages/core/test/state-events-commands.test.ts
+- [x] C-002-007 `GridStateSnapshot` / `getState` / `setState` / `initialState` contract 구현
+  - Evidence:
+    - packages/core/src/state/gridState.ts
+    - packages/core/src/types/grid-api.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/dom/src/grid/gridStateRuntime.ts
+    - packages/dom/src/grid/oneGridApiBase.ts
+    - packages/react/src/gridHandle.ts
+    - packages/vue/src/gridExpose.ts
+    - packages/core/test/public-types.test.ts
+    - packages/dom/test/onegrid-shell.test.ts
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - snapshot 범위는 column UI state, sort/filter/group model, selection, pagination, scroll, locale로 한정한다.
+    - `columns`, `data`, `dataSource`, renderer/security configuration은 정적 옵션으로 남긴다.
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+    - pnpm exec vitest run packages/core/test/public-types.test.ts packages/core/test/client-row-model.test.ts packages/core/test/column-model.test.ts packages/dom/test/onegrid-shell.test.ts packages/react/test/react-shell.test.tsx packages/vue/test/vue-shell.test.ts
+- [x] C-002-008 public before-event / cancellable event contract 구현
+  - Evidence:
+    - packages/core/src/types/events.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/core/src/types/grid-api.ts
+    - packages/core/src/events/eventBus.ts
+	    - packages/core/src/wrapper/apiParity.ts
+	    - packages/dom/src/grid/gridEventRegistry.ts
+	    - packages/dom/src/grid/oneGridEventBase.ts
+	    - packages/dom/src/grid/oneGridBase.ts
+	    - packages/dom/src/grid/oneGridEditCommitBase.ts
+	    - packages/dom/src/grid/oneGridSortingFiltering.ts
+    - packages/dom/src/grid/oneGridPagination.ts
+    - packages/dom/src/grid/oneGridSelection.ts
+    - packages/dom/src/grid/oneGridEditing.ts
+    - packages/react/src/gridEvents.ts
+    - packages/vue/src/vueEvents.ts
+    - apps/docs/docs/api/events.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/frameworks/api-parity.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - public hooks: `beforeCellEditStart`, `beforeCellEditCommit`, `beforeSelectionChange`, `beforeSortChange`, `beforeFilterChange`, `beforePageChange`, `beforeColumnStateChange`
+    - `preventDefault(reason?)` 호출 시 해당 DOM mutation은 적용하지 않고 normal after-event도 발생하지 않는다.
+	  - Verified:
+	    - pnpm typecheck
+	    - pnpm exec vitest run packages/core/test/public-types.test.ts packages/dom/test/onegrid-shell.test.ts packages/react/test/react-shell.test.tsx packages/vue/test/vue-shell.test.ts
+	    - pnpm lint
+	    - pnpm test:unit
+	    - pnpm test:e2e
+	    - pnpm test:a11y
+	    - pnpm test:perf:smoke
+	    - pnpm build
+	    - pnpm docs:build
 
 ### C-003 Plugin System
 
@@ -348,6 +430,101 @@
   - Verified:
     - pnpm --filter @onegrid/core typecheck
     - pnpm test:unit -- packages/core/test/plugin-registry.test.ts
+- [x] C-003-005 plugin extension point 구현
+  - Evidence:
+    - packages/core/src/types/plugin.ts
+    - packages/core/src/menu/contextMenuModel.ts
+    - packages/core/src/column/columnUi.ts
+    - packages/core/src/export/exportTypes.ts
+    - packages/core/src/plugin/pluginExtensions.ts
+    - packages/core/src/plugin/pluginContext.ts
+    - packages/core/src/plugin/pluginRegistry.ts
+    - packages/dom/src/grid/oneGridBase.ts
+    - packages/dom/src/grid/columnMenu.ts
+    - packages/dom/src/grid/gridFocusRestore.ts
+    - packages/dom/src/grid/oneGridMenu.ts
+    - packages/dom/src/grid/oneGridExport.ts
+    - packages/dom/src/grid/pluginThemeRuntime.ts
+    - packages/react/src/gridHandle.ts
+    - packages/vue/src/gridExpose.ts
+    - apps/docs/docs/api/plugins.mdx
+    - packages/core/test/plugin-registry.test.ts
+    - packages/core/test/context-menu.test.ts
+    - packages/core/test/public-types.test.ts
+    - packages/dom/test/onegrid-shell.test.ts
+  - Verified:
+    - pnpm --filter @onegrid/core test -- packages/core/test/plugin-registry.test.ts packages/core/test/public-types.test.ts packages/core/test/context-menu.test.ts
+    - pnpm --filter @onegrid/dom test -- packages/dom/test/onegrid-shell.test.ts
+    - pnpm --filter @onegrid/react test -- packages/react/test/react-shell.test.tsx
+    - pnpm --filter @onegrid/vue test -- packages/vue/test/vue-shell.test.ts
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+
+### C-004 Column Identity Contract
+
+- [x] C-004-001 `columnId` 중심 public type contract 시작
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/core/src/types/column.ts
+    - packages/core/src/types/grid-api.ts
+    - packages/core/src/row/clientSort.ts
+    - packages/core/src/row/clientFilter.ts
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm docs:build
+    - pnpm exec vitest run packages/core/test/column-model.test.ts packages/core/test/public-types.test.ts packages/core/test/client-row-model.test.ts packages/core/test/editing.test.ts packages/dom/test/edit-history-runtime.test.ts
+- [x] C-004-002 column normalization에서 `columnId` 우선순위 적용
+  - Evidence:
+    - packages/core/src/column/columnIds.ts
+    - packages/core/src/column/columnModel.ts
+    - packages/core/test/column-model.test.ts
+    - packages/core/test/client-row-model.test.ts
+  - Notes:
+    - 우선순위는 `columnId -> id/groupId -> field/path fallback`이다.
+    - 기존 `id`, `groupId`, `field` 기반 호출은 호환 fallback으로 유지한다.
+    - `SortModel`/`FilterCondition`은 `columnId`를 선택적으로 받아 client 계산 컬럼을 찾고, `field`는 데이터/서버 요청 키로 유지한다.
+- [x] C-004-003 DOM/Wrapper 경계에서 `columnId` 전달 시작
+  - Evidence:
+    - packages/dom/src/grid/rendererHost.ts
+    - packages/dom/src/grid/oneGridEditStore.ts
+    - packages/dom/src/grid/oneGridEditing.ts
+    - packages/dom/src/grid/selectionRuntime.ts
+    - packages/react/src/reactRendererBridge.tsx
+    - packages/vue/src/vueRendererBridge.ts
+  - Notes:
+    - `field`는 데이터 바인딩·서버 쿼리 키로 유지하고, column UI/state/slot 식별자는 `columnId`를 우선 사용한다.
+- [x] C-004-004 fieldless data column contract 구현
+  - Evidence:
+    - packages/core/src/types/column.ts
+    - packages/core/src/column/columnIds.ts
+    - packages/core/src/column/columnModel.ts
+    - packages/core/src/editing/editorLifecycle.ts
+    - packages/core/src/row/clientSort.ts
+    - packages/core/src/row/clientFilter.ts
+    - packages/react/src/reactRendererBridge.tsx
+    - packages/vue/src/vueRendererBridge.ts
+    - packages/core/test/column-model.test.ts
+    - packages/core/test/sorting.test.ts
+    - packages/core/test/filtering.test.ts
+    - packages/core/test/public-types.test.ts
+    - apps/docs/docs/api/column-def.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - `DataColumnDef.field`는 optional이며 `columnId`/`id`/fallback으로 column identity를 만든다.
+    - fieldless 컬럼은 `valueGetter`, `renderer`, `valueSetter` 기반 컬럼에 사용하고, 서버 request/import/export 데이터 키가 필요한 경우 명시적인 `field`를 유지한다.
+  - Verified:
+    - pnpm exec vitest run packages/core/test/column-model.test.ts packages/core/test/sorting.test.ts packages/core/test/filtering.test.ts packages/core/test/editing.test.ts packages/core/test/public-types.test.ts
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
 
 ---
 
@@ -420,6 +597,29 @@
     - pnpm --filter @onegrid/core typecheck
     - pnpm test:unit -- packages/core/test/column-model.test.ts
     - pnpm test:e2e
+- [x] COL-001-008 Column State API 구현
+  - Evidence:
+    - packages/core/src/column/columnUi.ts
+    - packages/core/src/types/grid-api.ts
+    - packages/core/src/wrapper/apiParity.ts
+    - packages/dom/src/grid/oneGridApiBase.ts
+    - packages/react/src/gridHandle.ts
+    - packages/vue/src/gridExpose.ts
+    - packages/core/test/public-types.test.ts
+    - packages/dom/test/onegrid-shell.test.ts
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - `getColumnState`, `setColumnState`, `resetColumnState`는 `ColumnUiState`를 그대로 사용한다.
+    - `resetColumnState`는 `GridOptions.columnState`와 `frozenColumns` 초기값으로 복원한다.
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+    - pnpm exec vitest run packages/core/test/public-types.test.ts packages/dom/test/onegrid-shell.test.ts packages/react/test/react-shell.test.tsx packages/vue/test/vue-shell.test.ts
 
 ### COL-002 Group Header / Header Merge
 
@@ -1767,6 +1967,8 @@
     - packages/core/src/editing/index.ts
     - packages/core/test/editing.test.ts
     - packages/dom/src/grid/OneGrid.ts
+  - Notes:
+    - 2026-05-07: `EditingOptions.startMode`와 `ColumnDef.editTrigger`를 추가하고 core `resolveEditStartMode()`로 grid/column/checkbox default 정책을 일원화했다.
 - [x] F-EDIT-002 text editor
   - Evidence:
     - packages/dom/src/grid/editorOverlay.ts
@@ -1796,6 +1998,7 @@
     - 2026-04-30: 체크박스 UI를 파란 박스형 강조 스타일에서 기본 폼 컨트롤에 가까운 회색 테두리/체크 표시 스타일로 낮췄다.
     - 2026-04-30: AG Grid 공개 예제/문서의 기본 editor UX를 벤치마크해 checked 상태는 작고 일반적인 blue checkbox로, unchecked 상태는 얇은 회색 테두리로 정리했다. 구현/소스는 복제하지 않는다.
     - 2026-04-30: Active 컬럼은 편집 전 셀 표시도 기본 checkbox로 보이도록 element renderer를 추가하고, checkbox editor는 별도 custom skin이 아닌 native input 경로로 분리했다.
+    - 2026-05-07: Checkbox editor 셀은 더블클릭 overlay 진입 없이 단일 pointer click으로 즉시 토글되며, batch commit mode에서는 변경 이력이 pending edit으로 누적되도록 보강했다.
 - [x] F-EDIT-007 select editor
   - Evidence:
     - packages/dom/src/grid/editorOverlay.ts
@@ -1845,16 +2048,34 @@
 - [x] F-EDIT-015 commit/cancel policy
   - Evidence:
     - packages/core/src/types/grid-options.ts
+    - packages/core/src/types/shared.ts
+    - packages/core/src/editing/editorLifecycle.ts
     - packages/core/src/types/grid-api.ts
     - packages/core/src/types/events.ts
+    - packages/core/src/wrapper/apiParity.ts
+    - packages/dom/src/grid/editBatchRuntime.ts
+    - packages/dom/src/grid/editHistoryRuntime.ts
+    - packages/dom/src/grid/oneGridBatchEditing.ts
     - packages/dom/src/grid/editorOverlay.ts
+    - packages/dom/src/grid/editorOverlayPosition.ts
+    - packages/dom/src/grid/editFocusMove.ts
+    - packages/dom/src/grid/oneGridEditing.ts
+    - packages/dom/src/grid/gridFocusNavigation.ts
     - packages/dom/src/grid/OneGrid.ts
     - packages/dom/src/grid/virtualColumnWindow.ts
     - packages/dom/src/grid/gridFocus.ts
+    - apps/examples/src/features/editing/data.ts
     - apps/examples/src/features/editing/vanilla.ts
+    - apps/examples/src/features/editing/react.tsx
+    - apps/examples/src/features/editing/vue.vue
     - tests/e2e/features/editing.spec.ts
+    - tests/e2e/features/editing-undo-redo.spec.ts
+    - tests/e2e/features/editing-readonly.spec.ts
   - Verified:
     - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing-undo-redo.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing-readonly.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/editing-a11y.spec.ts --project=chromium
     - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=webkit
   - Notes:
     - 2026-04-30: toolbar `Cancel edit` 클릭 시 editor blur commit이 먼저 실행되지 않도록 blur commit delay와 example button pointerdown focus preservation을 추가했다.
@@ -1862,6 +2083,13 @@
     - 2026-04-30: `editing.commitMode: "batch"`와 pending edit API(`getPendingEdits`, `commitPendingEdits`, `cancelPendingEdits`)를 추가해 Enter는 staged history만 만들고, 예제의 Commit changes 버튼에서만 최종 commit event가 발생하도록 변경했다.
     - 2026-04-30: Cancel changes가 staged history 전체를 원본 row 값으로 복원하도록 Chromium/WebKit E2E로 검증했다.
     - 2026-04-30: `GridPendingEdit.sourceIndex`와 editing 예제의 Pending detail 표시를 추가해 commit 전 변경 목록을 `row/field/previousValue/nextValue` 형식으로 조회할 수 있게 했다.
+    - 2026-05-07: Inline checkbox toggle은 `cellEditStarted` 후 `trigger: "pointer"`로 staged edit을 만들고, overlay editor focus/blur lifecycle을 거치지 않도록 분리했다.
+    - 2026-05-07: Pointer edit 시작 정책은 `doubleClick`, `singleClick`, `manual`로 명시하고, `manual`은 pointer start만 막아 keyboard/API edit 진입은 유지한다.
+    - 2026-05-07: `editing.keyboard` 정책을 추가해 Enter start/commit, Tab commit+move, Escape cancel, Backspace clear-start 동작을 public option과 core resolver로 명시했다.
+    - 2026-05-07: `startBatchEditSession`, `getBatchEditSession`, `commitBatchEditSession`, `cancelBatchEditSession` API와 batch session lifecycle event를 추가해 pending edit 목록을 named session으로 관리할 수 있게 했다.
+    - 2026-05-07: `editing.readOnly`와 `cellEditRequested`를 추가해 editor validation은 유지하되 내부 row mutation/staging 없이 외부 상태 저장소가 `event.nextRow`를 반영하도록 분리했다.
+    - 2026-05-07: Full row editing 후보 구현은 UX 검토 후 제거했다. OneGrid의 기본 행 수정 흐름은 셀 단위 편집, Tab/Shift+Tab 이동, batch pending history, 명시적 commit/cancel API로 유지한다.
+    - 2026-05-07: `editing.undoRedo`, `undoEdit`, `redoEdit`, `getEditHistoryState`, `clearEditHistory`를 추가해 staged/committed cell edit step을 bounded row snapshot stack으로 되돌릴 수 있게 했다.
 - [x] F-EDIT-016 IME composition support
   - Evidence:
     - packages/dom/src/grid/editorOverlay.ts
@@ -1876,6 +2104,8 @@
 - [x] F-EDIT-018 Playwright E2E
   - Evidence:
     - tests/e2e/features/editing.spec.ts
+    - tests/e2e/features/editing-undo-redo.spec.ts
+    - tests/e2e/features/editing-readonly.spec.ts
     - tests/a11y/editing-a11y.spec.ts
     - tests/e2e/visual/editing.visual.spec.ts
     - tests/e2e/visual/editing.visual.spec.ts-snapshots/editing-grid-chromium-darwin.png
@@ -1885,6 +2115,7 @@
     - tests/e2e/visual/tree-row-model.visual.spec.ts-snapshots/tree-row-model-grid-chromium-darwin.png
   - Verified:
     - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing-readonly.spec.ts --project=chromium
     - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=webkit
     - pnpm test:e2e
     - pnpm test:e2e:visual
@@ -1894,6 +2125,18 @@
     - 2026-04-30: Active checkbox 표시/편집과 Priority radio editor가 native form control class를 사용하는지 Chromium/WebKit E2E로 검증했다.
     - 2026-04-30: WebKit에서 checkbox/radio pointer click이 blur cancel 또는 native toggle 차이로 staged edit을 잃지 않도록 pointer-driven toggle 경로를 보강하고 Chromium/WebKit에서 확인했다.
     - 2026-04-30: batch commit action 버튼과 Active checkbox inline alignment를 반영해 editing visual snapshot을 갱신하고 `pnpm test:e2e:visual`로 확인했다.
+    - 2026-05-07: Active checkbox 단일 클릭 토글, overlay 미표시, pending detail 누적, 가로 스크롤 유지 회귀를 Chromium E2E에 반영했다.
+    - 2026-05-07: `Quick Note` single-click edit, `Manual Note` pointer-suppressed edit, checkbox column override를 Chromium E2E로 검증했다.
+    - 2026-05-07: Active editor overlay가 body viewport wheel/scroll 후 셀 위치를 따라가도록 `editorScrollSync`를 추가하고, 셀이 viewport 밖으로 벗어나면 dangling overlay를 취소하도록 보강했다.
+    - 2026-05-07: Toolbar/API `startEdit()`이 현재 가로 스크롤 밖의 셀에 editor overlay를 띄우지 않도록 대상 컬럼을 먼저 viewport 안으로 스크롤한 뒤 편집기를 열도록 보강했다.
+    - 2026-05-07: Center 셀이 가로 스크롤로 left/right pinned pane 뒤에 들어간 상태에서 편집을 시작해도 editor overlay가 pinned 영역 위로 올라오지 않도록 visible cell rect clipping을 추가했다.
+    - 2026-05-07: Pointer/API edit 시작 전에 center viewport 폭을 pinned 영역 제외 기준으로 계산해 대상 컬럼을 먼저 노출하고, window scroll/resize에서도 editor overlay가 셀 위치를 따라가도록 보강했다.
+    - 2026-05-07: Editor overlay를 가능한 경우 `document.body` fixed layer가 아니라 grid shell absolute layer에 붙여 브라우저 페이지 스크롤에서 JS 위치 보정 지연으로 흔들리지 않도록 개선했다.
+    - 2026-05-07: Backspace clear-start, Enter commit, Tab commit+move, `tab` trigger 기록을 editing Chromium E2E에 추가했다.
+    - 2026-05-07: Named batch edit session 시작, editCount 증가, commit 후 session status와 event count를 editing Chromium E2E에 추가했다.
+    - 2026-05-07: Read-only edit가 `cellEditRequested`만 발생시키고 외부 store 반영 후 `setData()`로 화면이 갱신되는지 Chromium E2E를 추가했다.
+    - 2026-05-07: 키보드 셀 이동이 viewport 밖 center 셀로 이동할 때 body horizontal scroll을 먼저 이동시키고 pinned pane 뒤로 focus box가 들어가지 않도록 Chromium E2E를 추가했다.
+    - 2026-05-07: Undo/Redo 버튼이 batch pending edit map과 화면 값을 함께 되돌리고, 같은 셀 반복 편집에서도 단계별 stack이 유지되는지 Chromium E2E를 추가했다.
 - [x] F-EDIT-019 docs
   - Evidence:
     - apps/docs/docs/features/editing.mdx
@@ -1902,7 +2145,17 @@
     - apps/docs/docs/api/grid-options.mdx
     - apps/docs/docs/api/grid-api.mdx
     - apps/docs/docs/api/events.mdx
+    - apps/docs/docs/frameworks/api-parity.mdx
+    - apps/docs/docs/frameworks/react.mdx
+    - apps/docs/docs/frameworks/vue.mdx
     - API_CHANGELOG.md
+  - Notes:
+    - 2026-05-07: `editing.startMode`, `ColumnDef.editTrigger`, checkbox default single-click, pointer trigger migration note를 docs/API changelog에 반영했다.
+    - 2026-05-07: `editing.keyboard` 옵션, 키별 focused-cell/editor 동작 표, `tab` commit trigger migration note를 docs/API changelog에 반영했다.
+    - 2026-05-07: Batch edit session API, React/Vue method/event parity, `batchEditSessionStarted/Committed/Cancelled` event를 docs/API changelog에 반영했다.
+    - 2026-05-07: Read-only edit / external state integration 문서, `cellEditRequested` event, React/Vue wrapper parity, vanilla/React/Vue 예제를 갱신했다.
+    - 2026-05-07: Full row editing은 public API에서 제외하고, 셀 편집 + keyboard navigation + batch session을 권장 editing flow로 기록했다.
+    - 2026-05-07: Undo/Redo edit stack option, API, events, wrapper parity, example README, API changelog를 문서화했다.
   - Verified:
     - pnpm lint
     - pnpm typecheck
@@ -3278,109 +3531,644 @@
 
 ### EX-001 Basic / Setup
 
-- [ ] EX-001-001 basic grid
+- [x] EX-001-001 basic grid
   - Evidence:
-- [ ] EX-001-002 column types
+    - apps/examples/src/features/basic/data.ts
+    - apps/examples/src/features/basic/vanilla.ts
+    - apps/examples/src/features/basic/react.tsx
+    - apps/examples/src/features/basic/vue.vue
+    - apps/examples/src/features/basic/README.md
+    - apps/examples/src/catalog.ts
+    - tests/e2e/features/basic.spec.ts
+    - tests/a11y/basic-a11y.spec.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/basic.spec.ts tests/a11y/basic-a11y.spec.ts --project=chromium
+- [x] EX-001-002 column types
   - Evidence:
-- [ ] EX-001-003 row data update
+    - apps/examples/src/features/column-types/data.ts
+    - apps/examples/src/features/column-types/vanilla.ts
+    - apps/examples/src/features/column-types/react.tsx
+    - apps/examples/src/features/column-types/vue.vue
+    - apps/examples/src/features/column-types/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/column-types.spec.ts
+    - tests/a11y/column-types-a11y.spec.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/column-types.spec.ts tests/a11y/column-types-a11y.spec.ts --project=chromium
+- [x] EX-001-003 row data update
   - Evidence:
-- [ ] EX-001-004 grid api methods
+    - apps/examples/src/features/row-data-update/data.ts
+    - apps/examples/src/features/row-data-update/vanilla.ts
+    - apps/examples/src/features/row-data-update/react.tsx
+    - apps/examples/src/features/row-data-update/vue.vue
+    - apps/examples/src/features/row-data-update/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/row-data-update.spec.ts
+    - tests/a11y/row-data-update-a11y.spec.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/row-data-update.spec.ts tests/a11y/row-data-update-a11y.spec.ts --project=chromium
+- [x] EX-001-004 grid api methods
   - Evidence:
+    - apps/examples/src/features/grid-api-methods/data.ts
+    - apps/examples/src/features/grid-api-methods/vanilla.ts
+    - apps/examples/src/features/grid-api-methods/react.tsx
+    - apps/examples/src/features/grid-api-methods/vue.vue
+    - apps/examples/src/features/grid-api-methods/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/grid-api-methods.spec.ts
+    - tests/a11y/grid-api-methods-a11y.spec.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/grid-api-methods.spec.ts tests/a11y/grid-api-methods-a11y.spec.ts --project=chromium
 
 ### EX-002 Layout / Header / Merge
 
-- [ ] EX-002-001 group header
+- [x] EX-002-001 group header
   - Evidence:
-- [ ] EX-002-002 header merge
+    - apps/examples/src/features/group-header/data.ts
+    - apps/examples/src/features/group-header/vanilla.ts
+    - apps/examples/src/features/group-header/react.tsx
+    - apps/examples/src/features/group-header/vue.vue
+    - apps/examples/src/features/group-header/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-layout-merge.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=chromium
+- [x] EX-002-002 header merge
   - Evidence:
-- [ ] EX-002-003 cell merge vertical
+    - apps/examples/src/features/group-header/data.ts
+    - apps/examples/src/features/group-header/vanilla.ts
+    - apps/examples/src/features/group-header/react.tsx
+    - apps/examples/src/features/group-header/vue.vue
+    - tests/e2e/features/group-header.spec.ts
+    - tests/e2e/features/examples-layout-merge.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=chromium
+- [x] EX-002-003 cell merge vertical
   - Evidence:
-- [ ] EX-002-004 cell merge horizontal
+    - apps/examples/src/features/cell-merge/data.ts
+    - apps/examples/src/features/cell-merge/vanilla.ts
+    - apps/examples/src/features/cell-merge/react.tsx
+    - apps/examples/src/features/cell-merge/vue.vue
+    - tests/e2e/features/cell-merge.spec.ts
+    - tests/e2e/features/examples-layout-merge.spec.ts
+    - tests/a11y/cell-merge-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=chromium
+- [x] EX-002-004 cell merge horizontal
   - Evidence:
-- [ ] EX-002-005 cell merge block
+    - apps/examples/src/features/cell-merge/data.ts
+    - apps/examples/src/features/cell-merge/vanilla.ts
+    - apps/examples/src/features/cell-merge/react.tsx
+    - apps/examples/src/features/cell-merge/vue.vue
+    - tests/e2e/features/cell-merge.spec.ts
+    - tests/e2e/features/examples-layout-merge.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=chromium
+- [x] EX-002-005 cell merge block
   - Evidence:
-- [ ] EX-002-006 frozen columns
+    - apps/examples/src/features/cell-merge-block/data.ts
+    - apps/examples/src/features/cell-merge-block/vanilla.ts
+    - apps/examples/src/features/cell-merge-block/react.tsx
+    - apps/examples/src/features/cell-merge-block/vue.vue
+    - apps/examples/src/features/cell-merge-block/README.md
+    - tests/e2e/features/examples-layout-merge.spec.ts
+    - tests/a11y/examples-layout-merge-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts tests/a11y/examples-layout-merge-a11y.spec.ts --project=chromium
+- [x] EX-002-006 frozen columns
   - Evidence:
-- [ ] EX-002-007 frozen rows
+    - apps/examples/src/features/frozen/data.ts
+    - apps/examples/src/features/frozen/vanilla.ts
+    - apps/examples/src/features/frozen/react.tsx
+    - apps/examples/src/features/frozen/vue.vue
+    - tests/e2e/features/frozen.spec.ts
+    - tests/e2e/features/examples-layout-merge.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=chromium
+- [x] EX-002-007 frozen rows
   - Evidence:
-- [ ] EX-002-008 variable row height
+    - apps/examples/src/features/frozen/data.ts
+    - apps/examples/src/features/frozen/vanilla.ts
+    - apps/examples/src/features/frozen/react.tsx
+    - apps/examples/src/features/frozen/vue.vue
+    - tests/e2e/features/frozen.spec.ts
+    - tests/e2e/features/examples-layout-merge.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=chromium
+- [x] EX-002-008 variable row height
   - Evidence:
+    - packages/dom/src/grid/rowHeightRuntime.ts
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - apps/examples/src/features/variable-row-height/data.ts
+    - apps/examples/src/features/variable-row-height/vanilla.ts
+    - apps/examples/src/features/variable-row-height/react.tsx
+    - apps/examples/src/features/variable-row-height/vue.vue
+    - apps/examples/src/features/variable-row-height/README.md
+    - tests/e2e/features/examples-layout-merge.spec.ts
+    - tests/a11y/examples-layout-merge-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts tests/a11y/examples-layout-merge-a11y.spec.ts --project=chromium
 
 ### EX-003 Data Modes
 
-- [ ] EX-003-001 client row model
+- [x] EX-003-001 client row model
   - Evidence:
-- [ ] EX-003-002 infinite row model
+    - apps/examples/src/features/client-row-model/data.ts
+    - apps/examples/src/features/client-row-model/vanilla.ts
+    - apps/examples/src/features/client-row-model/react.tsx
+    - apps/examples/src/features/client-row-model/vue.vue
+    - apps/examples/src/features/client-row-model/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/client-row-model.spec.ts
+    - tests/a11y/client-row-model-a11y.spec.ts
+    - tests/e2e/features/examples-data-modes.spec.ts
+    - tests/a11y/examples-data-modes-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-data-modes.spec.ts tests/a11y/examples-data-modes-a11y.spec.ts --project=chromium
+- [x] EX-003-002 infinite row model
   - Evidence:
-- [ ] EX-003-003 server row model
+    - apps/examples/src/features/infinite-row-model/data.ts
+    - apps/examples/src/features/infinite-row-model/vanilla.ts
+    - apps/examples/src/features/infinite-row-model/react.tsx
+    - apps/examples/src/features/infinite-row-model/vue.vue
+    - apps/examples/src/features/infinite-row-model/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/infinite-row-model.spec.ts
+    - tests/a11y/infinite-row-model-a11y.spec.ts
+    - tests/e2e/features/examples-data-modes.spec.ts
+    - tests/a11y/examples-data-modes-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-data-modes.spec.ts tests/a11y/examples-data-modes-a11y.spec.ts --project=chromium
+- [x] EX-003-003 server row model
   - Evidence:
-- [ ] EX-003-004 viewport row model
+    - apps/examples/src/features/server-row-model/data.ts
+    - apps/examples/src/features/server-row-model/vanilla.ts
+    - apps/examples/src/features/server-row-model/react.tsx
+    - apps/examples/src/features/server-row-model/vue.vue
+    - apps/examples/src/features/server-row-model/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/server-row-model.spec.ts
+    - tests/a11y/server-row-model-a11y.spec.ts
+    - tests/e2e/features/examples-data-modes.spec.ts
+    - tests/a11y/examples-data-modes-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-data-modes.spec.ts tests/a11y/examples-data-modes-a11y.spec.ts --project=chromium
+- [x] EX-003-004 viewport row model
   - Evidence:
-- [ ] EX-003-005 tree row model
+    - apps/examples/src/features/viewport-row-model/data.ts
+    - apps/examples/src/features/viewport-row-model/vanilla.ts
+    - apps/examples/src/features/viewport-row-model/react.tsx
+    - apps/examples/src/features/viewport-row-model/vue.vue
+    - apps/examples/src/features/viewport-row-model/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/viewport-row-model.spec.ts
+    - tests/a11y/viewport-row-model-a11y.spec.ts
+    - tests/e2e/features/examples-data-modes.spec.ts
+    - tests/a11y/examples-data-modes-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-data-modes.spec.ts tests/a11y/examples-data-modes-a11y.spec.ts --project=chromium
+- [x] EX-003-005 tree row model
   - Evidence:
+    - apps/examples/src/features/tree-row-model/data.ts
+    - apps/examples/src/features/tree-row-model/vanilla.ts
+    - apps/examples/src/features/tree-row-model/react.tsx
+    - apps/examples/src/features/tree-row-model/vue.vue
+    - apps/examples/src/features/tree-row-model/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/tree-row-model.spec.ts
+    - tests/a11y/tree-row-model-a11y.spec.ts
+    - tests/e2e/features/examples-data-modes.spec.ts
+    - tests/a11y/examples-data-modes-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-data-modes.spec.ts tests/a11y/examples-data-modes-a11y.spec.ts --project=chromium
 
 ### EX-004 Enterprise Features
 
-- [ ] EX-004-001 sorting
+- [x] EX-004-001 sorting
   - Evidence:
-- [ ] EX-004-002 filtering
+    - apps/examples/src/features/sorting/data.ts
+    - apps/examples/src/features/sorting/vanilla.ts
+    - apps/examples/src/features/sorting/react.tsx
+    - apps/examples/src/features/sorting/vue.vue
+    - apps/examples/src/features/sorting/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/sorting.spec.ts
+    - tests/a11y/sorting-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-002 filtering
   - Evidence:
-- [ ] EX-004-003 editing
+    - apps/examples/src/features/filtering/data.ts
+    - apps/examples/src/features/filtering/vanilla.ts
+    - apps/examples/src/features/filtering/react.tsx
+    - apps/examples/src/features/filtering/vue.vue
+    - apps/examples/src/features/filtering/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/filtering.spec.ts
+    - tests/a11y/filtering-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-003 editing
   - Evidence:
-- [ ] EX-004-004 selection
+    - apps/examples/src/features/editing/data.ts
+    - apps/examples/src/features/editing/vanilla.ts
+    - apps/examples/src/features/editing/react.tsx
+    - apps/examples/src/features/editing/vue.vue
+    - apps/examples/src/features/editing/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/editing.spec.ts
+    - tests/a11y/editing-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-004 selection
   - Evidence:
-- [ ] EX-004-005 clipboard
+    - apps/examples/src/features/selection/data.ts
+    - apps/examples/src/features/selection/vanilla.ts
+    - apps/examples/src/features/selection/react.tsx
+    - apps/examples/src/features/selection/vue.vue
+    - apps/examples/src/features/selection/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/selection.spec.ts
+    - tests/a11y/selection-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-005 clipboard
   - Evidence:
-- [ ] EX-004-006 summary
+    - apps/examples/src/features/clipboard/data.ts
+    - apps/examples/src/features/clipboard/vanilla.ts
+    - apps/examples/src/features/clipboard/react.tsx
+    - apps/examples/src/features/clipboard/vue.vue
+    - apps/examples/src/features/clipboard/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/clipboard.spec.ts
+    - tests/a11y/clipboard-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-006 summary
   - Evidence:
-- [ ] EX-004-007 grouping
+    - apps/examples/src/features/summary/data.ts
+    - apps/examples/src/features/summary/vanilla.ts
+    - apps/examples/src/features/summary/react.tsx
+    - apps/examples/src/features/summary/vue.vue
+    - apps/examples/src/features/summary/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/summary.spec.ts
+    - tests/a11y/summary-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-007 grouping
   - Evidence:
-- [ ] EX-004-008 tree
+    - apps/examples/src/features/grouping/data.ts
+    - apps/examples/src/features/grouping/vanilla.ts
+    - apps/examples/src/features/grouping/react.tsx
+    - apps/examples/src/features/grouping/vue.vue
+    - apps/examples/src/features/grouping/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/grouping.spec.ts
+    - tests/a11y/grouping-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-008 tree
   - Evidence:
-- [ ] EX-004-009 pivot
+    - apps/examples/src/features/tree/data.ts
+    - apps/examples/src/features/tree/vanilla.ts
+    - apps/examples/src/features/tree/react.tsx
+    - apps/examples/src/features/tree/vue.vue
+    - apps/examples/src/features/tree/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/tree.spec.ts
+    - tests/a11y/tree-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-009 pivot
   - Evidence:
-- [ ] EX-004-010 pagination
+    - apps/examples/src/features/pivot/data.ts
+    - apps/examples/src/features/pivot/vanilla.ts
+    - apps/examples/src/features/pivot/react.tsx
+    - apps/examples/src/features/pivot/vue.vue
+    - apps/examples/src/features/pivot/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/pivot.spec.ts
+    - tests/a11y/pivot-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-010 pagination
   - Evidence:
-- [ ] EX-004-011 context menu
+    - apps/examples/src/features/pagination/data.ts
+    - apps/examples/src/features/pagination/vanilla.ts
+    - apps/examples/src/features/pagination/react.tsx
+    - apps/examples/src/features/pagination/vue.vue
+    - apps/examples/src/features/pagination/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/pagination.spec.ts
+    - tests/a11y/pagination-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-011 context menu
   - Evidence:
-- [ ] EX-004-012 header menu
+    - apps/examples/src/features/menus/data.ts
+    - apps/examples/src/features/menus/vanilla.ts
+    - apps/examples/src/features/menus/react.tsx
+    - apps/examples/src/features/menus/vue.vue
+    - apps/examples/src/features/menus/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/menus.spec.ts
+    - tests/a11y/menus-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-012 header menu
   - Evidence:
-- [ ] EX-004-013 export/import
+    - apps/examples/src/features/menus/data.ts
+    - apps/examples/src/features/menus/vanilla.ts
+    - apps/examples/src/features/menus/react.tsx
+    - apps/examples/src/features/menus/vue.vue
+    - apps/examples/src/features/menus/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/menus.spec.ts
+    - tests/a11y/menus-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
+- [x] EX-004-013 export/import
   - Evidence:
+    - apps/examples/src/features/export/data.ts
+    - apps/examples/src/features/export/vanilla.ts
+    - apps/examples/src/features/export/react.tsx
+    - apps/examples/src/features/export/vue.vue
+    - apps/examples/src/features/export/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - apps/examples/public/export-testFile.csv
+    - apps/examples/public/export-testFile.xlsx
+    - tests/e2e/features/export.spec.ts
+    - tests/a11y/export-a11y.spec.ts
+    - tests/e2e/features/examples-enterprise-features.spec.ts
+    - tests/a11y/examples-enterprise-features-a11y.spec.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-enterprise-features.spec.ts tests/a11y/examples-enterprise-features-a11y.spec.ts --project=chromium
 
 ### EX-005 Quality / Security / Performance
 
-- [ ] EX-005-001 CSP nonce example
+- [x] EX-005-001 CSP nonce example
   - Evidence:
-- [ ] EX-005-002 XSS-safe renderer example
+    - apps/examples/src/features/csp/vanilla.ts
+    - apps/examples/src/features/csp/react.tsx
+    - apps/examples/src/features/csp/vue.vue
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - tests/a11y/examples-quality-security-performance-a11y.spec.ts
+    - apps/docs/docs/features/quality-security-performance.mdx
+  - Verified:
+    - pnpm typecheck
+- [x] EX-005-002 XSS-safe renderer example
   - Evidence:
-- [ ] EX-005-003 theme customization example
+    - apps/examples/src/features/xss-defense/vanilla.ts
+    - apps/examples/src/features/xss-defense/react.tsx
+    - apps/examples/src/features/xss-defense/vue.vue
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - tests/a11y/examples-quality-security-performance-a11y.spec.ts
+    - apps/docs/docs/features/quality-security-performance.mdx
+  - Verified:
+    - pnpm typecheck
+- [x] EX-005-003 theme customization example
   - Evidence:
-- [ ] EX-005-004 accessibility keyboard example
+    - apps/examples/src/features/si-customization/vanilla.ts
+    - apps/examples/src/features/si-customization/react.tsx
+    - apps/examples/src/features/si-customization/vue.vue
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - tests/a11y/examples-quality-security-performance-a11y.spec.ts
+    - apps/docs/docs/features/quality-security-performance.mdx
+  - Verified:
+    - pnpm typecheck
+- [x] EX-005-004 accessibility keyboard example
   - Evidence:
-- [ ] EX-005-005 10M server rows example
+    - apps/examples/src/features/accessibility/vanilla.ts
+    - apps/examples/src/features/accessibility/react.tsx
+    - apps/examples/src/features/accessibility/vue.vue
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - tests/a11y/examples-quality-security-performance-a11y.spec.ts
+    - apps/docs/docs/features/quality-security-performance.mdx
+  - Verified:
+    - pnpm typecheck
+- [x] EX-005-005 10M server rows example
   - Evidence:
-- [ ] EX-005-006 100M viewport rows example
+    - apps/examples/src/features/qsp-server-10m/data.ts
+    - apps/examples/src/features/qsp-server-10m/vanilla.ts
+    - apps/examples/src/features/qsp-server-10m/react.tsx
+    - apps/examples/src/features/qsp-server-10m/vue.vue
+    - apps/examples/src/features/qsp-server-10m/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - tests/a11y/examples-quality-security-performance-a11y.spec.ts
+    - tests/perf/smoke.test.ts
+    - apps/docs/docs/features/quality-security-performance.mdx
+    - packages/dom/src/grid/gridScrollbars.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - packages/dom/src/grid/viewportVirtualBodyWindow.ts
+    - packages/dom/src/grid/oneGridRemoteRows.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+- [x] EX-005-006 100M viewport rows example
   - Evidence:
-- [ ] EX-005-007 financial SI scenario
+    - apps/examples/src/features/qsp-viewport-100m/data.ts
+    - apps/examples/src/features/qsp-viewport-100m/vanilla.ts
+    - apps/examples/src/features/qsp-viewport-100m/react.tsx
+    - apps/examples/src/features/qsp-viewport-100m/vue.vue
+    - apps/examples/src/features/qsp-viewport-100m/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - tests/a11y/examples-quality-security-performance-a11y.spec.ts
+    - tests/perf/smoke.test.ts
+    - apps/docs/docs/features/quality-security-performance.mdx
+    - packages/dom/src/grid/gridScrollbars.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - packages/dom/src/grid/viewportVirtualBodyWindow.ts
+    - packages/dom/src/grid/bodyPaneRenderer.ts
+    - packages/dom/src/grid/virtualScrollRuntime.ts
+    - packages/dom/src/grid/oneGridRemoteRows.ts
+  - Verified:
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+    - Manual Playwright check on http://127.0.0.1:4174/#EX-005-006: bottom-track click settles at logicalTop/logicalMax 2,999,999,651 with native scrollTop 0, renders VP100M-099999989 through VP100M-100000000, and keeps the last row fully visible.
+  - Notes:
+    - 100M viewport row example routes custom vertical scrollbar track clicks and thumb drags through logical row scroll coordinates. Far jumps render target-range skeleton/data rows instead of keeping an unrelated cached range and moving native scroll first, so Jump near 100M and scrollbar-end clicks do not show a blank body.
+    - Viewport row virtualization no longer couples the 100M logical position to native body scroll height. The body renders the current logical rows in place and applies sub-row offset only when the logical scrollbar lands between row boundaries, preventing bottom-edge clipping while keeping DOM size bounded.
+- [x] EX-005-007 financial SI scenario
   - Evidence:
-- [ ] EX-005-008 public-sector SI scenario
+    - apps/examples/src/features/qsp-financial-si/data.ts
+    - apps/examples/src/features/qsp-financial-si/vanilla.ts
+    - apps/examples/src/features/qsp-financial-si/react.tsx
+    - apps/examples/src/features/qsp-financial-si/vue.vue
+    - apps/examples/src/features/qsp-financial-si/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - tests/a11y/examples-quality-security-performance-a11y.spec.ts
+    - apps/docs/docs/features/quality-security-performance.mdx
+  - Verified:
+    - pnpm typecheck
+- [x] EX-005-008 public-sector SI scenario
   - Evidence:
+    - apps/examples/src/features/qsp-public-si/data.ts
+    - apps/examples/src/features/qsp-public-si/vanilla.ts
+    - apps/examples/src/features/qsp-public-si/react.tsx
+    - apps/examples/src/features/qsp-public-si/vue.vue
+    - apps/examples/src/features/qsp-public-si/README.md
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - tests/a11y/examples-quality-security-performance-a11y.spec.ts
+    - apps/docs/docs/features/quality-security-performance.mdx
+  - Verified:
+    - pnpm typecheck
+
+EX-005 shared verification:
+
+- pnpm typecheck
+- pnpm lint
+- pnpm test:unit
+- pnpm test:e2e
+- pnpm test:a11y
+- pnpm test:perf:smoke
+- pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+- pnpm exec playwright test --config playwright.config.ts tests/a11y/examples-quality-security-performance-a11y.spec.ts --project=chromium
+- pnpm docs:build
+- pnpm build
+- git diff --check
 
 ### EX-006 Catalog Integrity
 
-- [ ] EX-006-001 every example registered in catalog
+- [x] EX-006-001 every example registered in catalog
   - Evidence:
-- [ ] EX-006-002 every example has vanilla variant
+    - apps/examples/src/catalog.ts
+    - apps/examples/src/main.ts
+    - tests/catalog/example-catalog-integrity.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/catalog/example-catalog-integrity.test.ts
+- [x] EX-006-002 every example has vanilla variant
   - Evidence:
-- [ ] EX-006-003 every example has React variant
+    - apps/examples/src/features/*/vanilla.ts
+    - tests/catalog/example-catalog-integrity.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/catalog/example-catalog-integrity.test.ts
+- [x] EX-006-003 every example has React variant
   - Evidence:
-- [ ] EX-006-004 every example has Vue variant
+    - apps/examples/src/features/*/react.tsx
+    - tests/catalog/example-catalog-integrity.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/catalog/example-catalog-integrity.test.ts
+- [x] EX-006-004 every example has Vue variant
   - Evidence:
-- [ ] EX-006-005 every example has README
+    - apps/examples/src/features/*/vue.vue
+    - tests/catalog/example-catalog-integrity.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/catalog/example-catalog-integrity.test.ts
+- [x] EX-006-005 every example has README
   - Evidence:
-- [ ] EX-006-006 every example has E2E spec
+    - apps/examples/src/features/*/README.md
+    - tests/catalog/example-catalog-integrity.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/catalog/example-catalog-integrity.test.ts
+- [x] EX-006-006 every example has E2E spec
   - Evidence:
+    - tests/e2e/features/*.spec.ts
+    - tests/catalog/example-catalog-integrity.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/catalog/example-catalog-integrity.test.ts
+  - Notes:
+    - React/Vue wrapper standalone pages are intentionally outside the hash-routed catalog and are still checked through `apps/examples/react.html`, `apps/examples/vue.html`, `tests/e2e/features/react-wrapper.spec.ts`, and `tests/e2e/features/vue-wrapper.spec.ts`.
 
 ---
 
@@ -3723,6 +4511,37 @@
 ## 18. Risk / Decision Log
 
 작업 중 방향이 흔들릴 수 있는 결정은 여기에 기록한다.
+
+#### D-20260507-001 Full row editing 제외 및 cell+Tab editing flow 유지
+
+- Date: 2026-05-07
+- Status: accepted
+- Context: Full row editing 후보는 한 행의 모든 editor를 동시에 열어 보여주는 방식이라 pinned pane clipping, 가로 스크롤, native select/radio/date editor 폭, 포커스 유지가 동시에 복잡해졌다. 실제 업무 입력 흐름은 한 셀을 수정하고 Tab/Shift+Tab으로 다음 셀로 이동하면서 pending edit history를 쌓는 방식이 더 예측 가능하다.
+- Decision: Full row editing을 OneGrid 1.0 public API와 예제에서 제외한다. 편집 기본 전략은 cell editing, column별 `editTrigger`, keyboard policy, batch edit session API, read-only external state integration으로 유지한다.
+- Risk: 일부 업무 화면에서 한 행 전체를 form처럼 동시에 띄우는 요구가 생길 수 있다.
+- Mitigation: 해당 요구는 grid 기본 editing API가 아니라 외부 row detail/form panel 또는 custom editor workflow로 처리한다. OneGrid core/wrapper는 row-level pending edits 조회와 batch commit/cancel API를 제공하므로 외부 form 연동은 가능하다.
+- Evidence:
+  - packages/core/src/types/grid-api.ts
+  - packages/core/src/types/events.ts
+  - packages/core/src/types/grid-options.ts
+  - packages/dom/src/grid/oneGridEditing.ts
+  - packages/dom/src/grid/oneGridBatchEditing.ts
+  - packages/react/src/gridHandle.ts
+  - packages/react/src/gridEvents.ts
+  - packages/vue/src/gridExpose.ts
+  - packages/vue/src/vueEvents.ts
+  - apps/examples/src/features/editing/vanilla.ts
+  - apps/examples/src/features/editing/react.tsx
+  - apps/examples/src/features/editing/vue.vue
+  - tests/e2e/features/editing.spec.ts
+- Verified:
+  - pnpm lint
+  - pnpm typecheck
+  - pnpm test:unit -- editing
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=chromium
+- Follow-up checklist items:
+  - EX-004 Enterprise Features
+  - REL-004 Final Gates
 
 #### D-20260506-001 Advanced Export/Import는 adapter/plugin 경계로 분리
 

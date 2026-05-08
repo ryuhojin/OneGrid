@@ -5,6 +5,9 @@ import type {
   CellPosition,
   EditCancelReason,
   EditCommitTrigger,
+  GridEditHistoryChangeAction,
+  GridEditHistoryEntry,
+  GridBatchEditSession,
   RowKey
 } from "@onegrid/core";
 import type { PendingDomEdit } from "./editBatchRuntime.js";
@@ -15,9 +18,10 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
   protected resolveEditableCell(
     rowKey: string,
     field: string,
-    sourceIndex: number | undefined
+    sourceIndex: number | undefined,
+    columnId?: string
   ): ResolvedEditableCell<TData> | undefined {
-    const column = this.findDataColumn(field);
+    const column = this.findDataColumn(columnId ?? field);
     const rowInfo = this.findEditableRow(rowKey, sourceIndex);
     if (!column || !rowInfo) {
       return undefined;
@@ -125,7 +129,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
       return Object.freeze({ ...entry, data: nextRow });
     });
     this.viewportEntries = this.viewportEntries.map((entry) => {
-      if (String(entry.key) !== String(rowKey)) {
+      if (entry.kind === "skeleton" || String(entry.key) !== String(rowKey)) {
         return entry;
       }
       replaced = true;
@@ -149,6 +153,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
       position: {
         rowIndex: session.rowIndex,
         rowKey: session.rowKey,
+        columnId: session.columnId,
         field: session.field
       },
       value: session.previousValue
@@ -195,11 +200,34 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
       position: {
         rowIndex: result.session.rowIndex,
         rowKey: result.session.rowKey,
+        columnId: result.session.columnId,
         field: result.session.field
       },
       value: result.nextValue,
       previousValue: result.previousValue,
       nextValue: result.nextValue,
+      trigger
+    });
+  }
+
+  protected emitCellEditRequested(
+    result: CellEditCommitResult<TData>,
+    trigger: EditCommitTrigger
+  ): void {
+    this.emitGridEvent("cellEditRequested", {
+      type: "cellEditRequested",
+      row: result.session.row,
+      rowKey: result.session.rowKey,
+      position: {
+        rowIndex: result.session.rowIndex,
+        rowKey: result.session.rowKey,
+        columnId: result.session.columnId,
+        field: result.session.field
+      },
+      value: result.nextValue,
+      previousValue: result.previousValue,
+      nextValue: result.nextValue,
+      nextRow: result.nextRow,
       trigger
     });
   }
@@ -212,6 +240,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
       position: {
         rowIndex: result.session.rowIndex,
         rowKey: result.session.rowKey,
+        columnId: result.session.columnId,
         field: result.session.field
       },
       value: result.nextValue,
@@ -239,11 +268,62 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
       position: {
         rowIndex: session.rowIndex,
         rowKey: session.rowKey,
+        columnId: session.columnId,
         field: session.field
       },
       value: session.previousValue,
       reason
     });
+  }
+
+  protected emitBatchEditSessionStarted(session: GridBatchEditSession<TData>): void {
+    this.emitBatchEditSessionEvent("batchEditSessionStarted", session);
+  }
+
+  protected emitBatchEditSessionCommitted(session: GridBatchEditSession<TData>): void {
+    this.emitBatchEditSessionEvent("batchEditSessionCommitted", session);
+  }
+
+  protected emitBatchEditSessionCancelled(session: GridBatchEditSession<TData>): void {
+    this.emitBatchEditSessionEvent("batchEditSessionCancelled", session);
+  }
+
+  protected emitEditUndo(entry: GridEditHistoryEntry<TData>): void {
+    this.emitGridEvent("editUndo", {
+      type: "editUndo",
+      entry,
+      state: this.editHistory.getState()
+    });
+  }
+
+  protected emitEditRedo(entry: GridEditHistoryEntry<TData>): void {
+    this.emitGridEvent("editRedo", {
+      type: "editRedo",
+      entry,
+      state: this.editHistory.getState()
+    });
+  }
+
+  protected emitEditHistoryChanged(
+    action: GridEditHistoryChangeAction,
+    entry?: GridEditHistoryEntry<TData>
+  ): void {
+    this.emitGridEvent("editHistoryChanged", {
+      type: "editHistoryChanged",
+      action,
+      ...(entry === undefined ? {} : { entry }),
+      state: this.editHistory.getState()
+    });
+  }
+
+  protected cancelActiveEdit(reason: EditCancelReason): void {
+    const active = this.activeEdit;
+    if (!active) {
+      return;
+    }
+    this.activeEdit = undefined;
+    active.overlay.destroy();
+    this.emitCellEditCancelled(active.session, reason);
   }
 
   protected findCellElement(position: CellPosition): HTMLElement | undefined {
@@ -252,13 +332,23 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
       const rowMatches = position.rowKey === undefined
         ? cell.dataset.rowIndex === String(position.rowIndex)
         : cell.dataset.editRowKey === String(position.rowKey);
+      const columnMatches = position.columnId === undefined
+        ? cell.dataset.field === position.field
+        : cell.dataset.columnId === position.columnId;
       if (
-        cell.dataset.field === position.field
+        columnMatches
         && rowMatches
       ) {
         return cell;
       }
     }
     return undefined;
+  }
+
+  private emitBatchEditSessionEvent(
+    type: "batchEditSessionStarted" | "batchEditSessionCommitted" | "batchEditSessionCancelled",
+    session: GridBatchEditSession<TData>
+  ): void {
+    this.emitGridEvent(type, { type, session, edits: session.pendingEdits });
   }
 }

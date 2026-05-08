@@ -43,6 +43,7 @@
   background: var(--og-color-panel-bg);
   border: 1px solid var(--og-color-checkbox-border);
   box-sizing: border-box;
+  cursor: pointer;
   flex: 0 0 auto;
   margin: 0;
 }
@@ -87,6 +88,7 @@
 .og-grid__cell-native-checkbox {
   accent-color: var(--og-color-accent);
   block-size: 16px;
+  cursor: default;
   inline-size: 16px;
   margin: 0;
   pointer-events: none;
@@ -113,6 +115,11 @@
 
 .og-grid__cell--editable {
   cursor: text;
+}
+
+.og-grid__cell--editable.og-grid__cell--editor-checkbox,
+.og-grid__cell--editable.og-grid__cell--editor-radio {
+  cursor: pointer;
 }
 
 .og-grid__cell:focus {

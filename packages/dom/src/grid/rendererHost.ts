@@ -67,6 +67,7 @@ export function renderHeaderHost<TData>(input: HeaderRendererHostInput<TData>): 
 
   const context: HeaderContext<TData> = {
     column: column.source,
+    columnId: column.id,
     depth: input.cell.depth
   };
   const rendered = renderer.render(context, renderer.kind === "element" ? elementBuilder : undefined);
@@ -98,10 +99,12 @@ function createCellContext<TData>(input: CellRendererHostInput<TData>): CellCont
     rowIndex: input.rowIndex,
     rowKey: input.rowKey,
     column: input.column.source,
+    columnId: input.column.id,
     field: input.column.field,
     value: input.value,
     position: {
       rowIndex: input.rowIndex,
+      columnId: input.column.id,
       field: input.column.field,
       rowKey: input.rowKey
     }

@@ -9,6 +9,7 @@ import type {
 import type { TreeRowRuntime } from "./treeRowRenderer.js";
 
 export interface RowRenderState<TData = unknown> {
+  readonly rowModel: "infinite" | "server" | "viewport" | "tree";
   readonly entries: readonly (
     InfiniteRowEntry<TData> | ServerRowEntry<TData> | ViewportRowEntry<TData> | TreeRowEntry<TData>
   )[];

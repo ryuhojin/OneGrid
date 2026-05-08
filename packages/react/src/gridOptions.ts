@@ -1,6 +1,10 @@
 import type { GridOptions } from "@onegrid/core";
 import type { OneGridEventProps } from "./gridEvents.js";
-import { createGridEventHandlers, getEventPropDeps } from "./gridEvents.js";
+import {
+  createGridBeforeEventHandlers,
+  createGridEventHandlers,
+  getEventPropDeps
+} from "./gridEvents.js";
 import type { ReactRendererBridge, ReactRendererSlots } from "./reactRendererBridge.js";
 
 export interface OneGridOptionProps<TData = unknown> extends GridOptions<TData> {
@@ -12,8 +16,12 @@ export function createReactGridOptions<TData>(
   bridge: ReactRendererBridge<TData>
 ): GridOptions<TData> {
   const events = createGridEventHandlers(props.events, props);
+  const beforeEvents = createGridBeforeEventHandlers(props.beforeEvents, props);
   return {
     columns: bridge.enhanceColumns(props.columns, props.reactRenderers),
+    ...(props.defaultColumnDef === undefined ? {} : { defaultColumnDef: props.defaultColumnDef }),
+    ...(props.columnTypes === undefined ? {} : { columnTypes: props.columnTypes }),
+    ...(props.initialState === undefined ? {} : { initialState: props.initialState }),
     ...(props.columnOrder === undefined ? {} : { columnOrder: props.columnOrder }),
     ...(props.columnState === undefined ? {} : { columnState: props.columnState }),
     ...(props.columnUi === undefined ? {} : { columnUi: props.columnUi }),
@@ -54,7 +62,8 @@ export function createReactGridOptions<TData>(
     ...(props.theme === undefined ? {} : { theme: props.theme }),
     ...(props.locale === undefined ? {} : { locale: props.locale }),
     ...(props.plugins === undefined ? {} : { plugins: props.plugins }),
-    ...(events === undefined ? {} : { events })
+    ...(events === undefined ? {} : { events }),
+    ...(beforeEvents === undefined ? {} : { beforeEvents })
   };
 }
 
@@ -63,6 +72,9 @@ export function getGridOptionDeps<TData>(
 ): readonly unknown[] {
   return [
     props.columns,
+    props.defaultColumnDef,
+    props.columnTypes,
+    props.initialState,
     props.columnOrder,
     props.columnState,
     props.columnUi,
@@ -104,6 +116,7 @@ export function getGridOptionDeps<TData>(
     props.locale,
     props.plugins,
     props.events,
+    props.beforeEvents,
     props.reactRenderers,
     ...getEventPropDeps(props)
   ];

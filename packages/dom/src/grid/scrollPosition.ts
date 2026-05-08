@@ -1,8 +1,8 @@
 import {
-  createColumnModel,
   getScrollLeftForColumn,
   getScrollTopForRow
 } from "@onegrid/core";
+import { createDomColumnModel } from "./domColumnModel.js";
 import { getCurrentRowCount } from "./currentRowCount.js";
 import { resolveVirtualRowHeight, resolveVirtualViewportHeight } from "./virtualScrollRuntime.js";
 import { resolveColumnViewportWidth } from "./columnVirtualScrollRuntime.js";
@@ -58,10 +58,7 @@ export function resolveScrollLeftForField<TData>(input: {
   readonly currentScrollLeft: number;
   readonly viewportWidth: number | undefined;
 }): number | undefined {
-  const model = createColumnModel(input.options.columns, {
-    ...(input.options.columnOrder === undefined ? {} : { columnOrder: input.options.columnOrder }),
-    columnState: input.columnState
-  });
+  const model = createDomColumnModel({ ...input.options, columnState: input.columnState });
   const centerColumns = model.pinnedLeafColumns.center;
   const columnIndex = centerColumns.findIndex((column) =>
     column.field === input.field || column.id === input.field

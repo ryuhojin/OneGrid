@@ -9,7 +9,7 @@ export interface FrozenRowSectionInput<TData> {
   readonly rows: readonly BodyRowEntry<TData>[];
   readonly position: "top" | "bottom";
   readonly rowIndexOffset: number;
-  readonly runtime: BodyPaneRuntime;
+  readonly runtime: BodyPaneRuntime<TData>;
   readonly centerOwnsTreeControls: boolean;
 }
 
@@ -19,7 +19,7 @@ export interface FrozenRowsSectionSetInput<TData> {
   readonly topRows: readonly BodyRowEntry<TData>[];
   readonly bottomRows: readonly BodyRowEntry<TData>[];
   readonly bottomOffset: number;
-  readonly runtime: BodyPaneRuntime;
+  readonly runtime: BodyPaneRuntime<TData>;
   readonly centerOwnsTreeControls: boolean;
 }
 

@@ -3,6 +3,8 @@ import {
   commitCellEdit,
   createLocaleFormatter,
   isCellEditable,
+  resolveEditKeyboardPolicy,
+  resolveEditStartMode,
   resolveEditorDef,
   startCellEdit
 } from "../src/index.js";
@@ -39,6 +41,47 @@ describe("editing lifecycle", () => {
       .toBe("number");
     expect(resolveEditorDef({ field: "active", editable: true, type: "boolean" }).kind)
       .toBe("checkbox");
+  });
+
+  it("resolves edit start mode from column, grid option, and checkbox defaults", () => {
+    expect(resolveEditStartMode(createColumn({ field: "title", editable: true }), undefined))
+      .toBe("doubleClick");
+    expect(resolveEditStartMode(createColumn({ field: "active", editable: true, type: "boolean" }), undefined))
+      .toBe("singleClick");
+    expect(resolveEditStartMode(
+      createColumn({ field: "title", editable: true }),
+      { startMode: "singleClick" }
+    )).toBe("singleClick");
+    expect(resolveEditStartMode(
+      createColumn({ field: "title", editable: true, editTrigger: "manual" }),
+      { startMode: "singleClick" }
+    )).toBe("manual");
+  });
+
+  it("resolves explicit keyboard editing policy with enterprise defaults", () => {
+    expect(resolveEditKeyboardPolicy(undefined)).toMatchObject({
+      startOnEnter: true,
+      commitOnEnter: true,
+      moveOnTab: true,
+      commitOnTab: true,
+      cancelOnEscape: true,
+      clearOnBackspace: true
+    });
+
+    expect(resolveEditKeyboardPolicy({
+      keyboard: {
+        startOnEnter: false,
+        commitOnTab: false,
+        clearOnBackspace: false
+      }
+    })).toMatchObject({
+      startOnEnter: false,
+      commitOnEnter: true,
+      moveOnTab: true,
+      commitOnTab: false,
+      cancelOnEscape: true,
+      clearOnBackspace: false
+    });
   });
 
   it("commits text, number, checkbox, select, multi-select, and radio editors", async () => {
@@ -123,7 +166,7 @@ async function expectCommit(
   const result = await commitCellEdit({ session, rawValue });
   expect(result.valid).toBe(true);
   expect(result.nextValue).toEqual(expectedValue);
-  expect(result.nextRow).toMatchObject({ [column.field]: expectedValue });
+  expect(result.nextRow).toMatchObject({ [session.field]: expectedValue });
 }
 
 async function expectInvalid(
@@ -158,8 +201,14 @@ function createContext(column: ColumnDef<EditRow>, value: unknown): CellContext<
     rowIndex: 0,
     rowKey: row.id,
     column,
-    field: column.field,
+    columnId: column.columnId ?? column.id ?? column.field ?? "column",
+    field: column.field ?? column.columnId ?? column.id ?? "column",
     value,
-    position: { rowIndex: 0, field: column.field, rowKey: row.id }
+    position: {
+      rowIndex: 0,
+      columnId: column.columnId ?? column.id ?? column.field ?? "column",
+      field: column.field ?? column.columnId ?? column.id ?? "column",
+      rowKey: row.id
+    }
   };
 }

@@ -73,7 +73,7 @@ const columns: readonly ColumnDef<FilterTestRow>[] = [
   { field: "urgent", headerName: "Urgent", type: "boolean", filter: "boolean" },
   { field: "status", headerName: "Status", filter: "set" },
   {
-    field: "risk",
+    columnId: "risk",
     headerName: "Risk",
     valueGetter: ({ row }) => `${row.status} ${row.urgent ? "urgent" : "normal"}`
   }

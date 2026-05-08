@@ -1,8 +1,10 @@
 import { createColumnsToolPanelModel } from "@onegrid/core";
 import type {
   ColumnModel,
+  ColumnMenuExtensionPayload,
   ColumnUiOptions,
   ColumnUiState,
+  GridPluginExtension,
   HeaderCell,
   PinnedSide
 } from "@onegrid/core";
@@ -10,6 +12,7 @@ import { createColumnMenuButton } from "./columnMenu.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
 
 export interface ColumnUiRuntime {
+  readonly headerMenuExtensions?: HeaderMenuExtensionRuntime;
   resizeColumn(columnId: string, width: number): void;
   autoSizeColumn(columnId: string): void;
   hideColumn(columnId: string): void;
@@ -17,6 +20,10 @@ export interface ColumnUiRuntime {
   pinColumn(columnId: string, pinned: PinnedSide | null): void;
   moveColumnBefore(columnId: string, targetColumnId: string): void;
   moveColumnByOffset(columnId: string, offset: number): void;
+}
+
+export interface HeaderMenuExtensionRuntime {
+  getExtensions(): readonly GridPluginExtension<ColumnMenuExtensionPayload>[];
 }
 
 export interface ResolvedColumnUiOptions {

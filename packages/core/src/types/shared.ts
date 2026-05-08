@@ -1,5 +1,9 @@
 export type RowKey = string | number;
 
+export type ColumnId = string;
+
+export type ColumnKey = ColumnId;
+
 export type RowModelKind = "client" | "infinite" | "server" | "viewport" | "tree";
 
 export type PinnedSide = "left" | "right";
@@ -13,6 +17,10 @@ export type ScrollAlign = "start" | "center" | "end" | "nearest";
 export type Density = "comfortable" | "standard" | "compact";
 
 export type ColumnType = "text" | "number" | "date" | "datetime" | "boolean" | "custom";
+
+export type ColumnTypeName = ColumnType | (string & {});
+
+export type ColumnTypeReference = ColumnTypeName | readonly ColumnTypeName[];
 
 export type FilterKind = "text" | "number" | "date" | "boolean" | "set" | "custom";
 
@@ -33,7 +41,9 @@ export type EditBlurAction = "commit" | "cancel";
 
 export type EditCommitMode = "cell" | "batch";
 
-export type EditCommitTrigger = "enter" | "blur" | "api";
+export type EditStartMode = "doubleClick" | "singleClick" | "manual";
+
+export type EditCommitTrigger = "enter" | "blur" | "api" | "pointer" | "tab";
 
 export type EditCancelReason = "escape" | "blur" | "api" | "replace";
 
@@ -44,6 +54,7 @@ export type Unsubscribe = () => void;
 export interface CellPosition {
   readonly rowIndex: number;
   readonly field: string;
+  readonly columnId?: ColumnId;
   readonly rowKey?: RowKey;
 }
 
@@ -55,12 +66,14 @@ export interface ViewportRange {
 }
 
 export interface SortModel {
+  readonly columnId?: ColumnId;
   readonly field: string;
   readonly direction: SortDirection;
   readonly priority?: number;
 }
 
 export interface FilterCondition {
+  readonly columnId?: ColumnId;
   readonly field: string;
   readonly kind: FilterKind;
   readonly operator: string;

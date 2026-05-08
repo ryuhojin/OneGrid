@@ -102,6 +102,40 @@ describe("client row model", () => {
     });
   });
 
+  it("resolves client sort and filter columns by columnId before field", () => {
+    const model = createClientRowModel(rows, {
+      rowKey: "id",
+      columns: [
+        {
+          columnId: "amount-band",
+          field: "amount",
+          filter: { kind: "set" },
+          valueGetter: ({ row }) => row.amount >= 900 ? "large" : "small"
+        },
+        {
+          columnId: "amount-desc-rank",
+          field: "amount",
+          valueGetter: ({ row }) => -row.amount
+        }
+      ],
+      filterModel: {
+        conditions: [
+          {
+            columnId: "amount-band",
+            field: "amount",
+            kind: "set",
+            operator: "in",
+            value: ["large"]
+          }
+        ]
+      },
+      sortModel: [{ columnId: "amount-desc-rank", field: "amount", direction: "asc" }]
+    });
+
+    expect(model.filteredRows.map((row) => row.key)).toEqual(["ORD-5101", "ORD-5102"]);
+    expect(model.sortedRows.map((row) => row.key)).toEqual(["ORD-5101", "ORD-5102"]);
+  });
+
   it("adds bottom group footers with aggregate values", () => {
     const model = createClientRowModel(rows, {
       rowKey: "id",

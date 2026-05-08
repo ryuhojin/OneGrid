@@ -4,10 +4,12 @@ import { examples } from "./catalog.js";
 import { mountAccessibilityExample } from "./features/accessibility/vanilla.js";
 import { mountBaseLayoutExample } from "./features/base-layout/vanilla.js";
 import { mountBasicExample } from "./features/basic/vanilla.js";
+import { mountCellMergeBlockExample } from "./features/cell-merge-block/vanilla.js";
 import { mountCellMergeExample } from "./features/cell-merge/vanilla.js";
 import { mountClipboardExample } from "./features/clipboard/vanilla.js";
 import { mountClientRowModelExample } from "./features/client-row-model/vanilla.js";
 import { mountColumnModelExample } from "./features/column-model/vanilla.js";
+import { mountColumnTypesExample } from "./features/column-types/vanilla.js";
 import { mountColumnVirtualizationExample } from "./features/column-virtualization/vanilla.js";
 import { mountColumnUiExample } from "./features/column-ui/vanilla.js";
 import { mountCspExample } from "./features/csp/vanilla.js";
@@ -15,6 +17,7 @@ import { mountEditingExample } from "./features/editing/vanilla.js";
 import { mountExportExample } from "./features/export/vanilla.js";
 import { mountFilteringExample } from "./features/filtering/vanilla.js";
 import { mountFrozenExample } from "./features/frozen/vanilla.js";
+import { mountGridApiMethodsExample } from "./features/grid-api-methods/vanilla.js";
 import { mountGroupHeaderExample } from "./features/group-header/vanilla.js";
 import { mountGroupingExample } from "./features/grouping/vanilla.js";
 import { mountInfiniteRowModelExample } from "./features/infinite-row-model/vanilla.js";
@@ -23,7 +26,12 @@ import { mountLocalizationExample } from "./features/localization/vanilla.js";
 import { mountMenusExample } from "./features/menus/vanilla.js";
 import { mountPaginationExample } from "./features/pagination/vanilla.js";
 import { mountPivotExample } from "./features/pivot/vanilla.js";
+import { mountQspFinancialSiExample } from "./features/qsp-financial-si/vanilla.js";
+import { mountQspPublicSiExample } from "./features/qsp-public-si/vanilla.js";
+import { mountQspServer10mExample } from "./features/qsp-server-10m/vanilla.js";
+import { mountQspViewport100mExample } from "./features/qsp-viewport-100m/vanilla.js";
 import { mountRendererFoundationExample } from "./features/renderer-foundation/vanilla.js";
+import { mountRowDataUpdateExample } from "./features/row-data-update/vanilla.js";
 import { mountRowVirtualizationExample } from "./features/row-virtualization/vanilla.js";
 import { mountServerRowModelExample } from "./features/server-row-model/vanilla.js";
 import { mountSiCustomizationExample } from "./features/si-customization/vanilla.js";
@@ -33,6 +41,7 @@ import { mountSummaryExample } from "./features/summary/vanilla.js";
 import { mountThemeFoundationExample } from "./features/theme-foundation/vanilla.js";
 import { mountTreeExample } from "./features/tree/vanilla.js";
 import { mountTreeRowModelExample } from "./features/tree-row-model/vanilla.js";
+import { mountVariableRowHeightExample } from "./features/variable-row-height/vanilla.js";
 import { mountViewportRowModelExample } from "./features/viewport-row-model/vanilla.js";
 import { mountXssDefenseExample } from "./features/xss-defense/vanilla.js";
 
@@ -44,6 +53,43 @@ type ExampleMount = (el: HTMLElement) => MountedExample;
 
 const mounts: Readonly<Record<string, ExampleMount>> = {
   "EX-001-001": mountBasicExample,
+  "EX-001-002": mountColumnTypesExample,
+  "EX-001-003": mountRowDataUpdateExample,
+  "EX-001-004": mountGridApiMethodsExample,
+  "EX-002-001": mountGroupHeaderExample,
+  "EX-002-002": mountGroupHeaderExample,
+  "EX-002-003": mountCellMergeExample,
+  "EX-002-004": mountCellMergeExample,
+  "EX-002-005": mountCellMergeBlockExample,
+  "EX-002-006": mountFrozenExample,
+  "EX-002-007": mountFrozenExample,
+  "EX-002-008": mountVariableRowHeightExample,
+  "EX-003-001": mountClientRowModelExample,
+  "EX-003-002": mountInfiniteRowModelExample,
+  "EX-003-003": mountServerRowModelExample,
+  "EX-003-004": mountViewportRowModelExample,
+  "EX-003-005": mountTreeRowModelExample,
+  "EX-004-001": mountSortingExample,
+  "EX-004-002": mountFilteringExample,
+  "EX-004-003": mountEditingExample,
+  "EX-004-004": mountSelectionExample,
+  "EX-004-005": mountClipboardExample,
+  "EX-004-006": mountSummaryExample,
+  "EX-004-007": mountGroupingExample,
+  "EX-004-008": mountTreeExample,
+  "EX-004-009": mountPivotExample,
+  "EX-004-010": mountPaginationExample,
+  "EX-004-011": mountMenusExample,
+  "EX-004-012": mountMenusExample,
+  "EX-004-013": mountExportExample,
+  "EX-005-001": mountCspExample,
+  "EX-005-002": mountXssDefenseExample,
+  "EX-005-003": mountSiCustomizationExample,
+  "EX-005-004": mountAccessibilityExample,
+  "EX-005-005": mountQspServer10mExample,
+  "EX-005-006": mountQspViewport100mExample,
+  "EX-005-007": mountQspFinancialSiExample,
+  "EX-005-008": mountQspPublicSiExample,
   "COL-001": mountColumnModelExample,
   "COL-002": mountGroupHeaderExample,
   "COL-003": mountColumnUiExample,

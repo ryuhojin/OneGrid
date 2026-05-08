@@ -20,8 +20,93 @@ const options: GridOptions<OrderRow> = {
 };
 ```
 
+`defaultColumnDef` applies reusable defaults to every leaf column before explicit column options.
+`columnTypes` names reusable column profiles that a column can reference with `type`:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns: [
+    { field: "id", headerName: "ID", pinned: "left" },
+    { field: "amount", headerName: "Amount", type: "money", width: 180 },
+    { field: "requestedAt", headerName: "Requested", type: "dateOnly" }
+  ],
+  defaultColumnDef: {
+    minWidth: 96,
+    resizable: true,
+    sortable: true,
+    filter: "text"
+  },
+  columnTypes: {
+    money: {
+      type: "number",
+      width: 140,
+      filter: "number",
+      editor: "number",
+      formatter: ({ value }) => Number(value).toLocaleString("en-US")
+    },
+    dateOnly: {
+      type: "date",
+      width: 132,
+      filter: "date"
+    }
+  }
+};
+```
+
+Merge order is `defaultColumnDef`, then any type defaults, then the explicit column definition.
+Column types can inherit from built-in or named types by setting their own `type`.
+
 `columnState` can be supplied by renderers or persisted application state when column width,
-visibility, order, or pinning should be restored.
+visibility, order, or pinning should be restored. The runtime API uses the same shape through
+`api.getColumnState()`, `api.setColumnState()`, and `api.resetColumnState()`.
+
+`initialState` restores mutable grid state without mixing it into static options. It is the preferred
+contract for saved user views, route restore, and wrapper parity:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  initialState: {
+    columnState: { columns: { amount: { width: 160, hidden: false } } },
+    sortModel: [{ columnId: "amount", field: "amount", direction: "desc" }],
+    filterModel: { quickText: "approved" },
+    groupModel: { fields: ["region"], expandedKeys: ["group:region=Capital"] },
+    selection: { mode: "row", rowKeys: ["ORD-001"], cells: [], ranges: [] },
+    pagination: { page: 2, pageSize: 50 },
+    scroll: { top: 360, left: 120 },
+    locale: "ko-KR"
+  }
+};
+```
+
+`initialState` is intentionally limited to runtime UI state. It does not replace `columns`, `data`,
+`dataSource`, renderer definitions, or security options. Missing fields are left at normal defaults.
+
+`beforeEvents` provides cancellable hooks before grid mutations. Use it for business rules that
+must block a user action before the grid changes visible state:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  beforeEvents: {
+    beforeColumnStateChange(event) {
+      if (event.event.columnState.columns?.orderId?.hidden) {
+        event.preventDefault("Order ID cannot be hidden");
+      }
+    },
+    beforePageChange(event) {
+      if (hasUnsavedChanges()) {
+        event.preventDefault("Save edits before paging");
+      }
+    }
+  }
+};
+```
+
+The same hooks can be attached at runtime through `GridApi.onBefore()`. React and Vue expose the
+same contract through `beforeEvents` plus framework event props/emits.
 
 Client row model inputs are supplied through the existing row options:
 
@@ -116,18 +201,43 @@ const options: GridOptions<OrderRow> = {
   rowModel: "client",
   editing: {
     enabled: true,
+    startMode: "doubleClick",
     commitMode: "batch",
+    undoRedo: { enabled: true, limit: 100 },
+    readOnly: false,
+    keyboard: {
+      startOnEnter: true,
+      commitOnEnter: true,
+      moveOnTab: true,
+      commitOnTab: true,
+      cancelOnEscape: true,
+      clearOnBackspace: true
+    },
     blurAction: "cancel",
     validateOnCommit: true
   }
 };
 ```
 
-The DOM renderer starts editing from Enter, F2, printable keys, double click, or
-`GridApi.startEdit()`. `blurAction` controls whether focus loss commits or cancels the editor.
+The DOM renderer starts editing from Enter, F2, printable keys, pointer edit policy, or
+`GridApi.startEdit()`. `startMode` controls pointer-started editing: `doubleClick` is the default for
+regular cells, `singleClick` starts editing from a primary click, and `manual` suppresses click and
+double-click editing while preserving keyboard/API entry points. Checkbox editors default to
+`singleClick` unless the column or grid option overrides the policy. `blurAction` controls whether
+focus loss commits or cancels the editor.
+`keyboard` makes editing keys explicit. The default enterprise policy starts editing from Enter,
+commits single-line editors from Enter, commits and moves from Tab, cancels from Escape, and clears
+then starts editing from Backspace. `moveOnTab` controls focused-cell Tab navigation and the focus
+move after an editor Tab commit.
 `commitMode: "batch"` stores accepted values in pending edit history until
 `GridApi.commitPendingEdits()` finalizes them; `GridApi.cancelPendingEdits()` restores the previous
 values.
+`undoRedo` controls the cell edit undo/redo stack. It is enabled by default with a bounded history
+limit, can be disabled with `undoRedo: false`, and is exposed through `GridApi.undoEdit()`,
+`redoEdit()`, `getEditHistoryState()`, and `clearEditHistory()`.
+`readOnly: true` keeps the same editor lifecycle but emits `cellEditRequested` instead of mutating
+or staging row data. Use it for externally controlled data stores and then feed accepted
+`event.nextRow` values back through `setData`, `updateRows`, React props, or Vue props.
 `commitOnBlur` remains supported as a legacy boolean alias, but `blurAction` is preferred for new
 code. React and Vue pass the same `editing` option through to the DOM renderer.
 

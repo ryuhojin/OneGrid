@@ -9,11 +9,81 @@ api.scrollToRow(2_499, "start");
 api.scrollToColumn("metric32", "nearest");
 ```
 
+Column methods take `columnId` as the preferred identifier. Field names still resolve as a
+compatibility fallback, but duplicate-field and generated columns should use explicit `columnId`
+values:
+
+```ts
+api.hideColumn("workflow-owner");
+api.pinColumn("order-id", "left");
+api.autoSizeColumn("risk-score");
+```
+
+Column state methods persist and restore the same `ColumnUiState` shape used by
+`GridOptions.columnState` and `GridStateSnapshot.columnState`:
+
+```ts
+const columnState = api.getColumnState();
+
+api.setColumnState({
+  order: ["order-id", "customer", "amount", "status"],
+  columns: {
+    amount: { width: 160 },
+    status: { pinned: "right" },
+    internalNotes: { hidden: true }
+  }
+});
+
+api.resetColumnState();
+```
+
+`setColumnState()` replaces the current column UI state with the provided state and rerenders by
+default. `resetColumnState()` returns to `GridOptions.columnState` plus any configured
+`frozenColumns` defaults.
+
+Before-event methods attach cancellable handlers after constructor options are created:
+
+```ts
+const off = api.onBefore("beforeFilterChange", (event) => {
+  if (event.event.filterModel.quickText === "restricted") {
+    event.preventDefault("restricted quick filter");
+  }
+});
+
+api.offBefore("beforeFilterChange", handler);
+off();
+```
+
+`onBefore()` and `offBefore()` use `GridBeforeEventMap<TData>` names. Calling
+`preventDefault()` prevents the pending sort, filter, page, selection, column state, or edit
+mutation. Normal `events.*` handlers still run only after the change succeeds.
+
+State methods capture and restore runtime UI state. `getState()` returns a `GridStateSnapshot`
+containing column UI state, sort/filter/group models, selection, pagination, scroll offsets, and
+locale. `setState()` applies only the fields provided, so applications can restore a saved view
+without remounting the grid:
+
+```ts
+const saved = api.getState();
+
+api.setState({
+  columnState: saved.columnState,
+  sortModel: saved.sortModel,
+  filterModel: saved.filterModel,
+  pagination: { page: 1, pageSize: 100 },
+  scroll: { top: 0, left: 0 }
+});
+```
+
+The same snapshot shape is accepted by `GridOptions.initialState` for first render. `setState()` is
+not a data-loading API; it does not replace `columns`, `data`, `dataSource`, or renderer/security
+configuration.
+
 Sorting methods update the shared `SortModel[]` used by header state, client row model sorting,
 and remote row model requests:
 
 ```ts
-api.setSortModel([{ field: "amount", direction: "desc" }]);
+api.setSortModel([{ columnId: "amount", field: "amount", direction: "desc" }]);
 const sortModel = api.getSortModel();
 ```
 
@@ -23,7 +93,9 @@ requests:
 ```ts
 api.setFilterModel({
   quickText: "office",
-  conditions: [{ field: "status", kind: "set", operator: "in", value: ["Approved"] }]
+  conditions: [
+    { columnId: "status", field: "status", kind: "set", operator: "in", value: ["Approved"] }
+  ]
 });
 
 const filterModel = api.getFilterModel();
@@ -58,11 +130,12 @@ const selectedTreeKeys = api.getTreeSelection();
 `expandTreeNode()` and `toggleTreeNode()` return a promise because expanding a lazy node may call
 `DataSource.getChildren()`.
 
-Editing methods use the shared `CellPosition` contract. `startEdit()` opens the renderer editor for
-the visible cell, and `stopEdit()` commits or cancels the active editor:
+Editing methods use the shared `CellPosition` contract. `field` remains the data key, while
+`columnId` disambiguates duplicate-field columns. `startEdit()` opens the renderer editor for the
+visible cell, and `stopEdit()` commits or cancels the active editor:
 
 ```ts
-api.startEdit({ rowIndex: 0, rowKey: "ED-0001", field: "title" });
+api.startEdit({ rowIndex: 0, rowKey: "ED-0001", columnId: "title", field: "title" });
 api.stopEdit({ commit: true, validate: true });
 api.stopEdit({ commit: false });
 ```
@@ -71,16 +144,45 @@ The DOM renderer also starts editing from Enter, F2, printable keys, and cell do
 `stopEdit({ commit: true })` emits `cellEditCommitted` with `trigger: "api"`;
 `stopEdit({ commit: false })` emits `cellEditCancelled` with `reason: "api"`.
 When `editing.commitMode` is `"batch"`, `stopEdit({ commit: true })` stages the cell value instead
-of finalizing it. Use the pending-edit API to inspect, finalize, or discard the staged history:
+of finalizing it. Use the batch edit session API to group, inspect, finalize, or discard staged
+history:
+
+When `editing.readOnly` is `true`, `stopEdit({ commit: true })` emits `cellEditRequested` instead
+of mutating or staging row data. Controlled applications should update their own store and then call
+`setData()` or `updateRows()` with the accepted row.
 
 ```ts
+const session = api.startBatchEditSession({
+  id: "approval-draft",
+  label: "Approval draft"
+});
+
+const activeSession = api.getBatchEditSession();
 const pending = api.getPendingEdits();
-await api.commitPendingEdits();
-api.cancelPendingEdits();
+await api.commitBatchEditSession();
+api.cancelBatchEditSession();
 ```
 
 Each pending edit includes `rowKey`, `position.field`, `position.rowIndex`, `sourceIndex` when the
 renderer can resolve the original client data index, `previousValue`, `nextValue`, and `stagedAt`.
+`startBatchEditSession()` is optional; if a grid in batch commit mode stages a value first, the DOM
+renderer creates an implicit session. `commitPendingEdits()` and `cancelPendingEdits()` remain
+supported aliases for existing integrations.
+
+Undo and redo operate on accepted edit steps. Before batch commit they update the staged pending
+history; after final commit they restore the committed row snapshot directly:
+
+```ts
+api.undoEdit();
+api.redoEdit();
+
+const history = api.getEditHistoryState();
+api.clearEditHistory();
+```
+
+`getEditHistoryState()` exposes `canUndo`, `canRedo`, and the current stack sizes for toolbar state.
+External data replacement through `setData()`, `appendRows()`, `updateRows()`, or `removeRows()`
+clears the edit stack because row identity and stored snapshots may no longer match.
 
 Selection methods expose the same core state used by pointer and keyboard interaction:
 
@@ -177,3 +279,15 @@ When `security.csp.nonce` is configured, the inserted runtime style tag receives
 `security.csp.disableStyleInjection` is true, `applyTheme()` updates the theme metadata without
 inserting a style tag. Built-in theme names and density values are documented in
 `features/theme-foundation`; SI token mapping is documented in `features/si-customization`.
+
+Plugin methods expose lifecycle-bound extension metadata without wrapper-specific behavior:
+
+```ts
+if (api.hasPlugin("audit")) {
+  const menuItems = api.getPluginExtensions<{ label: string }>("menu.context");
+}
+```
+
+`getPluginExtensions()` returns ordered, immutable extension records registered by plugins.
+Extension payloads are metadata or adapter hooks; they do not bypass renderer security or sanitizer
+policy.

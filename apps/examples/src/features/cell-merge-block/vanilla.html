@@ -1,0 +1,11 @@
+<section id="EX-002-005" aria-label="Cell merge block example"></section>
+<script type="module">
+  import { mountCellMergeBlockExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#EX-002-005");
+  if (!host) {
+    throw new Error("Cell merge block example host was not found.");
+  }
+
+  mountCellMergeBlockExample(host);
+</script>

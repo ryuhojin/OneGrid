@@ -74,9 +74,7 @@ export function focusInitialCell(grid: HTMLElement): void {
 }
 
 export function focusTarget(grid: HTMLElement, target: NavigationTarget): boolean {
-  const clamped = clampTarget(grid, target);
-  const cell = findCellCovering(grid, clamped)
-    ?? findNearestCell(grid, clamped);
+  const cell = getNavigationTargetCell(grid, target);
   if (!cell) {
     return false;
   }
@@ -85,9 +83,35 @@ export function focusTarget(grid: HTMLElement, target: NavigationTarget): boolea
   return true;
 }
 
+export function getNavigationTargetCell(
+  grid: HTMLElement,
+  target: NavigationTarget
+): HTMLElement | undefined {
+  const clamped = clampTarget(grid, target);
+  return findCellCovering(grid, clamped)
+    ?? findNearestCell(grid, clamped);
+}
+
+export function isNavigationCellVisible(
+  cell: HTMLElement,
+  viewport: HTMLElement
+): boolean {
+  const rect = cell.getBoundingClientRect();
+  const clip = getNavigationClipRect(cell, viewport);
+  return rect.width > 0
+    && rect.height > 0
+    && rect.left < clip.right - 1
+    && rect.right > clip.left + 1
+    && rect.top < clip.bottom - 1
+    && rect.bottom > clip.top + 1;
+}
+
 export function moveByTab(grid: HTMLElement, current: HTMLElement, direction: -1 | 1): boolean {
   const cells = getNavigableCells(grid).sort(byCellPosition);
   const currentIndex = cells.indexOf(current);
+  if (currentIndex < 0) {
+    return false;
+  }
   const next = cells[currentIndex + direction];
   if (!next) {
     return false;
@@ -162,8 +186,14 @@ export function getCellPosition(cell: HTMLElement): CellPosition | undefined {
 export function scrollTowardTarget(
   input: FocusViewportInput,
   target: NavigationTarget,
-  current: CellPosition
+  current: CellPosition,
+  targetCell?: HTMLElement
 ): void {
+  if (targetCell) {
+    scrollNavigationCellIntoView(input, targetCell);
+    return;
+  }
+
   const rowDelta = target.rowIndex - current.rowIndex;
   if (rowDelta !== 0) {
     input.viewport.scrollTop = Math.max(0, (target.rowIndex - 1) * getEstimatedRowHeight(input.grid));
@@ -176,15 +206,55 @@ export function scrollTowardTarget(
       input.viewport.scrollLeft + Math.sign(colDelta) * getEstimatedColumnWidth(input.grid)
     );
   }
-  input.viewport.dispatchEvent(new Event("scroll"));
+  input.viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
 }
 
-export function getInitialEditText(event: KeyboardEvent): string | undefined {
+export function scrollNavigationCellIntoView(
+  input: FocusViewportInput,
+  cell: HTMLElement
+): void {
+  const rect = cell.getBoundingClientRect();
+  const clip = getNavigationClipRect(cell, input.viewport);
+  let nextScrollTop = input.viewport.scrollTop;
+  let nextScrollLeft = input.viewport.scrollLeft;
+
+  if (rect.top < clip.top) {
+    nextScrollTop -= clip.top - rect.top;
+  } else if (rect.bottom > clip.bottom) {
+    nextScrollTop += rect.bottom - clip.bottom;
+  }
+
+  if (cell.closest<HTMLElement>(".og-grid__pane")?.dataset.layoutPane === "center") {
+    if (rect.left < clip.left) {
+      nextScrollLeft -= clip.left - rect.left;
+    } else if (rect.right > clip.right) {
+      nextScrollLeft += rect.right - clip.right;
+    }
+  }
+
+  nextScrollTop = Math.max(0, nextScrollTop);
+  nextScrollLeft = Math.max(0, nextScrollLeft);
+  if (
+    Math.abs(nextScrollTop - input.viewport.scrollTop) < 1
+    && Math.abs(nextScrollLeft - input.viewport.scrollLeft) < 1
+  ) {
+    return;
+  }
+
+  input.viewport.scrollTop = nextScrollTop;
+  input.viewport.scrollLeft = nextScrollLeft;
+  input.viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
+}
+
+export function getInitialEditText(
+  event: KeyboardEvent,
+  options: { readonly startOnEnter: boolean }
+): string | undefined {
   if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) {
     return undefined;
   }
 
-  if (event.key === "Enter" || event.key === "F2") {
+  if ((event.key === "Enter" && options.startOnEnter) || event.key === "F2") {
     return "";
   }
 
@@ -238,6 +308,36 @@ function getPageStep(viewport: HTMLElement): number {
   const firstRow = viewport.querySelector<HTMLElement>('[role="row"]');
   const rowHeight = firstRow?.getBoundingClientRect().height || 36;
   return Math.max(1, Math.floor(viewport.clientHeight / rowHeight) - 1);
+}
+
+function getNavigationClipRect(
+  cell: HTMLElement,
+  viewport: HTMLElement
+): { readonly top: number; readonly right: number; readonly bottom: number; readonly left: number } {
+  const viewportRect = viewport.getBoundingClientRect();
+  if (cell.closest<HTMLElement>(".og-grid__pane")?.dataset.layoutPane !== "center") {
+    return viewportRect;
+  }
+
+  const grid = viewport.closest<HTMLElement>(".og-grid");
+  const leftPane = grid?.querySelector<HTMLElement>(
+    '[data-layout-section="body"] [data-layout-pane="left"][data-layout-pane-visible="true"]'
+  );
+  const rightPane = grid?.querySelector<HTMLElement>(
+    '[data-layout-section="body"] [data-layout-pane="right"][data-layout-pane-visible="true"]'
+  );
+  const left = leftPane
+    ? Math.max(viewportRect.left, leftPane.getBoundingClientRect().right)
+    : viewportRect.left;
+  const right = rightPane
+    ? Math.min(viewportRect.right, rightPane.getBoundingClientRect().left)
+    : viewportRect.right;
+  return {
+    top: viewportRect.top,
+    right,
+    bottom: viewportRect.bottom,
+    left
+  };
 }
 
 function clampTarget(grid: HTMLElement, target: NavigationTarget): NavigationTarget {

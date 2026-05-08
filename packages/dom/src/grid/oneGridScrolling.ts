@@ -8,8 +8,8 @@ import type { VirtualScrollRuntime } from "./virtualScrollRuntime.js";
 import { OneGridPagination } from "./oneGridPagination.js";
 
 export abstract class OneGridScrolling<TData = unknown> extends OneGridPagination<TData> {
-  async scrollToColumn(field: string, align: ScrollAlign = "start"): Promise<void> {
-    this.setColumnScrollToField(field, align);
+  async scrollToColumn(columnId: string, align: ScrollAlign = "start"): Promise<void> {
+    this.setColumnScrollToField(columnId, align);
     await this.render(invalidate(["columns"], "scroll-column"));
   }
 
@@ -67,11 +67,11 @@ export abstract class OneGridScrolling<TData = unknown> extends OneGridPaginatio
     this.columnViewportWidth = nextViewportWidth;
   }
 
-  protected setColumnScrollToField(field: string, align: ScrollAlign): void {
+  protected setColumnScrollToField(columnId: string, align: ScrollAlign): void {
     const nextScrollLeft = resolveScrollLeftForField({
       options: this.options,
       columnState: this.columnState,
-      field,
+      field: columnId,
       align,
       currentScrollLeft: this.columnScrollLeft,
       viewportWidth: this.columnViewportWidth

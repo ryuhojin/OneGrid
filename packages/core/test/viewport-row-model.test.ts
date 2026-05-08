@@ -150,6 +150,8 @@ describe("viewport row model", () => {
       row: { id: "ORD-VP-1", amount: 999, status: "Closed" }
     });
 
-    expect(model.entries[1]?.data.amount).toBe(999);
+    const updated = model.entries[1];
+    expect(updated?.kind).toBe("data");
+    expect(updated?.kind === "data" ? updated.data.amount : undefined).toBe(999);
   });
 });

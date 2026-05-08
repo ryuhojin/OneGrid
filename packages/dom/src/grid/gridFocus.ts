@@ -1,3 +1,5 @@
+import { resolveEditKeyboardPolicy } from "@onegrid/core";
+import type { ResolvedEditingKeyboardPolicy } from "@onegrid/core";
 import type { GridEditRuntime } from "./editRuntime.js";
 import {
   clearActiveCell,
@@ -7,8 +9,11 @@ import {
   getCellPosition,
   getCoordinateTarget,
   getInitialEditText,
+  getNavigationTargetCell,
+  isNavigationCellVisible,
   moveByTab,
   refreshRovingTabIndex,
+  scrollNavigationCellIntoView,
   scrollTowardTarget,
   setActiveCell
 } from "./gridFocusNavigation.js";
@@ -23,6 +28,7 @@ export interface GridFocusInput {
   readonly grid: HTMLElement;
   readonly viewport: HTMLElement;
   readonly editRuntime?: GridEditRuntime;
+  readonly editKeyboardPolicy?: ResolvedEditingKeyboardPolicy;
   readonly selectionRuntime?: GridSelectionRuntime;
 }
 
@@ -47,6 +53,7 @@ export function attachGridFocus(input: GridFocusInput): GridFocusHandle {
   let frame = 0;
   let suppressGridFocus = false;
   let suppressReset = 0;
+  const editKeyboardPolicy = input.editKeyboardPolicy ?? resolveEditKeyboardPolicy(undefined);
 
   input.grid.tabIndex = 0;
   input.grid.dataset.keyboardFocus = "true";
@@ -85,8 +92,33 @@ export function attachGridFocus(input: GridFocusInput): GridFocusHandle {
     const cell = getCellFromEventTarget(event.target, input.grid);
     if (cell) {
       setActiveCell(input.grid, cell, true);
+      if (shouldToggleCheckboxOnSingleClick(cell, event)) {
+        event.stopPropagation();
+      }
     }
   }, { capture: true, signal: abortController.signal });
+
+  input.grid.addEventListener("click", (event) => {
+    if (isNonBodyFocusTarget(event.target)) {
+      return;
+    }
+
+    const cell = getCellFromEventTarget(event.target, input.grid);
+    if (!cell || !shouldStartEditOnSingleClick(cell, event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.detail > 1) {
+      return;
+    }
+    if (cell.dataset.editorKind === "checkbox") {
+      input.editRuntime?.toggleCheckboxCell(cell, "pointer");
+      return;
+    }
+    input.editRuntime?.startEditFromCell(cell, "pointer");
+  }, { signal: abortController.signal });
 
   input.grid.addEventListener("dblclick", (event) => {
     if (isNonBodyFocusTarget(event.target)) {
@@ -94,7 +126,11 @@ export function attachGridFocus(input: GridFocusInput): GridFocusHandle {
     }
 
     const cell = getCellFromEventTarget(event.target, input.grid);
-    if (cell && input.editRuntime?.startEditFromCell(cell, "pointer") === true) {
+    if (!cell || getCellEditStartMode(cell) !== "doubleClick") {
+      event.preventDefault();
+      return;
+    }
+    if (input.editRuntime?.startEditFromCell(cell, "pointer") === true) {
       event.preventDefault();
     }
   }, { signal: abortController.signal });
@@ -117,7 +153,15 @@ export function attachGridFocus(input: GridFocusInput): GridFocusHandle {
       return;
     }
 
-    const initialText = getInitialEditText(event);
+    if (event.key === "Backspace" && input.editRuntime && editKeyboardPolicy.clearOnBackspace) {
+      event.preventDefault();
+      input.editRuntime.startEditFromCell(cell, "keyboard", "");
+      return;
+    }
+
+    const initialText = getInitialEditText(event, {
+      startOnEnter: editKeyboardPolicy.startOnEnter
+    });
     if (
       input.editRuntime
       && initialText !== undefined
@@ -127,7 +171,7 @@ export function attachGridFocus(input: GridFocusInput): GridFocusHandle {
       return;
     }
 
-    const moved = moveFromKey(input, cell, event);
+    const moved = moveFromKey(input, cell, event, editKeyboardPolicy);
     if (moved) {
       event.preventDefault();
       if (event.shiftKey && input.selectionRuntime) {
@@ -159,18 +203,30 @@ export function attachGridFocus(input: GridFocusInput): GridFocusHandle {
     if (frame !== 0) cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
       frame = 0;
-      focusTarget(input.grid, target);
+      focusVisibleTarget(input, target);
     });
   }
 
-  function moveFromKey(focusInput: GridFocusInput, cell: HTMLElement, event: KeyboardEvent): boolean {
+  function moveFromKey(
+    focusInput: GridFocusInput,
+    cell: HTMLElement,
+    event: KeyboardEvent,
+    keyboardPolicy: ResolvedEditingKeyboardPolicy
+  ): boolean {
     const position = getCellPosition(cell);
     if (!position) {
       return false;
     }
 
     if (event.key === "Tab") {
-      return moveByTab(focusInput.grid, cell, event.shiftKey ? -1 : 1);
+      if (!keyboardPolicy.moveOnTab) {
+        return false;
+      }
+      const moved = moveByTab(focusInput.grid, cell, event.shiftKey ? -1 : 1);
+      if (moved) {
+        revealActiveCell(focusInput);
+      }
+      return moved;
     }
 
     const target = getCoordinateTarget(focusInput.grid, focusInput.viewport, position, event);
@@ -178,12 +234,39 @@ export function attachGridFocus(input: GridFocusInput): GridFocusHandle {
       return false;
     }
 
-    const moved = focusTarget(focusInput.grid, target);
-    if (!moved) {
-      scrollTowardTarget(focusInput, target, position);
-      scheduleFocus(target);
+    if (focusVisibleTarget(focusInput, target)) {
+      return true;
     }
+
+    const targetCell = getNavigationTargetCell(focusInput.grid, target);
+    scrollTowardTarget(focusInput, target, position, targetCell);
+    scheduleFocus(target);
     return true;
+  }
+
+  function focusVisibleTarget(focusInput: GridFocusInput, target: NavigationTarget): boolean {
+    const cell = getNavigationTargetCell(focusInput.grid, target);
+    if (!cell || !isNavigationCellVisible(cell, focusInput.viewport)) {
+      return false;
+    }
+
+    return focusTarget(focusInput.grid, target);
+  }
+
+  function revealActiveCell(focusInput: GridFocusInput): void {
+    const active = focusInput.grid.querySelector<HTMLElement>('[data-focus-active="true"]');
+    if (!active || isNavigationCellVisible(active, focusInput.viewport)) {
+      return;
+    }
+
+    const position = getCellPosition(active);
+    scrollNavigationCellIntoView(focusInput, active);
+    if (position) {
+      scheduleFocus({
+        rowIndex: position.rowIndex,
+        colIndex: position.colIndex
+      });
+    }
   }
 
   function suppressNextGridFocus(): void {
@@ -199,4 +282,25 @@ export function attachGridFocus(input: GridFocusInput): GridFocusHandle {
 function isNonBodyFocusTarget(target: EventTarget | null): boolean {
   return target instanceof Element
     && target.closest("button,input,select,textarea,a,[role='button'],[role='menuitem'],[role='columnheader'],.og-grid__header") !== null;
+}
+
+function shouldStartEditOnSingleClick(cell: HTMLElement, event: MouseEvent): boolean {
+  return getCellEditStartMode(cell) === "singleClick" && isPlainPrimaryPointer(event);
+}
+
+function shouldToggleCheckboxOnSingleClick(cell: HTMLElement, event: MouseEvent): boolean {
+  return cell.dataset.editorKind === "checkbox"
+    && shouldStartEditOnSingleClick(cell, event);
+}
+
+function getCellEditStartMode(cell: HTMLElement): string {
+  return cell.dataset.editStartMode ?? "doubleClick";
+}
+
+function isPlainPrimaryPointer(event: MouseEvent): boolean {
+  return event.button === 0
+    && !event.shiftKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && !event.altKey;
 }

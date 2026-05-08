@@ -1,12 +1,19 @@
 import { createColumnMenuModel } from "@onegrid/core";
 import type {
+  ColumnMenuExtensionContext,
+  ColumnMenuExtensionPayload,
   ColumnMenuAction,
   ColumnModel,
   ColumnUiState,
+  GridPluginExtension,
   HeaderCell,
   NormalizedDataColumn
 } from "@onegrid/core";
-import type { ColumnUiRuntime, ResolvedColumnUiOptions } from "./columnControls.js";
+import type {
+  ColumnUiRuntime,
+  HeaderMenuExtensionRuntime,
+  ResolvedColumnUiOptions
+} from "./columnControls.js";
 import { attachOverlayFocusTrap } from "./focusTrap.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
 import type { FocusTrapHandle } from "./focusTrap.js";
@@ -97,6 +104,13 @@ function showColumnMenu<TData>(
     menu.append(button);
   }
 
+  appendExtensionMenuItems(
+    menu,
+    column?.kind === "data" ? column as NormalizedDataColumn : undefined,
+    runtime.headerMenuExtensions,
+    closeCurrentMenu
+  );
+
   const onDocumentPointerDown = (event: PointerEvent): void => {
     if (!menu.contains(event.target as Node) && !anchor.contains(event.target as Node)) {
       closeCurrentMenu();
@@ -120,6 +134,69 @@ function showColumnMenu<TData>(
     };
   });
   menu.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+}
+
+function appendExtensionMenuItems(
+  menu: HTMLElement,
+  column: NormalizedDataColumn | undefined,
+  extensions: HeaderMenuExtensionRuntime | undefined,
+  closeCurrentMenu: () => void
+): void {
+  if (!column || !extensions) {
+    return;
+  }
+
+  const context: ColumnMenuExtensionContext = {
+    columnId: column.id,
+    headerName: column.headerName,
+    column: column.source
+  };
+
+  for (const extension of extensions.getExtensions()) {
+    const payload = extension.payload;
+    if (!payload || !isExtensionVisible(payload, context)) {
+      continue;
+    }
+
+    menu.append(createExtensionMenuItem(extension, payload, context, closeCurrentMenu));
+  }
+}
+
+function createExtensionMenuItem(
+  extension: GridPluginExtension<ColumnMenuExtensionPayload>,
+  payload: ColumnMenuExtensionPayload,
+  context: ColumnMenuExtensionContext,
+  closeCurrentMenu: () => void
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "og-grid__column-menu-item";
+  button.textContent = payload.label;
+  button.disabled = resolveExtensionPredicate(payload.disabled, context);
+  button.dataset.pluginId = extension.pluginId;
+  button.dataset.pluginExtensionId = extension.id;
+  button.setAttribute("role", "menuitem");
+  button.setAttribute("aria-disabled", String(button.disabled));
+  button.addEventListener("click", () => {
+    payload.onSelect?.(context);
+    closeCurrentMenu();
+  });
+  return button;
+}
+
+function isExtensionVisible(
+  payload: ColumnMenuExtensionPayload,
+  context: ColumnMenuExtensionContext
+): boolean {
+  return resolveExtensionPredicate(payload.visible, context, true);
+}
+
+function resolveExtensionPredicate(
+  value: boolean | ((context: ColumnMenuExtensionContext) => boolean) | undefined,
+  context: ColumnMenuExtensionContext,
+  defaultValue = false
+): boolean {
+  return typeof value === "function" ? value(context) : value ?? defaultValue;
 }
 
 function createFilterMenuItem<TData>(

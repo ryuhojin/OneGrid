@@ -12,12 +12,13 @@ import type {
   TreeRowEntry,
   ViewportRowEntry
 } from "@onegrid/core";
-import { getCellSpanState, isCellEditable } from "@onegrid/core";
+import { getCellSpanState, isCellEditable, resolveEditorDef, resolveEditStartMode } from "@onegrid/core";
 import { createGroupFooterRow, createGroupRow } from "./groupRowRenderer.js";
 import type { GroupRowRuntime } from "./groupRowRenderer.js";
 import { readCellValue, renderCellHost } from "./rendererHost.js";
 import { createTreeBodyRow } from "./treeRowRenderer.js";
 import type { TreeRowRuntime } from "./treeRowRenderer.js";
+import type { BodyRowHeightResolver } from "./rowHeightRuntime.js";
 
 export type BodyRowEntry<TData> =
   | ClientRowModelEntry<TData>
@@ -44,6 +45,7 @@ export interface BodyRowRenderOptions<TData> {
   readonly security?: SecurityOptions;
   readonly editing?: EditingOptions;
   readonly i18n: LocaleFormatterBridge;
+  readonly rowHeight?: BodyRowHeightResolver<TData>;
 }
 
 export function createBodyRow<TData>(options: BodyRowRenderOptions<TData>): HTMLElement {
@@ -91,7 +93,8 @@ export function createBodyRow<TData>(options: BodyRowRenderOptions<TData>): HTML
     options.cellSpanWindow,
     options.security,
     options.editing,
-    options.i18n
+    options.i18n,
+    options.rowHeight
   );
 }
 
@@ -108,9 +111,11 @@ function createDataRow<TData>(
   cellSpanWindow: CellSpanWindow | undefined,
   security: SecurityOptions | undefined,
   editing: EditingOptions | undefined,
-  i18n: LocaleFormatterBridge
+  i18n: LocaleFormatterBridge,
+  rowHeight: BodyRowHeightResolver<TData> | undefined
 ): HTMLElement {
   const row = createPaneRow("og-grid__row", columnTemplate, rowIndex, rowKey, exposeRowKey);
+  applyRowHeight(row, rowHeight?.(rowData, rowIndex));
 
   columns.forEach((column, columnIndex) => {
     const globalColumnIndex = ariaColumnOffset + columnIndex;
@@ -134,6 +139,12 @@ function createDataRow<TData>(
   });
 
   return row;
+}
+
+function applyRowHeight(row: HTMLElement, height: number | undefined): void {
+  if (height !== undefined) {
+    row.style.setProperty("--og-row-height", `${height}px`);
+  }
 }
 
 function createSkeletonRow<TData>(options: BodyRowRenderOptions<TData>): HTMLElement {
@@ -270,18 +281,25 @@ function applyEditMetadata<TData>(
     rowIndex: input.rowIndex,
     rowKey: input.rowKey,
     column: input.column.source,
+    columnId: input.column.id,
     field: input.column.field,
     value,
     position: {
       rowIndex: input.rowIndex,
       rowKey: input.rowKey,
+      columnId: input.column.id,
       field: input.column.field
     }
   }, input.editing);
   cell.setAttribute("aria-readonly", editable ? "false" : "true");
   if (editable) {
+    const editorKind = resolveEditorDef(input.column.source).kind;
+    const editStartMode = resolveEditStartMode(input.column.source, input.editing);
     cell.classList.add("og-grid__cell--editable");
+    cell.classList.add(`og-grid__cell--editor-${editorKind}`);
     cell.dataset.editable = "true";
+    cell.dataset.editorKind = editorKind;
+    cell.dataset.editStartMode = editStartMode;
   }
 }
 

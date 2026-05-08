@@ -3,6 +3,37 @@
 `GridEventMap<TData>` defines the typed event surface for lifecycle, data, selection, sorting,
 filtering, editing, validation, and error events.
 
+`GridBeforeEventMap<TData>` defines cancellable hooks that run before mutable grid state changes.
+The handler receives a `GridCancellableEvent<T>` wrapper. Calling `preventDefault(reason?)` stops
+the default grid mutation and prevents later before-event handlers from running:
+
+```ts
+const beforeEvents: GridBeforeEventHandlers<OrderRow> = {
+  beforeSortChange(event) {
+    if (event.event.sortModel[0]?.field === "amount") {
+      event.preventDefault("amount sorting is locked");
+    }
+  },
+  beforeCellEditCommit(event) {
+    if (event.event.nextValue === "Closed") {
+      event.preventDefault("closed rows require approval workflow");
+    }
+  }
+};
+
+const unsubscribe = api.onBefore("beforeColumnStateChange", (event) => {
+  if (event.event.columnState.columns?.orderId?.hidden) {
+    event.preventDefault("ID column is required");
+  }
+});
+```
+
+Public before events are available through `GridOptions.beforeEvents`, `GridApi.onBefore()`,
+React props such as `onBeforeSortChange`, and Vue emits such as `@before-sort-change`.
+Supported hooks are `beforeCellEditStart`, `beforeCellEditCommit`, `beforeSelectionChange`,
+`beforeSortChange`, `beforeFilterChange`, `beforePageChange`, and
+`beforeColumnStateChange`.
+
 Editing emits lifecycle events through the same map:
 
 ```ts
@@ -10,18 +41,30 @@ const events: GridEventHandlers<OrderRow> = {
   cellEditStarted: ({ position }) => console.log("editing", position.field),
   cellEditStaged: ({ previousValue, nextValue, trigger }) =>
     console.log("staged", trigger, previousValue, nextValue),
+  cellEditRequested: ({ rowKey, nextRow }) =>
+    console.log("external update requested", rowKey, nextRow),
   cellEditCommitted: ({ previousValue, nextValue, trigger }) =>
     console.log(trigger, previousValue, nextValue),
   cellEditCancelled: ({ position, reason }) => console.log("cancelled", position.field, reason),
+  editHistoryChanged: ({ action, state }) =>
+    console.log(action, state.undoCount, state.redoCount),
   validationFailed: ({ issues }) => console.warn(issues)
 };
 ```
 
+`cellEditRequested` is emitted when `editing.readOnly` is enabled. It exposes the original row,
+`previousValue`, `nextValue`, and `nextRow` so externally controlled applications can update their
+own state and pass the row back to the grid.
 `validationFailed` keeps the editor open in the DOM renderer and exposes field, row key, message,
-and severity metadata from core validation. `cellEditStaged.trigger` and
-`cellEditCommitted.trigger` identify whether the value came from Enter, blur, or the API;
+and severity metadata from core validation. `cellEditStaged.trigger`,
+`cellEditRequested.trigger`, and `cellEditCommitted.trigger` identify whether the value came from
+Enter, Tab, blur, pointer, or the API;
 `cellEditCancelled.reason` identifies Escape, blur, API cancel, or replacement by another edit
 session.
+`batchEditSessionStarted`, `batchEditSessionCommitted`, and `batchEditSessionCancelled` wrap the
+same staged edits in a named session snapshot when `editing.commitMode` is `"batch"`.
+`editUndo`, `editRedo`, and `editHistoryChanged` expose undo/redo stack transitions for toolbar
+state and audit UI without reusing commit events for non-commit operations.
 
 Selection emits row keys, selected cells, selected ranges, and optional server dataset token:
 

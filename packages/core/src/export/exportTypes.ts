@@ -1,4 +1,5 @@
 import type { ExportOptions, ImportOptions } from "../types/grid-options.js";
+import type { GridExportResult } from "../types/shared.js";
 
 export type GridExportFormat = NonNullable<ExportOptions["format"]>;
 
@@ -19,6 +20,17 @@ export interface GridExportMatrix {
   readonly columns: readonly GridExportColumn[];
   readonly headerRows: readonly (readonly GridExportCell[])[];
   readonly bodyRows: readonly (readonly GridExportCell[])[];
+}
+
+export interface GridExportAdapterContext<TData = unknown> {
+  readonly matrix: GridExportMatrix;
+  readonly options: ExportOptions;
+  readonly rows?: readonly TData[];
+}
+
+export interface GridExportAdapterPayload<TData = unknown> {
+  readonly format: GridExportFormat;
+  export(context: GridExportAdapterContext<TData>): GridExportResult | Promise<GridExportResult>;
 }
 
 export interface GridImportMatrix {

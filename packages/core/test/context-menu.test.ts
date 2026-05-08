@@ -49,4 +49,24 @@ describe("context menu model", () => {
 
     expect(model?.items.map((item) => item.label)).toEqual(["Flag row"]);
   });
+
+  it("appends plugin extension items after configured menu items", () => {
+    const model = createContextMenuModel({
+      context: cellContext,
+      options: {
+        enabled: true,
+        defaultItems: false,
+        items: [{ id: "custom", label: "Custom action" }]
+      },
+      extensionItems: [
+        { id: "audit", label: "Audit cell" },
+        { id: "hidden", label: "Hidden", visible: false }
+      ]
+    });
+
+    expect(model?.items.map((item) => [item.id, item.label])).toEqual([
+      ["custom", "Custom action"],
+      ["extension:audit", "Audit cell"]
+    ]);
+  });
 });

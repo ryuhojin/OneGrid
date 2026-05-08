@@ -5,6 +5,8 @@ import {
 } from "@onegrid/core";
 import type {
   ContextMenuContext,
+  ContextMenuExtensionPayload,
+  ContextMenuItemDef,
   ContextMenuModel,
   ContextMenuModelItem
 } from "@onegrid/core";
@@ -60,12 +62,19 @@ export class OneGridMenu<TData = unknown> extends OneGridExport<TData> {
     return createContextMenuModel({
       context,
       ...(this.options.contextMenu === undefined ? {} : { options: this.options.contextMenu }),
+      extensionItems: this.getContextMenuExtensionItems(),
       capabilities: {
         canCopy: this.options.clipboard?.enabled === true,
         canEdit: this.isContextEditable(context),
         hasSelection: this.hasSelection()
       }
     });
+  }
+
+  private getContextMenuExtensionItems(): readonly ContextMenuItemDef<TData>[] {
+    return this.getPluginExtensions<ContextMenuExtensionPayload<TData>>("menu.context")
+      .map((extension) => extension.payload?.item)
+      .filter((item): item is ContextMenuItemDef<TData> => item !== undefined);
   }
 
   private async runContextMenuItem(
@@ -82,7 +91,12 @@ export class OneGridMenu<TData = unknown> extends OneGridExport<TData> {
       this.selectRows([context.rowKey]);
       await this.copyToClipboard({ selectedOnly: true, includeHeaders: true });
     } else if (item.action === "startEdit" && context.field) {
-      this.startEdit({ rowIndex: context.rowIndex, rowKey: context.rowKey, field: context.field });
+      this.startEdit({
+        rowIndex: context.rowIndex,
+        rowKey: context.rowKey,
+        field: context.field,
+        ...(context.columnId === undefined ? {} : { columnId: context.columnId })
+      });
     } else if (item.action === "clearSelection") {
       this.clearSelection();
     }
@@ -93,6 +107,7 @@ export class OneGridMenu<TData = unknown> extends OneGridExport<TData> {
   private readContextMenuContext(cell: HTMLElement): ContextMenuContext<TData> | undefined {
     const rowKey = cell.dataset.editRowKey;
     const field = cell.dataset.field;
+    const columnId = cell.dataset.columnId;
     const rowIndex = readNumber(cell.dataset.rowIndex);
     const sourceIndex = readNumber(cell.dataset.sourceIndex);
     const ariaColumnIndex = readNumber(cell.getAttribute("aria-colindex") ?? undefined);
@@ -101,7 +116,7 @@ export class OneGridMenu<TData = unknown> extends OneGridExport<TData> {
     }
 
     const rowInfo = this.findEditableRow(rowKey, sourceIndex);
-    const column = this.findDataColumn(field);
+    const column = this.findDataColumn(columnId ?? field);
     if (!rowInfo || !column) {
       return undefined;
     }
@@ -114,6 +129,7 @@ export class OneGridMenu<TData = unknown> extends OneGridExport<TData> {
       rowKey: rowInfo.rowKey,
       ...(rowInfo.sourceIndex === undefined ? {} : { sourceIndex: rowInfo.sourceIndex }),
       field,
+      ...(columnId === undefined ? {} : { columnId }),
       ...(ariaColumnIndex === undefined ? {} : { columnIndex: ariaColumnIndex - 1 }),
       column: column.source,
       value
@@ -131,9 +147,15 @@ export class OneGridMenu<TData = unknown> extends OneGridExport<TData> {
       rowIndex: context.rowIndex,
       rowKey: context.rowKey,
       column: context.column,
+      columnId: context.columnId ?? context.field,
       field: context.field,
       value: context.value,
-      position: { rowIndex: context.rowIndex, rowKey: context.rowKey, field: context.field }
+      position: {
+        rowIndex: context.rowIndex,
+        rowKey: context.rowKey,
+        columnId: context.columnId ?? context.field,
+        field: context.field
+      }
     }, this.options.editing);
   }
 
@@ -149,6 +171,7 @@ function toSelectedCell<TData>(context: ContextMenuContext<TData>, field: string
   return {
     rowKey: context.rowKey,
     rowIndex: context.rowIndex,
+    ...(context.columnId === undefined ? {} : { columnId: context.columnId }),
     field,
     columnIndex: context.columnIndex ?? 0
   };

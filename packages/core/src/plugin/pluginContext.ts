@@ -2,9 +2,13 @@ import type { GridApi } from "../types/grid-api.js";
 import type { GridOptions } from "../types/grid-options.js";
 import type {
   GridPluginCleanup,
-  GridPluginContext as PublicGridPluginContext
+  GridPluginContext as PublicGridPluginContext,
+  GridPluginExtension,
+  GridPluginExtensionContribution,
+  GridPluginExtensionPoint
 } from "../types/plugin.js";
 import type { Unsubscribe } from "../types/shared.js";
+import type { GridPluginExtensionRegistry } from "./pluginExtensions.js";
 
 export class GridPluginRuntimeContext<TData = unknown>
   implements PublicGridPluginContext<TData>
@@ -12,12 +16,21 @@ export class GridPluginRuntimeContext<TData = unknown>
   readonly api: GridApi<TData>;
   readonly options: GridOptions<TData>;
 
+  private readonly pluginId: string;
+  private readonly extensions: GridPluginExtensionRegistry;
   private readonly cleanups: GridPluginCleanup[] = [];
   private disposed = false;
 
-  constructor(api: GridApi<TData>, options: GridOptions<TData>) {
+  constructor(
+    pluginId: string,
+    api: GridApi<TData>,
+    options: GridOptions<TData>,
+    extensions: GridPluginExtensionRegistry
+  ) {
+    this.pluginId = pluginId;
     this.api = api;
     this.options = options;
+    this.extensions = extensions;
   }
 
   addCleanup(cleanup: GridPluginCleanup): void {
@@ -38,6 +51,24 @@ export class GridPluginRuntimeContext<TData = unknown>
         this.cleanups.splice(cleanupIndex, 1);
       }
     };
+  }
+
+  registerExtension<TPayload = unknown>(
+    extension: GridPluginExtensionContribution<TPayload>
+  ): Unsubscribe {
+    if (this.disposed) {
+      throw new Error(`Plugin is already disposed: ${this.pluginId}`);
+    }
+
+    const unregister = this.extensions.register(this.pluginId, extension);
+    this.addCleanup(unregister);
+    return unregister;
+  }
+
+  getExtensions<TPayload = unknown>(
+    point?: GridPluginExtensionPoint
+  ): readonly GridPluginExtension<TPayload>[] {
+    return this.extensions.list<TPayload>(point);
   }
 
   dispose(): void {

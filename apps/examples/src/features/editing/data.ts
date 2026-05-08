@@ -13,11 +13,23 @@ export interface EditingRow {
   readonly notes: string;
   readonly owner: string;
   readonly code: string;
+  readonly quickNote: string;
+  readonly manualNote: string;
 }
 
 export const editingOptions: EditingOptions = {
   enabled: true,
+  startMode: "doubleClick",
   commitMode: "batch",
+  undoRedo: { enabled: true, limit: 50 },
+  keyboard: {
+    startOnEnter: true,
+    commitOnEnter: true,
+    moveOnTab: true,
+    commitOnTab: true,
+    cancelOnEscape: true,
+    clearOnBackspace: true
+  },
   blurAction: "cancel",
   validateOnCommit: true
 };
@@ -73,6 +85,22 @@ export const editingColumns: readonly ColumnDef<EditingRow>[] = [
     width: 180,
     validator: (value) => String(value).trim().length < 3 ? ["Title must be at least 3 characters"] : []
   },
+  {
+    field: "quickNote",
+    headerName: "Quick Note",
+    editable: true,
+    editor: "text",
+    editTrigger: "singleClick",
+    width: 170
+  },
+  {
+    field: "manualNote",
+    headerName: "Manual Note",
+    editable: true,
+    editor: "text",
+    editTrigger: "manual",
+    width: 170
+  },
   { field: "budget", headerName: "Budget", type: "number", editable: true, width: 128 },
   { field: "dueDate", headerName: "Due Date", type: "date", editable: true, width: 132 },
   { field: "meetingAt", headerName: "Meeting", type: "datetime", editable: true, width: 168 },
@@ -81,6 +109,7 @@ export const editingColumns: readonly ColumnDef<EditingRow>[] = [
     headerName: "Active",
     type: "boolean",
     editable: true,
+    editTrigger: "singleClick",
     width: 104,
     renderer: {
       kind: "element",
@@ -153,7 +182,9 @@ export const editingRows: readonly EditingRow[] = [
     priority: "High",
     notes: "Joint approval",
     owner: "Han",
-    code: "APR"
+    code: "APR",
+    quickNote: "single click",
+    manualNote: "keyboard/API only"
   },
   {
     id: "ED-0002",
@@ -167,7 +198,9 @@ export const editingRows: readonly EditingRow[] = [
     priority: "Medium",
     notes: "Needs review",
     owner: "Lee",
-    code: "REV"
+    code: "REV",
+    quickNote: "single click",
+    manualNote: "keyboard/API only"
   },
   {
     id: "ED-0003",
@@ -181,7 +214,9 @@ export const editingRows: readonly EditingRow[] = [
     priority: "Low",
     notes: "Automated check",
     owner: "Kang",
-    code: "SEC"
+    code: "SEC",
+    quickNote: "single click",
+    manualNote: "keyboard/API only"
   }
 ];
 

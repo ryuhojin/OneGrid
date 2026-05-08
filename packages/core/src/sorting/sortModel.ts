@@ -1,5 +1,6 @@
 import type { ColumnDef, DataColumnDef } from "../types/column.js";
 import type { SortCycleItem, SortDirection, SortModel } from "../types/shared.js";
+import { resolveDataColumnId } from "../column/columnIds.js";
 
 const DEFAULT_SORT_ORDER: readonly SortCycleItem[] = Object.freeze(["asc", "desc", null]);
 
@@ -22,13 +23,15 @@ export function normalizeSortModel(
       .map((sort, index) => ({ ...sort, priority: sort.priority ?? index }))
       .sort((left, right) => (left.priority ?? 0) - (right.priority ?? 0))
       .filter((sort) => {
-        if (seen.has(sort.field)) {
+        const key = sort.columnId ?? sort.field;
+        if (seen.has(key)) {
           return false;
         }
-        seen.add(sort.field);
+        seen.add(key);
         return true;
       })
       .map((sort, index) => Object.freeze({
+        ...(sort.columnId === undefined ? {} : { columnId: sort.columnId }),
         field: sort.field,
         direction: sort.direction,
         priority: index
@@ -47,7 +50,7 @@ export function createInitialSortModel<TData>(
   const initial = collectDataColumns(columns)
     .filter((column) => column.sortable !== false && column.sort !== undefined)
     .map((column, index) => Object.freeze({
-      field: column.field,
+      field: column.field ?? resolveDataColumnId(column),
       direction: column.sort as SortDirection,
       priority: index
     }));

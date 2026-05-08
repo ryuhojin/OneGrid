@@ -1,5 +1,5 @@
 import type { DataColumnDef } from "../types/column.js";
-import type { RowKey } from "../types/shared.js";
+import type { ColumnId, RowKey } from "../types/shared.js";
 
 export type ContextMenuScope = "row" | "cell";
 
@@ -17,6 +17,7 @@ export interface ContextMenuContext<TData = unknown> {
   readonly rowKey: RowKey;
   readonly sourceIndex?: number;
   readonly field?: string;
+  readonly columnId?: ColumnId;
   readonly columnIndex?: number;
   readonly column?: DataColumnDef<TData>;
   readonly value?: unknown;
@@ -36,6 +37,10 @@ export interface ContextMenuItemDef<TData = unknown> {
   readonly visible?: boolean | ContextMenuPredicate<TData>;
   readonly disabled?: boolean | ContextMenuPredicate<TData>;
   onSelect?(context: ContextMenuContext<TData>): void;
+}
+
+export interface ContextMenuExtensionPayload<TData = unknown> {
+  readonly item: ContextMenuItemDef<TData>;
 }
 
 export interface ContextMenuOptions<TData = unknown> {
@@ -67,6 +72,7 @@ export interface CreateContextMenuModelInput<TData = unknown> {
   readonly context: ContextMenuContext<TData>;
   readonly options?: ContextMenuOptions<TData>;
   readonly capabilities?: ContextMenuCapabilities;
+  readonly extensionItems?: readonly ContextMenuItemDef<TData>[];
 }
 
 const DEFAULT_ACTIONS: readonly ContextMenuAction[] = [
@@ -86,7 +92,8 @@ export function createContextMenuModel<TData>(
 
   const items = [
     ...createDefaultItems(input),
-    ...createCustomItems(input)
+    ...createCustomItems(input),
+    ...createExtensionItems(input)
   ];
   if (items.length === 0) {
     return undefined;
@@ -96,6 +103,20 @@ export function createContextMenuModel<TData>(
     context: input.context,
     items: Object.freeze(items)
   });
+}
+
+function createExtensionItems<TData>(
+  input: CreateContextMenuModelInput<TData>
+): readonly ContextMenuModelItem<TData>[] {
+  return (input.extensionItems ?? [])
+    .filter((item) => isItemVisible(item, input.context))
+    .map((item) => Object.freeze({
+      id: `extension:${item.id}`,
+      label: item.label,
+      ...(item.action === undefined ? {} : { action: item.action }),
+      enabled: !resolvePredicate(item.disabled, input.context),
+      source: item
+    }));
 }
 
 function createDefaultItems<TData>(

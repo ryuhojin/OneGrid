@@ -8,6 +8,7 @@ export interface VirtualScrollRuntime {
   readonly scrollTop: number;
   readonly viewportHeight: number;
   onScroll(scrollTop: number, viewportHeight: number): void;
+  onLogicalRowScroll?(rowIndex: number, scrollTop?: number): void;
 }
 
 export function resolveVirtualRowHeight<TData>(options: GridOptions<TData>): number {
@@ -17,6 +18,10 @@ export function resolveVirtualRowHeight<TData>(options: GridOptions<TData>): num
 
   if (typeof options.rowHeight === "number" && isPositiveNumber(options.rowHeight)) {
     return options.rowHeight;
+  }
+
+  if (isPositiveNumber(options.viewport?.rowHeight)) {
+    return options.viewport.rowHeight;
   }
 
   if (isPositiveNumber(options.virtualization?.estimatedRowHeight)) {

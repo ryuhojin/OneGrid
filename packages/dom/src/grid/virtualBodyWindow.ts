@@ -17,8 +17,13 @@ import {
 import type { CellSpanModel, FixedRowVirtualWindow, LayoutPane } from "@onegrid/core";
 import type { BodyRowEntry } from "./bodyRowRenderer.js";
 import type { DomGridOptions } from "./OneGrid.js";
-import type { RowRenderState } from "./renderGridShell.js";
+import type { RowRenderState } from "./renderGridTypes.js";
+import { createBodyRowHeightResolver } from "./rowHeightRuntime.js";
+import type { BodyRowHeightResolver } from "./rowHeightRuntime.js";
 import type { VirtualScrollRuntime } from "./virtualScrollRuntime.js";
+
+const restoredViewportScrolls = new WeakSet<HTMLElement>();
+const CONTROLLED_SCROLL_RESTORE = "true";
 
 export function createVirtualWindow<TData>(
   options: DomGridOptions<TData>,
@@ -94,6 +99,7 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
       return;
     }
 
+    const rowHeight = createBodyRowHeightResolver(options);
     replaceBodyRows({
       scrollElement,
       rows: getRenderedRows(allRows, nextWindow),
@@ -102,6 +108,7 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
       cellSpanModel: input.cellSpanModel,
       ...(options.locale === undefined ? {} : { locale: options.locale }),
       ...(rowIndexOffset === undefined ? {} : { rowIndexOffset }),
+      ...(rowHeight === undefined ? {} : { rowHeight }),
       centerOwnsTreeControls,
       virtualWindow: nextWindow
     });
@@ -164,10 +171,20 @@ export function restoreVirtualScroll(
   markerElement.dataset.virtualizedRows = "true";
   scrollElement.dataset.virtualizedRows = "true";
   markerElement.style.setProperty("--og-row-height", `${virtualWindow.rowHeight}px`);
-  scrollElement.scrollTop = virtualScrollRuntime.scrollTop;
+  setControlledViewportScroll(scrollElement, virtualWindow.scrollTop);
 }
 
-function replaceBodyRows<TData>(input: {
+export function setControlledViewportScroll(scrollElement: HTMLElement, scrollTop: number): void {
+  restoredViewportScrolls.add(scrollElement);
+  scrollElement.dataset.logicalScrollRestoring = CONTROLLED_SCROLL_RESTORE;
+  scrollElement.scrollTop = scrollTop;
+  requestAnimationFrame(() => {
+    restoredViewportScrolls.delete(scrollElement);
+    delete scrollElement.dataset.logicalScrollRestoring;
+  });
+}
+
+export function replaceBodyRows<TData>(input: {
   readonly scrollElement: HTMLElement;
   readonly rows: readonly BodyRowEntry<TData>[];
   readonly panes: Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>;
@@ -175,6 +192,7 @@ function replaceBodyRows<TData>(input: {
   readonly cellSpanModel: CellSpanModel;
   readonly locale?: string;
   readonly rowIndexOffset?: number;
+  readonly rowHeight?: BodyRowHeightResolver<TData>;
   readonly centerOwnsTreeControls: boolean;
   readonly virtualWindow: FixedRowVirtualWindow;
 }): void {
@@ -201,6 +219,7 @@ function replaceBodyRows<TData>(input: {
           : { treeColumnField: input.rowRenderState.treeRuntime.treeColumnField }),
         cellSpanModel: input.cellSpanModel,
         i18n: createLocaleFormatter(input.locale),
+        ...(input.rowHeight === undefined ? {} : { rowHeight: input.rowHeight }),
         ...(input.rowIndexOffset === undefined ? {} : { rowIndexOffset: input.rowIndexOffset })
       },
       input.centerOwnsTreeControls,

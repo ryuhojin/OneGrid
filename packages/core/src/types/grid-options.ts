@@ -1,12 +1,13 @@
-import type { CellContext, ColumnDef } from "./column.js";
+import type { CellContext, ColumnDef, ColumnTypeRegistry, DataColumnDefaults } from "./column.js";
 import type { DataSource } from "./data.js";
-import type { GridEventHandlers } from "./events.js";
+import type { GridBeforeEventHandlers, GridEventHandlers } from "./events.js";
 import type { GridPlugin } from "./plugin.js";
 import type {
   AggregateModel,
   Density,
   EditBlurAction,
   EditCommitMode,
+  EditStartMode,
   FilterModel,
   GroupFooterPosition,
   GroupModel,
@@ -19,10 +20,14 @@ import type {
 } from "./shared.js";
 import type { ColumnUiState } from "../column/columnUi.js";
 import type { ContextMenuOptions } from "../menu/index.js";
+import type { GridStateSnapshot } from "../state/gridState.js";
 import type { VirtualizationOptions } from "../virtualization/index.js";
 
 export interface GridOptions<TData = unknown> {
   readonly columns: readonly ColumnDef<TData>[];
+  readonly defaultColumnDef?: DataColumnDefaults<TData>;
+  readonly columnTypes?: ColumnTypeRegistry<TData>;
+  readonly initialState?: GridStateSnapshot;
   readonly columnOrder?: readonly string[];
   readonly columnState?: ColumnUiState;
   readonly columnUi?: ColumnUiOptions;
@@ -64,6 +69,7 @@ export interface GridOptions<TData = unknown> {
   readonly locale?: string;
   readonly plugins?: readonly GridPlugin<TData>[];
   readonly events?: GridEventHandlers<TData>;
+  readonly beforeEvents?: GridBeforeEventHandlers<TData>;
 }
 
 export interface HeaderMergeOptions {
@@ -138,10 +144,28 @@ export interface SelectionOptions {
 
 export interface EditingOptions {
   readonly enabled?: boolean;
+  readonly startMode?: EditStartMode;
   readonly commitMode?: EditCommitMode;
+  readonly readOnly?: boolean;
+  readonly keyboard?: EditingKeyboardOptions;
+  readonly undoRedo?: boolean | EditUndoRedoOptions;
   readonly blurAction?: EditBlurAction;
   readonly commitOnBlur?: boolean;
   readonly validateOnCommit?: boolean;
+}
+
+export interface EditUndoRedoOptions {
+  readonly enabled?: boolean;
+  readonly limit?: number;
+}
+
+export interface EditingKeyboardOptions {
+  readonly startOnEnter?: boolean;
+  readonly commitOnEnter?: boolean;
+  readonly moveOnTab?: boolean;
+  readonly commitOnTab?: boolean;
+  readonly cancelOnEscape?: boolean;
+  readonly clearOnBackspace?: boolean;
 }
 
 export interface FilteringOptions {
@@ -234,7 +258,7 @@ export interface ClipboardOptions {
 }
 
 export interface ExportOptions {
-  readonly format?: "csv" | "xlsx" | "pdf" | "json" | "print";
+  readonly format?: "csv" | "xlsx" | "pdf" | "json" | "print" | (string & {});
   readonly selectedOnly?: boolean;
   readonly includeHeaders?: boolean;
   readonly preserveVisualLayout?: boolean;
@@ -280,6 +304,10 @@ export interface ThemeOptions {
   readonly density?: Density;
   readonly className?: string;
   readonly variables?: Readonly<Record<string, string>>;
+}
+
+export interface ThemeExtensionPayload {
+  readonly theme: ThemeOptions;
 }
 
 export type ThemeInput = string | ThemeOptions;

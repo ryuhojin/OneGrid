@@ -1,5 +1,6 @@
 import { readField } from "../row/rowIdentity.js";
 import { createLocaleFormatter } from "../i18n/index.js";
+import { resolveDataColumnId } from "../column/index.js";
 import type {
   CellContext,
   DataColumnDef,
@@ -7,7 +8,7 @@ import type {
   ValueValidator
 } from "../types/column.js";
 import type { EditingOptions } from "../types/grid-options.js";
-import type { EditorKind, RowKey, ValidationIssue } from "../types/shared.js";
+import type { EditorKind, EditStartMode, RowKey, ValidationIssue } from "../types/shared.js";
 
 export interface StartCellEditInput<TData = unknown> {
   readonly row: TData;
@@ -27,6 +28,7 @@ export interface CellEditSession<TData = unknown> {
   readonly rowIndex: number;
   readonly rowKey: RowKey;
   readonly column: DataColumnDef<TData>;
+  readonly columnId: string;
   readonly field: string;
   readonly previousValue: unknown;
   readonly editor: ResolvedEditorDef<TData>;
@@ -39,6 +41,15 @@ export interface ResolvedEditorDef<TData = unknown> {
   readonly options: readonly EditorOption[];
   readonly params?: Readonly<Record<string, unknown>>;
   readonly validate?: ValueValidator<TData>;
+}
+
+export interface ResolvedEditingKeyboardPolicy {
+  readonly startOnEnter: boolean;
+  readonly commitOnEnter: boolean;
+  readonly moveOnTab: boolean;
+  readonly commitOnTab: boolean;
+  readonly cancelOnEscape: boolean;
+  readonly clearOnBackspace: boolean;
 }
 
 export interface CommitCellEditInput<TData = unknown> {
@@ -67,7 +78,8 @@ export interface CellEditCancelResult<TData = unknown> {
 export function startCellEdit<TData>(
   input: StartCellEditInput<TData>
 ): CellEditSession<TData> | undefined {
-  const field = input.field ?? input.column.field;
+  const columnId = resolveDataColumnId(input.column);
+  const field = input.field ?? input.column.field ?? columnId;
   const currentValue = input.currentValue
     ?? readEditedValue(input.row, input.rowIndex, input.rowKey, input.column, field);
   const context = createCellContext(
@@ -84,11 +96,12 @@ export function startCellEdit<TData>(
   }
 
   return Object.freeze({
-    id: `edit:${String(input.rowKey)}:${field}`,
+    id: `edit:${String(input.rowKey)}:${columnId}`,
     row: input.row,
     rowIndex: input.rowIndex,
     rowKey: input.rowKey,
     column: input.column,
+    columnId,
     field,
     previousValue: currentValue,
     editor: resolveEditorDef(input.column),
@@ -176,6 +189,35 @@ export function resolveEditorDef<TData>(
   });
 }
 
+export function resolveEditStartMode<TData>(
+  column: DataColumnDef<TData>,
+  editing: EditingOptions | undefined
+): EditStartMode {
+  if (column.editTrigger) {
+    return column.editTrigger;
+  }
+
+  if (editing?.startMode) {
+    return editing.startMode;
+  }
+
+  return resolveEditorDef(column).kind === "checkbox" ? "singleClick" : "doubleClick";
+}
+
+export function resolveEditKeyboardPolicy(
+  editing: EditingOptions | undefined
+): ResolvedEditingKeyboardPolicy {
+  const keyboard = editing?.keyboard;
+  return Object.freeze({
+    startOnEnter: getKeyboardFlag(keyboard?.startOnEnter, true),
+    commitOnEnter: getKeyboardFlag(keyboard?.commitOnEnter, true),
+    moveOnTab: getKeyboardFlag(keyboard?.moveOnTab, true),
+    commitOnTab: getKeyboardFlag(keyboard?.commitOnTab, true),
+    cancelOnEscape: getKeyboardFlag(keyboard?.cancelOnEscape, true),
+    clearOnBackspace: getKeyboardFlag(keyboard?.clearOnBackspace, true)
+  });
+}
+
 function parseEditedValue<TData>(
   rawValue: unknown,
   editorKind: EditorKind,
@@ -243,7 +285,11 @@ function applyEditedValue<TData>(
     return row;
   }
 
-  return { ...(row as Record<string, unknown>), [context.field]: nextValue } as TData;
+  if (!column.field) {
+    return row;
+  }
+
+  return { ...(row as Record<string, unknown>), [column.field]: nextValue } as TData;
 }
 
 function createCellContext<TData>(
@@ -255,15 +301,17 @@ function createCellContext<TData>(
   value: unknown,
   locale: string | undefined
 ): CellContext<TData> {
+  const columnId = resolveDataColumnId(column);
   return {
     ...createLocaleFormatter(locale),
     row,
     rowIndex,
     rowKey,
     column,
+    columnId,
     field,
     value,
-    position: { rowIndex, field, rowKey }
+    position: { rowIndex, field, columnId, rowKey }
   };
 }
 
@@ -274,7 +322,11 @@ function readEditedValue<TData>(
   column: DataColumnDef<TData>,
   field: string
 ): unknown {
-  return column.valueGetter ? column.valueGetter({ row, rowIndex, rowKey }) : readField(row, field);
+  if (column.valueGetter) {
+    return column.valueGetter({ row, rowIndex, rowKey });
+  }
+
+  return column.field ? readField(row, column.field) : readField(row, field);
 }
 
 function inferEditorKind<TData>(column: DataColumnDef<TData>): EditorKind {
@@ -291,6 +343,10 @@ function inferEditorKind<TData>(column: DataColumnDef<TData>): EditorKind {
     return "checkbox";
   }
   return "text";
+}
+
+function getKeyboardFlag(value: boolean | undefined, fallback: boolean): boolean {
+  return value ?? fallback;
 }
 
 function getParamOptions(params: Readonly<Record<string, unknown>> | undefined): readonly EditorOption[] {

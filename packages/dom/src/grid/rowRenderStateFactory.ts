@@ -37,6 +37,7 @@ export function createRowRenderState<TData>(
 ): RowRenderState<TData> | undefined {
   if (input.infiniteRowModel) {
     return {
+      rowModel: "infinite",
       entries: input.infiniteEntries,
       rowCount: input.infiniteRowModel.rowCount ?? input.infiniteEntries.length,
       loading: input.infiniteLoading,
@@ -58,6 +59,7 @@ function createServerRowRenderState<TData>(
   }
 
   return {
+    rowModel: "server",
     entries: input.serverEntries,
     rowCount: input.serverRowModel.rowCount,
     loading: input.serverLoading,
@@ -76,6 +78,7 @@ function createViewportRowRenderState<TData>(
   }
 
   return {
+    rowModel: "viewport",
     entries: input.viewportEntries,
     rowCount: input.viewportRowModel.rowCount,
     loading: input.viewportLoading,
@@ -92,6 +95,7 @@ function createTreeRowRenderState<TData>(
   }
 
   return {
+    rowModel: "tree",
     entries: input.treeEntries,
     rowCount: input.treeRowModel.rowCount,
     loading: false,

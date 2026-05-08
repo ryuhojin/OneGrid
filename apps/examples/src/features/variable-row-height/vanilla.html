@@ -1,0 +1,11 @@
+<section id="EX-002-008" aria-label="Variable row height example"></section>
+<script type="module">
+  import { mountVariableRowHeightExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#EX-002-008");
+  if (!host) {
+    throw new Error("Variable row height example host was not found.");
+  }
+
+  mountVariableRowHeightExample(host);
+</script>

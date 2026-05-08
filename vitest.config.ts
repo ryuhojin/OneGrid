@@ -14,6 +14,11 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**", "tests/a11y/**"],
-    include: ["packages/**/test/**/*.test.{ts,tsx}", "tests/perf/**/*.test.ts", "tests/security/**/*.test.ts"]
+    include: [
+      "packages/**/test/**/*.test.{ts,tsx}",
+      "tests/catalog/**/*.test.ts",
+      "tests/perf/**/*.test.ts",
+      "tests/security/**/*.test.ts"
+    ]
   }
 });

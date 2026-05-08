@@ -5,26 +5,31 @@ import type {
   EditCancelReason,
   EditorOption,
   EditCommitTrigger,
+  ResolvedEditingKeyboardPolicy,
   ResolvedEditorDef,
   ValidationIssue
 } from "@onegrid/core";
+import { getOverlayHost, getOverlayPositioning, positionOverlay } from "./editorOverlayPosition.js";
 
 export interface CellEditorOverlayInput<TData = unknown> {
   readonly cell: HTMLElement;
   readonly session: CellEditSession<TData>;
   readonly initialValue?: string;
   readonly blurAction: EditBlurAction;
+  readonly keyboardPolicy: ResolvedEditingKeyboardPolicy;
   commit(rawValue: unknown, validate: boolean, trigger: EditCommitTrigger): Promise<CellEditCommitResult<TData>>;
   cancel(reason: EditCancelReason): void;
+  moveAfterCommit?(direction: -1 | 1): void;
 }
 
 export interface CellEditorOverlay {
   destroy(): void;
   commit(validate?: boolean, trigger?: EditCommitTrigger): Promise<boolean>;
+  reposition(cell: HTMLElement): void;
 }
 
-type ControlElement = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
-interface EditorControl {
+export type ControlElement = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+export interface EditorControl {
   readonly element: HTMLElement;
   readonly focusTarget: ControlElement;
   read(): unknown;
@@ -45,6 +50,7 @@ export function openCellEditor<TData>(
   root.setAttribute("role", "dialog");
   root.setAttribute("aria-label", `Edit ${input.session.column.headerName ?? input.session.field}`);
   root.dataset.editorKind = input.session.editor.kind;
+  root.dataset.positioning = getOverlayPositioning(input.cell);
   const error = document.createElement("div");
   error.className = "og-grid__editor-error";
   error.setAttribute("role", "alert");
@@ -53,7 +59,7 @@ export function openCellEditor<TData>(
   control.element.classList.add("og-grid__editor-control");
   control.focusTarget.setAttribute("aria-label", `Edit ${input.session.column.headerName ?? input.session.field}`);
   root.append(control.element, error);
-  document.body.append(root);
+  getOverlayHost(input.cell).append(root);
   positionOverlay(root, input.cell);
   focusControl(control.focusTarget);
 
@@ -84,12 +90,28 @@ export function openCellEditor<TData>(
       return;
     }
     if (event.key === "Escape") {
+      if (!input.keyboardPolicy.cancelOnEscape) {
+        return;
+      }
       event.preventDefault();
       input.cancel("escape");
       destroy();
       return;
     }
+    if (event.key === "Tab" && input.keyboardPolicy.commitOnTab) {
+      const direction = event.shiftKey ? -1 : 1;
+      event.preventDefault();
+      void commit(true, "tab").then((committed) => {
+        if (committed && input.keyboardPolicy.moveOnTab) {
+          input.moveAfterCommit?.(direction);
+        }
+      });
+      return;
+    }
     if (shouldCommitFromEnter(event, input.session.editor.kind)) {
+      if (!input.keyboardPolicy.commitOnEnter) {
+        return;
+      }
       event.preventDefault();
       void commit(true, "enter");
     }
@@ -98,7 +120,7 @@ export function openCellEditor<TData>(
     queueBlurAction(BLUR_COMMIT_DELAY_MS);
   }, { signal: abortController.signal });
 
-  return { destroy, commit };
+  return { destroy, commit, reposition };
 
   function queueBlurAction(delay: number): void {
     if (blurTimer !== 0) {
@@ -148,9 +170,15 @@ export function openCellEditor<TData>(
     abortController.abort();
     root.remove();
   }
+
+  function reposition(cell: HTMLElement): void {
+    if (!destroyed) {
+      positionOverlay(root, cell);
+    }
+  }
 }
 
-function createEditorControl<TData>(
+export function createEditorControl<TData>(
   editor: ResolvedEditorDef<TData>,
   value: unknown
 ): EditorControl {
@@ -312,7 +340,7 @@ function createDataList(id: string, options: readonly EditorOption[]): HTMLDataL
 }
 
 function getInitialValue<TData>(input: CellEditorOverlayInput<TData>): unknown {
-  return input.initialValue && input.initialValue.length > 0
+  return input.initialValue !== undefined
     ? input.initialValue
     : input.session.previousValue;
 }
@@ -337,7 +365,7 @@ function shouldCommitFromEnter<TData>(event: KeyboardEvent, kind: ResolvedEditor
   return event.key === "Enter" && (kind !== "textarea" || event.ctrlKey || event.metaKey);
 }
 
-function focusControl(control: ControlElement): void {
+export function focusControl(control: ControlElement): void {
   control.focus({ preventScroll: true });
   if (control instanceof HTMLTextAreaElement || isSelectableInput(control)) {
     control.select();
@@ -348,17 +376,7 @@ function isSelectableInput(control: ControlElement): control is HTMLInputElement
   return control instanceof HTMLInputElement && control.type !== "checkbox" && control.type !== "radio";
 }
 
-function positionOverlay(root: HTMLElement, cell: HTMLElement): void {
-  const rect = cell.getBoundingClientRect();
-  root.style.insetBlockStart = `${rect.top}px`;
-  root.style.insetInlineStart = `${rect.left}px`;
-  root.style.inlineSize = `${rect.width}px`;
-  root.style.maxInlineSize = `${rect.width}px`;
-  root.style.setProperty("--og-editor-cell-height", `${rect.height}px`);
-  root.style.minBlockSize = `${rect.height}px`;
-}
-
-function showErrors(error: HTMLElement, issues: readonly ValidationIssue[]): void {
+export function showErrors(error: HTMLElement, issues: readonly ValidationIssue[]): void {
   error.hidden = issues.length === 0;
   error.textContent = issues.map((issue) => issue.message).join(". ");
 }

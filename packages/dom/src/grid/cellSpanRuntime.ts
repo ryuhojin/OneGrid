@@ -1,6 +1,5 @@
 import {
   createCellSpanModel,
-  createColumnModel,
   resolveCellSpanAnchor
 } from "@onegrid/core";
 import type {
@@ -11,6 +10,7 @@ import type {
   SelectedCell
 } from "@onegrid/core";
 import { createCellSpanRows, getRows } from "./renderGridData.js";
+import { createDomColumnModel } from "./domColumnModel.js";
 import type { DomGridOptions } from "./oneGridTypes.js";
 import type { RowRenderState } from "./renderGridTypes.js";
 
@@ -23,10 +23,7 @@ export function createDomCellSpanSnapshot<TData>(
   options: DomGridOptions<TData>,
   rowRenderState: RowRenderState<TData> | undefined
 ): DomCellSpanSnapshot<TData> {
-  const columnModel = createColumnModel(options.columns, {
-    ...(options.columnOrder === undefined ? {} : { columnOrder: options.columnOrder }),
-    ...(options.columnState === undefined ? {} : { columnState: options.columnState })
-  });
+  const columnModel = createDomColumnModel(options);
   const rows = getRows(options, rowRenderState);
   return Object.freeze({
     columns: columnModel.visibleLeafColumns,
@@ -52,6 +49,7 @@ export function resolveMergedSelectedCell<TData>(
   return {
     rowIndex: anchor.rowIndex,
     rowKey: resolveAnchorRowKey(anchor.rowKey, cell.rowKey),
+    columnId: anchor.columnId,
     field: anchor.field,
     columnIndex: anchor.columnIndex
   };
@@ -62,7 +60,7 @@ export function resolveMergedCellPosition<TData>(
   position: CellPosition
 ): CellPosition {
   const columnIndex = snapshot.columns.findIndex((column) =>
-    column.field === position.field || column.id === position.field
+    column.id === (position.columnId ?? position.field) || column.field === position.field
   );
   if (columnIndex < 0) {
     return position;
@@ -76,6 +74,7 @@ export function resolveMergedCellPosition<TData>(
   const rowKey = resolveAnchorRowKey(anchor.rowKey, position.rowKey);
   return {
     rowIndex: anchor.rowIndex,
+    columnId: anchor.columnId,
     field: anchor.field,
     ...(rowKey === undefined ? {} : { rowKey })
   };

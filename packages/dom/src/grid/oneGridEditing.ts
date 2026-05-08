@@ -1,28 +1,29 @@
-import {
-  commitCellEdit,
-  startCellEdit
-} from "@onegrid/core";
+import { commitCellEdit, resolveEditKeyboardPolicy, startCellEdit } from "@onegrid/core";
 import type {
   CellEditCommitResult,
+  CellEditSession,
   CellPosition,
-  CommitPendingEditsOptions,
   EditBlurAction,
-  EditCancelReason,
-  EditCommitMode,
   EditCommitTrigger,
   GridOptions,
-  GridPendingEdit
+  ScrollAlign
 } from "@onegrid/core";
-import { readColumnValue } from "./editBatchRuntime.js";
-import { readCellEditTarget } from "./editRuntime.js";
-import type { EditTrigger, GridEditRuntime, GridStopEditOptions } from "./editRuntime.js";
+import {
+  isCellVisibleInViewport,
+  isMatchingEditCell
+} from "./editCellVisibility.js";
+import { revealEditCell, scrollEditPositionIntoView } from "./editCellReveal.js";
+import { moveEditFocusAfterCommit } from "./editFocusMove.js";
+import { readCellEditTarget, type CellEditTarget, type EditTrigger, type GridEditRuntime, type GridStopEditOptions } from "./editRuntime.js";
 import { openCellEditor } from "./editorOverlay.js";
-import { OneGridEditStore } from "./oneGridEditStore.js";
+import { OneGridEditCommitBase } from "./oneGridEditCommitBase.js";
 import { invalidate } from "./renderInvalidation.js";
 
-export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
+export class OneGridEditing<TData = unknown> extends OneGridEditCommitBase<TData> {
   startEdit(position: CellPosition): void {
-    const cell = this.findCellElement(this.resolveMergedEditPosition(position));
+    const resolvedPosition = this.resolveMergedEditPosition(position);
+    scrollEditPositionIntoView(resolvedPosition, this.createEditRevealRuntime());
+    const cell = this.findCellElement(resolvedPosition);
     if (cell) {
       this.startEditFromCell(cell, "api");
     }
@@ -45,68 +46,12 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
     this.emitCellEditCancelled(cancelled.session, "api");
   }
 
-  getPendingEdits(): readonly GridPendingEdit<TData>[] {
-    return this.editBatch.getPendingEdits();
-  }
-
-  async commitPendingEdits(options?: CommitPendingEditsOptions): Promise<void> {
-    if (this.destroyed) {
-      return;
-    }
-
-    const active = this.activeEdit;
-    if (active) {
-      const committed = await active.overlay.commit(options?.validate ?? true, "api");
-      if (!committed) {
-        return;
-      }
-    }
-
-    if (this.editBatch.size === 0) {
-      return;
-    }
-
-    const edits = this.editBatch.getEdits();
-    this.editBatch.clear();
-    for (const edit of edits) {
-      this.emitPendingEditCommitted(edit, "api");
-    }
-    await this.render(invalidate(["rows", "layout"], "cell-edit-batch-commit"));
-  }
-
-  cancelPendingEdits(): void {
-    if (this.destroyed) {
-      return;
-    }
-
-    const active = this.activeEdit;
-    if (active) {
-      this.cancelActiveEdit("api");
-    }
-
-    if (this.editBatch.size === 0) {
-      return;
-    }
-
-    const edits = this.editBatch.getEdits();
-    const originals = this.editBatch.getOriginalRows();
-    for (const original of originals) {
-      this.replaceStoredRow(original.rowKey, original.sourceIndex, original.row);
-    }
-    for (const edit of edits) {
-      this.emitPendingEditCancelled(edit, "api");
-    }
-    this.editBatch.clear();
-    void this.render(invalidate(["rows", "layout"], "cell-edit-batch-cancel"));
-  }
-
   protected createEditRuntime(): GridEditRuntime {
     return {
-      startEditFromCell: (cell, trigger, initialValue) =>
-        this.startEditFromCell(cell, trigger, initialValue),
-      stopEdit: (options) => {
-        this.stopEdit(options);
-      },
+      startEditFromCell: (cell, trigger, initialValue) => this.startEditFromCell(cell, trigger, initialValue),
+      toggleCheckboxCell: (cell, trigger) => this.toggleCheckboxCell(cell, trigger),
+      syncActiveEditOnScroll: (viewport) => this.syncActiveEditOnScroll(viewport),
+      stopEdit: (options) => this.stopEdit(options),
       isEditingCell: (cell) => {
         const target = readCellEditTarget(cell);
         return target !== undefined
@@ -114,6 +59,62 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
           && this.activeEdit.session.field === target.field;
       }
     };
+  }
+
+  private toggleCheckboxCell(cell: HTMLElement, trigger: "pointer"): boolean {
+    if (
+      this.destroyed
+      || this.options.editing?.enabled === false
+      || cell.dataset.editorKind !== "checkbox"
+    ) {
+      return false;
+    }
+
+    let target = readCellEditTarget(cell);
+    if (!target) {
+      return false;
+    }
+
+    cell = this.revealEditCell(cell, target);
+    target = readCellEditTarget(cell);
+    if (!target) {
+      return false;
+    }
+
+    const resolved = this.resolveEditableCell(
+      target.rowKey,
+      target.field,
+      target.sourceIndex,
+      target.columnId
+    );
+    if (!resolved) {
+      return false;
+    }
+
+    const session = startCellEdit({
+      row: resolved.row,
+      rowIndex: target.rowIndex,
+      rowKey: resolved.rowKey,
+      column: resolved.column.source,
+      field: resolved.column.field,
+      currentValue: resolved.value,
+      ...(this.options.locale === undefined ? {} : { locale: this.options.locale }),
+      ...(this.options.editing === undefined ? {} : { editing: this.options.editing })
+    });
+    if (!session || session.editor.kind !== "checkbox") {
+      return false;
+    }
+
+    if (!this.canStartCellEdit(session, trigger)) {
+      return false;
+    }
+    if (this.activeEdit) {
+      this.cancelActiveEdit("replace");
+    }
+
+    this.emitCellEditStarted(session);
+    void this.commitPreparedEdit(session, resolved.value !== true, true, trigger);
+    return true;
   }
 
   private startEditFromCell(
@@ -125,19 +126,27 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
       return false;
     }
 
-    const target = readCellEditTarget(cell);
+    let target = readCellEditTarget(cell);
     if (!target) {
       return false;
     }
 
-    const resolved = this.resolveEditableCell(target.rowKey, target.field, target.sourceIndex);
+    cell = this.revealEditCell(cell, target);
+    target = readCellEditTarget(cell);
+    if (!target) {
+      return false;
+    }
+
+    const resolved = this.resolveEditableCell(
+      target.rowKey,
+      target.field,
+      target.sourceIndex,
+      target.columnId
+    );
     if (!resolved) {
       return false;
     }
 
-    if (this.activeEdit) {
-      this.cancelActiveEdit("replace");
-    }
     const session = startCellEdit({
       row: resolved.row,
       rowIndex: target.rowIndex,
@@ -152,20 +161,61 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
       return false;
     }
 
+    if (!this.canStartCellEdit(session, trigger)) {
+      return false;
+    }
+    if (this.activeEdit) {
+      this.cancelActiveEdit("replace");
+    }
+
     this.emitCellEditStarted(session);
     const overlay = openCellEditor({
       cell,
       session,
       ...(initialValue === undefined ? {} : { initialValue }),
       blurAction: resolveEditBlurAction(this.options.editing),
+      keyboardPolicy: resolveEditKeyboardPolicy(this.options.editing),
       commit: (rawValue, validate, trigger) => this.commitActiveEdit(rawValue, validate, trigger),
       cancel: (reason) => {
         this.cancelActiveEdit(reason);
-      }
+      },
+      moveAfterCommit: (direction) => moveEditFocusAfterCommit(this.root, cell, direction)
     });
-    this.activeEdit = { session, overlay };
+    this.activeEdit = { session, overlay, cell };
     cell.dataset.editing = trigger;
     return true;
+  }
+
+  private syncActiveEditOnScroll(viewport: HTMLElement): void {
+    const active = this.activeEdit;
+    if (!active) {
+      return;
+    }
+
+    const cell = this.findActiveEditCell(active.cell);
+    if (!cell || !isCellVisibleInViewport(cell, viewport)) {
+      this.settleActiveEditAfterScroll();
+      return;
+    }
+
+    active.overlay.reposition(cell);
+    if (cell !== active.cell) {
+      this.activeEdit = { ...active, cell };
+    }
+  }
+
+  private revealEditCell(cell: HTMLElement, target: CellEditTarget): HTMLElement {
+    return revealEditCell(cell, target, this.createEditRevealRuntime());
+  }
+
+  private createEditRevealRuntime() {
+    return {
+      root: this.root,
+      findCellElement: (position: CellPosition) => this.findCellElement(position),
+      getColumnScrollLeft: () => this.columnScrollLeft,
+      setColumnScrollToField: (field: string, align: ScrollAlign) => this.setColumnScrollToField(field, align),
+      setColumnViewportWidth: (width: number) => { this.columnViewportWidth = width || this.columnViewportWidth; }
+    };
   }
 
   private async commitActiveEdit(
@@ -190,6 +240,18 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
       return result;
     }
 
+    if (!this.canCommitCellEdit(result, trigger)) {
+      return result;
+    }
+
+    if (this.isReadOnlyEdit()) {
+      this.activeEdit = undefined;
+      active.overlay.destroy();
+      this.emitCellEditRequested(result, trigger);
+      await this.render(invalidate(["rows", "layout"], "cell-edit-request"));
+      return result;
+    }
+
     if (this.getEditCommitMode() === "batch") {
       this.stageCommittedRow(result, trigger);
       this.activeEdit = undefined;
@@ -198,7 +260,9 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
       return result;
     }
 
+    const sourceIndex = this.findEditableRow(String(result.session.rowKey), undefined)?.sourceIndex;
     this.applyCommittedRow(result.session, result.nextRow);
+    this.pushEditHistory(result, sourceIndex);
     this.activeEdit = undefined;
     active.overlay.destroy();
     this.emitCellEditCommitted(result, trigger);
@@ -206,41 +270,67 @@ export class OneGridEditing<TData = unknown> extends OneGridEditStore<TData> {
     return result;
   }
 
-  protected stageCommittedRow(
-    result: CellEditCommitResult<TData>,
+  private async commitPreparedEdit(
+    session: CellEditSession<TData>,
+    rawValue: unknown,
+    validate: boolean,
     trigger: EditCommitTrigger
-  ): void {
+  ): Promise<CellEditCommitResult<TData>> {
+    const result = await commitCellEdit({
+      session,
+      rawValue,
+      validate,
+      ...(this.options.locale === undefined ? {} : { locale: this.options.locale }),
+      ...(this.options.editing === undefined ? {} : { editing: this.options.editing })
+    });
     if (!result.valid) {
-      return;
+      this.emitCellValidationFailed(result);
+      return result;
     }
 
-    const field = result.session.field;
-    const originalRow = this.editBatch.ensureOriginalRow(
-      result.session,
-      (rowKey) => this.findEditableRow(rowKey, undefined)
-    );
-    const column = this.findDataColumn(field);
-    const previousValue = readColumnValue(originalRow.row, originalRow.rowIndex, originalRow.rowKey, column)
-      ?? result.previousValue;
+    if (!this.canCommitCellEdit(result, trigger)) {
+      return result;
+    }
 
-    this.replaceStoredRow(result.session.rowKey, originalRow.sourceIndex, result.nextRow);
+    if (this.isReadOnlyEdit()) {
+      this.emitCellEditRequested(result, trigger);
+      await this.render(invalidate(["rows", "layout"], "cell-edit-checkbox-request"));
+      return result;
+    }
 
-    const pendingEdit = this.editBatch.stage(result, { originalRow, previousValue });
-    this.emitCellEditStaged(pendingEdit, trigger);
+    if (this.getEditCommitMode() === "batch") {
+      this.stageCommittedRow(result, trigger);
+      await this.render(invalidate(["rows", "layout"], "cell-edit-checkbox-stage"));
+      return result;
+    }
+
+    const sourceIndex = this.findEditableRow(String(result.session.rowKey), undefined)?.sourceIndex;
+    this.applyCommittedRow(result.session, result.nextRow);
+    this.pushEditHistory(result, sourceIndex);
+    this.emitCellEditCommitted(result, trigger);
+    await this.render(invalidate(["rows", "layout"], "cell-edit-checkbox-commit"));
+    return result;
   }
 
-  protected getEditCommitMode(): EditCommitMode {
-    return resolveEditCommitMode(this.options.editing);
-  }
-
-  private cancelActiveEdit(reason: EditCancelReason): void {
+  private findActiveEditCell(currentCell: HTMLElement): HTMLElement | undefined {
     const active = this.activeEdit;
     if (!active) {
-      return;
+      return undefined;
     }
-    this.activeEdit = undefined;
-    active.overlay.destroy();
-    this.emitCellEditCancelled(active.session, reason);
+
+    const rowKey = String(active.session.rowKey);
+    const field = active.session.field;
+    const columnId = active.session.columnId;
+    if (isMatchingEditCell(currentCell, rowKey, field, columnId)) {
+      return currentCell;
+    }
+
+    return Array.from(this.root.querySelectorAll<HTMLElement>("[data-edit-row-key][data-field]"))
+      .find((cell) => isMatchingEditCell(cell, rowKey, field, columnId));
+  }
+
+  private settleActiveEditAfterScroll(): void {
+    this.cancelActiveEdit("blur");
   }
 }
 
@@ -250,8 +340,4 @@ function resolveEditBlurAction(editing: GridOptions["editing"]): EditBlurAction 
   }
 
   return editing?.commitOnBlur === false ? "cancel" : "commit";
-}
-
-function resolveEditCommitMode(editing: GridOptions["editing"]): EditCommitMode {
-  return editing?.commitMode ?? "cell";
 }

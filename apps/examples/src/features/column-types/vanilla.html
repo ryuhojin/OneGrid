@@ -1,0 +1,11 @@
+<section id="EX-001-002" aria-label="Column types example"></section>
+<script type="module">
+  import { mountColumnTypesExample } from "./vanilla.ts";
+
+  const host = document.querySelector("#EX-001-002");
+  if (!host) {
+    throw new Error("Column types example host was not found.");
+  }
+
+  mountColumnTypesExample(host);
+</script>

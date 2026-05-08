@@ -1,10 +1,10 @@
 import {
   createCellSpanModel,
-  createColumnModel,
   createFrozenRowSlices,
   createGridLayoutModel,
   createHeaderModel,
   createLocaleFormatter,
+  resolveEditKeyboardPolicy,
   createSummaryRow
 } from "@onegrid/core";
 import type { CellSpanModel, LocaleFormatterBridge } from "@onegrid/core";
@@ -13,6 +13,7 @@ import type { ColumnVirtualScrollRuntime } from "./columnVirtualScrollRuntime.js
 import { resolveColumnUiOptions } from "./columnControls.js";
 import type { ColumnUiRuntime } from "./columnControls.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
+import { attachEditorScrollSyncForHost, disposeEditorScrollSync } from "./editorScrollSync.js";
 import { createFooterSection, createOverlayLayer } from "./footerRenderer.js";
 import { appendFrozenRowsSections } from "./frozenRowRenderer.js";
 import { applyGridAccessibility } from "./gridAccessibility.js";
@@ -20,6 +21,7 @@ import { attachGridFocusForHost, disposeGridFocus } from "./gridFocus.js";
 import { attachGridScrollbarsForHost, disposeGridScrollbars } from "./gridScrollbars.js";
 import { createBodyShell, createBodyViewport, createSection } from "./gridSections.js";
 import { appendBottomPagination, appendTopToolbars } from "./gridToolbarRenderer.js";
+import { createDomColumnModel } from "./domColumnModel.js";
 import { createHeaderPane } from "./headerRenderer.js";
 import type { GroupRowRuntime } from "./groupRowRenderer.js";
 import { attachInfiniteScroll } from "./infiniteScrollTrigger.js";
@@ -37,6 +39,7 @@ import {
   getSummaryRows
 } from "./renderGridData.js";
 import type { RowRenderState } from "./renderGridTypes.js";
+import { createBodyRowHeightResolver } from "./rowHeightRuntime.js";
 import { attachGridSelectionForHost, disposeGridSelection } from "./selectionRuntime.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
 import type { HeaderSortRuntime } from "./sortRuntime.js";
@@ -54,6 +57,11 @@ import {
   getRenderedRows,
   restoreVirtualScroll
 } from "./virtualBodyWindow.js";
+import {
+  attachViewportVirtualScroll,
+  createViewportVirtualWindow,
+  getRenderedViewportRows
+} from "./viewportVirtualBodyWindow.js";
 import type { VirtualScrollRuntime } from "./virtualScrollRuntime.js";
 import { attachWheelBoundaryGuard } from "./wheelScroll.js";
 
@@ -63,6 +71,7 @@ export function disposeGridShell(host: HTMLElement): void {
   disposeGridScrollbars(host);
   disposeGridFocus(host);
   disposeGridSelection(host);
+  disposeEditorScrollSync(host);
 }
 
 export function renderGridShell<TData>(
@@ -85,10 +94,7 @@ export function renderGridShell<TData>(
 
   const pivotRenderData = createPivotRenderData(options, rowRenderState !== undefined);
   const renderOptions = pivotRenderData.options;
-  const columnModel = createColumnModel(renderOptions.columns, {
-    ...(renderOptions.columnOrder === undefined ? {} : { columnOrder: renderOptions.columnOrder }),
-    ...(renderOptions.columnState === undefined ? {} : { columnState: renderOptions.columnState })
-  });
+  const columnModel = createDomColumnModel(renderOptions);
   const headerModel = createHeaderModel(
     columnModel,
     renderOptions.headerMerge === undefined ? {} : { merge: renderOptions.headerMerge }
@@ -112,8 +118,14 @@ export function renderGridShell<TData>(
     rowRenderState,
     virtualScrollRuntime
   );
-  const rowWindowState: { window: typeof virtualWindow } = { window: virtualWindow };
-  const rows = getRenderedRows(frozenRows.bodyRows, virtualWindow);
+  const viewportVirtualWindow = createViewportVirtualWindow(renderOptions, rowRenderState, virtualScrollRuntime);
+  const activeRowWindow = virtualWindow ?? viewportVirtualWindow;
+  const rowWindowState: { window: typeof activeRowWindow } = { window: activeRowWindow };
+  const rows = virtualWindow
+    ? getRenderedRows(frozenRows.bodyRows, virtualWindow)
+    : viewportVirtualWindow
+      ? getRenderedViewportRows(frozenRows.bodyRows, viewportVirtualWindow)
+    : frozenRows.bodyRows;
   const cellSpanModel = createCellSpanModel({
     rows: createCellSpanRows(allRows),
     columns: columnModel.visibleLeafColumns,
@@ -192,13 +204,30 @@ export function renderGridShell<TData>(
       rowWindowState.window = nextWindow;
     }
   });
+  attachViewportVirtualScroll({
+    scrollElement: bodyViewport,
+    options: renderOptions,
+    rowCount: frozenRows.scrollableRowCount,
+    allRows: frozenRows.bodyRows,
+    panes: paneState.panes,
+    rowRenderState,
+    cellSpanModel,
+    rowIndexOffset: frozenRows.bodyOffset,
+    centerOwnsTreeControls,
+    virtualScrollRuntime,
+    virtualWindow: viewportVirtualWindow,
+    getPanes: () => paneState.panes,
+    onWindowChange: (nextWindow) => {
+      rowWindowState.window = nextWindow;
+    }
+  });
   bodyViewport.append(createSection("body", paneState.panes, (pane) =>
       createBodyPane(
         pane,
         rows,
         { ...bodyRuntime, rowIndexOffset: frozenRows.bodyOffset },
       centerOwnsTreeControls,
-      virtualWindow
+      activeRowWindow
     )
   ));
 
@@ -300,6 +329,7 @@ export function renderGridShell<TData>(
     columnWindow,
     ...(renderOptions.security === undefined ? {} : { security: renderOptions.security })
   });
+  attachEditorScrollSyncForHost(host, bodyViewport, editRuntime);
   shell.append(grid);
   appendBottomPagination({
     shell,
@@ -314,13 +344,14 @@ export function renderGridShell<TData>(
     ...(paginationModel === undefined ? {} : { paginationModel })
   });
   host.append(shell);
-  restoreVirtualScroll(bodyViewport, grid, virtualScrollRuntime, virtualWindow);
+  restoreVirtualScroll(bodyViewport, grid, virtualScrollRuntime, activeRowWindow);
   restoreColumnVirtualScroll(bodyViewport, grid, columnVirtualScrollRuntime, columnWindow);
   attachGridScrollbarsForHost(host, { grid: bodyShell, viewport: bodyViewport, panes: layout.panes });
   attachGridFocusForHost(host, {
     grid,
     viewport: bodyViewport,
     ...(editRuntime === undefined ? {} : { editRuntime }),
+    editKeyboardPolicy: resolveEditKeyboardPolicy(renderOptions.editing),
     ...(selectionRuntime === undefined ? {} : { selectionRuntime })
   });
   if (selectionRuntime) {
@@ -354,12 +385,14 @@ function createBodyPaneRuntime<TData>(
   groupRuntime: GroupRowRuntime | undefined,
   i18n: LocaleFormatterBridge
 ) {
+  const rowHeight = createBodyRowHeightResolver(options);
   return {
     ...(rowRenderState?.treeRuntime === undefined ? {} : { treeRuntime: rowRenderState.treeRuntime }),
     ...(groupRuntime === undefined ? {} : { groupRuntime }),
     ...(options.tree?.treeColumnField === undefined ? {} : { treeColumnField: options.tree.treeColumnField }),
     cellSpanModel,
     i18n,
+    ...(rowHeight === undefined ? {} : { rowHeight }),
     ...(options.editing === undefined ? {} : { editing: options.editing }),
     ...(options.security === undefined ? {} : { security: options.security })
   };

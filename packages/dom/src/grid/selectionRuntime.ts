@@ -159,6 +159,7 @@ export function readCellSelectionTarget(cell: HTMLElement): SelectedCell | undef
   const rowKey = cell.dataset.editRowKey;
   const rowIndex = readNumber(cell.dataset.rowIndex);
   const field = cell.dataset.field;
+  const columnId = cell.dataset.columnId;
   const ariaColIndex = readNumber(cell.getAttribute("aria-colindex"));
   if (rowKey === undefined || rowIndex === undefined || field === undefined || ariaColIndex === undefined) {
     return undefined;
@@ -167,6 +168,7 @@ export function readCellSelectionTarget(cell: HTMLElement): SelectedCell | undef
   return {
     rowKey,
     rowIndex,
+    ...(columnId === undefined ? {} : { columnId }),
     field,
     columnIndex: ariaColIndex - 1
   };
@@ -335,7 +337,7 @@ function isSelectedCell(state: GridSelectionState, target: SelectedCell): boolea
   return state.cells.some((cell) =>
     cell.rowIndex === target.rowIndex
     && cell.columnIndex === target.columnIndex
-    && cell.field === target.field
+    && (cell.columnId ?? cell.field) === (target.columnId ?? target.field)
     && String(cell.rowKey) === String(target.rowKey)
   );
 }

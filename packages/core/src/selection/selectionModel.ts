@@ -1,12 +1,13 @@
 import { expandCellSpanRangeFromEndpoints } from "../merge/cellSpanWindow.js";
 import type { CellSpanModel, CellSpanRange } from "../merge/cellSpanTypes.js";
-import type { FilterModel, RowKey, RowModelKind, SortModel } from "../types/shared.js";
+import type { ColumnId, FilterModel, RowKey, RowModelKind, SortModel } from "../types/shared.js";
 
 export type GridSelectionMode = "none" | "row" | "cell" | "range";
 
 export interface SelectedCell {
   readonly rowKey: RowKey;
   readonly rowIndex: number;
+  readonly columnId?: ColumnId;
   readonly field: string;
   readonly columnIndex: number;
 }
@@ -231,7 +232,7 @@ function sameCell(left: SelectedCell, right: SelectedCell): boolean {
 }
 
 function createCellKey(cell: SelectedCell): string {
-  return `${String(cell.rowKey)}:${cell.rowIndex}:${cell.field}:${cell.columnIndex}`;
+  return `${String(cell.rowKey)}:${cell.rowIndex}:${cell.columnId ?? cell.field}:${cell.columnIndex}`;
 }
 
 function freezeSelectionState(state: GridSelectionState): GridSelectionState {

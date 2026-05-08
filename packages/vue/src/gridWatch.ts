@@ -8,6 +8,7 @@ export function watchGridProps(
   watch(
     () => [
       props.columns,
+      props.initialState,
       props.columnOrder,
       props.columnState,
       props.columnUi,

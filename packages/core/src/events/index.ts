@@ -1,4 +1,4 @@
-export { createEventBus } from "./eventBus.js";
+export { createCancellableEvent, createEventBus } from "./eventBus.js";
 export type {
   BeforeEventHandler,
   CancellableEvent,

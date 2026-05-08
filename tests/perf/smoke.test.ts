@@ -5,6 +5,14 @@ import {
   createColumnModel,
   createSegmentedVirtualScroll
 } from "../../packages/core/src/index.js";
+import {
+  createQspServerRow,
+  QSP_SERVER_TOTAL_ROWS
+} from "../../apps/examples/src/features/qsp-server-10m/data.js";
+import {
+  createQspViewportRow,
+  QSP_VIEWPORT_TOTAL_ROWS
+} from "../../apps/examples/src/features/qsp-viewport-100m/data.js";
 import type { CellSpanRow, ColumnDef } from "../../packages/core/src/index.js";
 import { createFixtureRows } from "../../packages/testing/src/index.js";
 
@@ -40,6 +48,13 @@ describe("performance harness smoke", () => {
 
     expect(window.renderedRowCount).toBeLessThanOrEqual(80);
     expect(window.firstRow).toBeGreaterThan(31_000_000);
+  });
+
+  it("keeps EX-005 large-row examples deterministic without bulk arrays", () => {
+    expect(QSP_SERVER_TOTAL_ROWS).toBe(10_000_000);
+    expect(QSP_VIEWPORT_TOTAL_ROWS).toBe(100_000_000);
+    expect(createQspServerRow(9_999_990).id).toBe("SRV10M-09999991");
+    expect(createQspViewportRow(99_999_950).id).toBe("VP100M-099999951");
   });
 
   it("builds cell spans for the current window instead of logical row count", () => {

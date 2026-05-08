@@ -1,15 +1,24 @@
-import { allocateColumnId } from "./columnIds.js";
+import { allocateColumnId, resolveDataColumnId, resolveGroupColumnId } from "./columnIds.js";
+import { resolveColumnDefinitions } from "./columnDefaults.js";
 import { applyColumnOrder, splitPinnedLeafColumns } from "./columnOrder.js";
 import { normalizeColumnSizingOptions, resolveColumnSizing } from "./columnSizing.js";
-import type { ColumnDef, ColumnGroupDef, DataColumnDef } from "../types/column.js";
+import type {
+  ColumnDef,
+  ColumnGroupDef,
+  ColumnTypeRegistry,
+  DataColumnDef,
+  DataColumnDefaults
+} from "../types/column.js";
 import type { PinnedSide } from "../types/shared.js";
 import type { ResolvedColumnSizingOptions } from "./columnSizing.js";
 import type { ColumnUiState } from "./columnUi.js";
 
-export interface ColumnModelOptions {
+export interface ColumnModelOptions<TData = unknown> {
   readonly defaultWidth?: number;
   readonly defaultMinWidth?: number;
   readonly defaultMaxWidth?: number;
+  readonly defaultColumnDef?: DataColumnDefaults<TData>;
+  readonly columnTypes?: ColumnTypeRegistry<TData>;
   readonly columnOrder?: readonly string[];
   readonly columnState?: ColumnUiState;
 }
@@ -81,8 +90,12 @@ interface NormalizeContext<TData = unknown> {
 
 export function createColumnModel<TData>(
   columns: readonly ColumnDef<TData>[],
-  options: ColumnModelOptions = {}
+  options: ColumnModelOptions<TData> = {}
 ): ColumnModel<TData> {
+  const resolvedColumns = resolveColumnDefinitions(columns, {
+    ...(options.defaultColumnDef === undefined ? {} : { defaultColumnDef: options.defaultColumnDef }),
+    ...(options.columnTypes === undefined ? {} : { columnTypes: options.columnTypes })
+  });
   const context: NormalizeContext<TData> = {
     options: normalizeColumnSizingOptions(options),
     columnState: options.columnState,
@@ -90,7 +103,7 @@ export function createColumnModel<TData>(
     byId: new Map<string, NormalizedColumn<TData>>(),
     leaves: []
   };
-  const rootColumns = columns.map((column, index) =>
+  const rootColumns = resolvedColumns.map((column, index) =>
     normalizeColumn(column, context, {
       depth: 0,
       parentId: undefined,
@@ -150,7 +163,10 @@ function normalizeGroupColumn<TData>(
     readonly path: readonly string[];
   }
 ): NormalizedColumnGroup<TData> {
-  const id = allocateColumnId(column.groupId ?? `group:${parent.path.join(".")}`, context.ids);
+  const id = allocateColumnId(
+    resolveGroupColumnId(column, `group:${parent.path.join(".")}`),
+    context.ids
+  );
   const pinned = column.pinned ?? parent.inheritedPinned;
   const children = column.children.map((child, index) =>
     normalizeColumn(child, context, {
@@ -187,7 +203,7 @@ function normalizeDataColumn<TData>(
     readonly path: readonly string[];
   }
 ): NormalizedDataColumn<TData> {
-  const id = allocateColumnId(column.id ?? column.field, context.ids);
+  const id = allocateColumnId(resolveDataColumnId(column, `column:${parent.path.join(".")}`), context.ids);
   const columnState = context.columnState?.columns?.[id];
   const sizing = resolveColumnSizing(column, context.options, columnState?.width);
   const leafIndex = context.leaves.length;
@@ -195,12 +211,12 @@ function normalizeDataColumn<TData>(
     kind: "data",
     id,
     source: column,
-    headerName: column.headerName ?? column.field,
+    headerName: column.headerName ?? column.field ?? id,
     depth: parent.depth,
     parentId: parent.parentId,
     path: parent.path,
     pinned: resolvePinned(columnState?.pinned, column.pinned ?? parent.inheritedPinned),
-    field: column.field,
+    field: column.field ?? id,
     width: sizing.width,
     minWidth: sizing.minWidth,
     maxWidth: sizing.maxWidth,

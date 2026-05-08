@@ -30,7 +30,11 @@ export function collectRenderedRows<TData>(
   }
 
   if (viewportEntries.length > 0) {
-    return viewportEntries.map((entry) => entry.data);
+    return viewportEntries
+      .filter((entry): entry is Extract<ViewportRowEntry<TData>, { readonly kind: "data" }> =>
+        entry.kind === "data"
+      )
+      .map((entry) => entry.data);
   }
 
   if (treeEntries.length > 0) {

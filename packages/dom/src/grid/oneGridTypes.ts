@@ -12,6 +12,7 @@ export interface DomGridOptions<TData = unknown> extends GridOptions<TData> {
 export interface ActiveDomEdit<TData> {
   readonly session: CellEditSession<TData>;
   readonly overlay: CellEditorOverlay;
+  readonly cell: HTMLElement;
 }
 
 export interface ResolvedEditableCell<TData> {

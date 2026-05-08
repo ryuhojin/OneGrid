@@ -103,6 +103,122 @@ describe("core plugin registry", () => {
 
     expect(() => registry.register(plugin)).toThrow("Plugin is already registered");
   });
+
+  it("registers ordered plugin extension points", () => {
+    const observedLabels: string[] = [];
+    const registry = createPluginRegistry({
+      api,
+      gridOptions,
+      plugins: [
+        {
+          id: "menu-core",
+          setup(context) {
+            context.registerExtension({
+              id: "audit",
+              point: "menu.context",
+              order: 20,
+              payload: { label: "Audit" }
+            });
+            return undefined;
+          }
+        },
+        {
+          id: "menu-feature",
+          dependencies: ["menu-core"],
+          setup(context) {
+            context.registerExtension({
+              id: "approve",
+              point: "menu.context",
+              order: 10,
+              payload: { label: "Approve" }
+            });
+            observedLabels.push(
+              ...context.getExtensions<{ label: string }>("menu.context")
+                .map((extension) => extension.payload?.label ?? "")
+            );
+            return undefined;
+          }
+        }
+      ]
+    });
+
+    registry.setupAll();
+
+    expect(observedLabels).toEqual(["Approve", "Audit"]);
+    expect(registry.getExtensions<{ label: string }>("menu.context")).toMatchObject([
+      { id: "approve", pluginId: "menu-feature", payload: { label: "Approve" } },
+      { id: "audit", pluginId: "menu-core", payload: { label: "Audit" } }
+    ]);
+  });
+
+  it("cleans up plugin extensions on dispose and unregister", () => {
+    const registry = createPluginRegistry({
+      api,
+      gridOptions,
+      plugins: [
+        {
+          id: "temporary-menu",
+          setup(context) {
+            context.registerExtension({
+              id: "temporary",
+              point: "menu.context"
+            });
+            return undefined;
+          }
+        }
+      ]
+    });
+
+    registry.setupAll();
+    expect(registry.getExtensions("menu.context")).toHaveLength(1);
+
+    registry.disposeAll();
+    expect(registry.getExtensions("menu.context")).toEqual([]);
+
+    const unregisterRegistry = createPluginRegistry({ api, gridOptions });
+    const unregister = unregisterRegistry.register({
+      id: "registered-menu",
+      setup(context) {
+        context.registerExtension({
+          id: "registered",
+          point: "menu.context"
+        });
+        return undefined;
+      }
+    });
+    unregisterRegistry.setupAll();
+    expect(unregisterRegistry.getExtensions("menu.context")).toHaveLength(1);
+
+    unregister();
+    expect(unregisterRegistry.getExtensions("menu.context")).toEqual([]);
+  });
+
+  it("rejects duplicate extension ids within one extension point", () => {
+    const registry = createPluginRegistry({
+      api,
+      gridOptions,
+      plugins: [
+        {
+          id: "first-menu",
+          setup(context) {
+            context.registerExtension({ id: "same", point: "menu.context" });
+            return undefined;
+          }
+        },
+        {
+          id: "second-menu",
+          setup(context) {
+            context.registerExtension({ id: "same", point: "menu.context" });
+            return undefined;
+          }
+        }
+      ]
+    });
+
+    expect(() => registry.setupAll()).toThrow(
+      "Plugin extension is already registered: menu.context:same"
+    );
+  });
 });
 
 function createLifecyclePlugin(

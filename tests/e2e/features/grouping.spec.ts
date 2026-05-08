@@ -34,7 +34,7 @@ test("grouping example sends server group keys and renders server group entries"
 
   await page.getByRole("button", { name: "Open server Capital" }).click();
   await expect(summaryValue(page, "Server group keys")).toHaveText("Capital (region)");
-  await expect(serverGrid).toHaveAttribute("aria-rowcount", "4");
+  await expect(serverGrid).toHaveAttribute("aria-rowcount", "6");
   await expect(serverGrid).toContainText("GRP-0001");
   await expect(serverGrid).toContainText("Capital subtotal");
   await expect(serverGrid.locator('[data-group-aggregate-value="2000"]').first()).toBeVisible();

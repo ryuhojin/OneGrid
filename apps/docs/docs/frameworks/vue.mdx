@@ -22,6 +22,8 @@ const columns = [
   <OneGrid
     ref="grid"
     :columns="columns"
+    :default-column-def="{ resizable: true, sortable: true }"
+    :column-types="{ money: { type: 'number', filter: 'number', editor: 'number' } }"
     :data="rows"
     row-key="id"
     row-model="client"
@@ -30,16 +32,23 @@ const columns = [
 </template>
 ```
 
+`defaultColumnDef` and `columnTypes` are forwarded to the shared core contract.
+Vue does not reimplement column default resolution.
+
 ## Expose Bridge
 
 The component exposes the same command surface used by the DOM grid:
 `selectRows`, `scrollToRow`, `scrollToColumn`, `startEdit`, `stopEdit`,
+`startBatchEditSession`, `commitBatchEditSession`, `cancelBatchEditSession`,
 `commitPendingEdits`, `cancelPendingEdits`, `exportData`, `importData`,
 `setLocale`, and `applyTheme`.
 
 ```ts
 grid.value?.selectRows(["ORD-1001"]);
-await grid.value?.commitPendingEdits();
+grid.value?.startBatchEditSession({ id: "approval-draft" });
+grid.value?.undoEdit();
+grid.value?.redoEdit();
+await grid.value?.commitBatchEditSession();
 ```
 
 ## Event Emits
@@ -48,6 +57,9 @@ Vue emits use the shared core event names. Template listeners can use kebab-case
 names such as `@selection-changed`, `@sort-changed`, `@filter-changed`, and
 `@cell-edit-committed`. The `events` prop remains available and is chained before
 Vue emits.
+For externally controlled edit state, set `:editing="{ readOnly: true }"` and
+replace the source row from `@cell-edit-requested`.
+Undo/redo emits `@edit-undo`, `@edit-redo`, and `@edit-history-changed`.
 
 ## Vue Slots
 

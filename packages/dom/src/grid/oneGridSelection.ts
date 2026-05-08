@@ -8,6 +8,7 @@ import {
 } from "@onegrid/core";
 import type {
   CellPosition,
+  GridSelectionChangedEvent,
   GridSelectionState,
   RowKey,
   SelectedCell
@@ -162,18 +163,34 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
       return;
     }
 
+    const previousSelection = this.createSelectionChangeEvent(this.selectionState);
+    const nextSelection = this.createSelectionChangeEvent(state);
+    const before = this.emitGridBeforeEvent("beforeSelectionChange", {
+      type: "beforeSelectionChange",
+      previousSelection,
+      nextSelection,
+      reason
+    });
+    if (before.defaultPrevented) {
+      return;
+    }
+
     this.selectionState = state;
-    this.emitGridEvent("selectionChanged", {
+    this.emitGridEvent("selectionChanged", nextSelection);
+    if (render) {
+      void this.render(invalidate(["rows"], reason));
+    }
+  }
+
+  protected createSelectionChangeEvent(state: GridSelectionState): GridSelectionChangedEvent<TData> {
+    return Object.freeze({
       type: "selectionChanged",
-      rows: this.getSelectedRows(),
+      rows: this.findRowsByKeys(state.rowKeys),
       rowKeys: state.rowKeys,
       cells: state.cells,
       ranges: state.ranges,
       ...(state.allRowsToken === undefined ? {} : { allRowsToken: state.allRowsToken })
     });
-    if (render) {
-      void this.render(invalidate(["rows"], reason));
-    }
   }
 
   private createServerDatasetSelection(): GridSelectionState {
@@ -197,7 +214,7 @@ export abstract class OneGridSelection<TData = unknown> extends OneGridSortingFi
     return createDomCellSpanSnapshot(this.getRenderOptions(), this.createRowRenderState());
   }
 
-  private findRowsByKeys(rowKeys: readonly RowKey[]): readonly TData[] {
+  protected findRowsByKeys(rowKeys: readonly RowKey[]): readonly TData[] {
     const requested = new Set(rowKeys.map((rowKey) => String(rowKey)));
     const rows: TData[] = [];
     const seen = new Set<string>();

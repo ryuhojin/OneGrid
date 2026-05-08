@@ -84,6 +84,16 @@ export abstract class OneGridSortingFiltering<TData = unknown> extends OneGridRo
       return;
     }
 
+    const before = this.emitGridBeforeEvent("beforeSortChange", {
+      type: "beforeSortChange",
+      previousSortModel: this.sortModel,
+      sortModel: model,
+      reason
+    });
+    if (before.defaultPrevented) {
+      return;
+    }
+
     this.sortModel = model;
     if (this.treeRowModel) {
       this.treeRowModel.setSortModel(this.sortModel);
@@ -101,6 +111,16 @@ export abstract class OneGridSortingFiltering<TData = unknown> extends OneGridRo
 
   protected applyFilterModel(model: FilterModel, reason: string): void {
     if (this.destroyed || sameFilterModel(this.filterModel, model)) {
+      return;
+    }
+
+    const before = this.emitGridBeforeEvent("beforeFilterChange", {
+      type: "beforeFilterChange",
+      previousFilterModel: this.filterModel,
+      filterModel: model,
+      reason
+    });
+    if (before.defaultPrevented) {
       return;
     }
 

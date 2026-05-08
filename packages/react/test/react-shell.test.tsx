@@ -2,11 +2,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   gridApiMethodParityNames,
+  gridBeforeEventParityNames,
   gridEventParityNames,
   gridOptionParityKeys
 } from "@onegrid/core";
 import { OneGrid } from "../src/index.js";
-import { reactGridEventPropEntries } from "../src/gridEvents.js";
+import { reactGridBeforeEventPropEntries, reactGridEventPropEntries } from "../src/gridEvents.js";
 import type { OneGridEventProps } from "../src/gridEvents.js";
 import { createGridHandle } from "../src/gridHandle.js";
 import { createReactGridOptions } from "../src/gridOptions.js";
@@ -48,7 +49,7 @@ describe("@onegrid/react shell", () => {
 
     expect(gridOptionParityKeys.filter((key) => !(key in options))).toEqual([]);
     for (const key of gridOptionParityKeys) {
-      if (key === "columns" || key === "events") {
+      if (key === "columns" || key === "events" || key === "beforeEvents") {
         continue;
       }
       expect(optionRecord[key]).toBe(propRecord[key]);
@@ -60,6 +61,10 @@ describe("@onegrid/react shell", () => {
     expect(reactGridEventPropEntries.map(([eventName]) => eventName)).toEqual(gridEventParityNames);
     expect(new Set(reactGridEventPropEntries.map(([, propName]) => propName)).size)
       .toBe(gridEventParityNames.length);
+    expect(reactGridBeforeEventPropEntries.map(([eventName]) => eventName))
+      .toEqual(gridBeforeEventParityNames);
+    expect(new Set(reactGridBeforeEventPropEntries.map(([, propName]) => propName)).size)
+      .toBe(gridBeforeEventParityNames.length);
 
     const handle = createGridHandle<ParityRow>(() => undefined);
     expect(gridApiMethodParityNames.filter((name) => typeof handle[name] !== "function")).toEqual([]);
@@ -71,6 +76,11 @@ function createParityOptions(): OneGridOptionProps<ParityRow> & OneGridEventProp
   const rows = Object.freeze([{ id: "R1", amount: 10 }]);
   return {
     columns,
+    defaultColumnDef: Object.freeze({ resizable: true }),
+    columnTypes: Object.freeze({
+      money: Object.freeze({ type: "number" as const, width: 140 })
+    }),
+    initialState: Object.freeze({ locale: "en-US", scroll: Object.freeze({ top: 0, left: 0 }) }),
     columnOrder: Object.freeze(["id"]),
     columnState: Object.freeze({}),
     columnUi: Object.freeze({ resize: true }),
@@ -113,6 +123,7 @@ function createParityOptions(): OneGridOptionProps<ParityRow> & OneGridEventProp
     theme: Object.freeze({ name: "clean" }),
     locale: "en-US",
     plugins: Object.freeze([]),
-    events: Object.freeze({ ready: () => undefined })
+    events: Object.freeze({ ready: () => undefined }),
+    beforeEvents: Object.freeze({ beforeSortChange: () => undefined })
   };
 }

@@ -85,7 +85,7 @@ export class ReactRendererBridge<TData = unknown> {
     slots: ReactRendererSlots<TData>
   ): ColumnGroupDef<TData> {
     const { children, headerRenderer: _headerRenderer, ...rest } = column;
-    const key = column.groupId ?? column.headerName;
+    const key = column.columnId ?? column.groupId ?? column.headerName;
     const nextHeaderRenderer = slots.headers?.[key];
     const headerRenderer = nextHeaderRenderer === undefined
       ? _headerRenderer
@@ -106,7 +106,7 @@ export class ReactRendererBridge<TData = unknown> {
       renderer: _renderer,
       ...rest
     } = column;
-    const key = column.id ?? column.field;
+    const key = column.columnId ?? column.id ?? column.field ?? column.headerName ?? "column";
     const cellRenderer = slots.cells?.[key];
     const nextHeaderRenderer = slots.headers?.[key];
     const renderer = cellRenderer === undefined ? _renderer : this.createCellRenderer(cellRenderer);

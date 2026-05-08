@@ -1,4 +1,5 @@
 import { normalizeFilterModel } from "../filtering/index.js";
+import { resolveDataColumnId } from "../column/index.js";
 import { readField } from "./rowIdentity.js";
 import type { ColumnDef, DataColumnDef } from "../types/column.js";
 import type { ClientRowNode } from "./rowIdentity.js";
@@ -65,20 +66,23 @@ function matchesCondition<TData>(
   columnMap: ReadonlyMap<string, DataColumnDef<TData>>,
   custom: Readonly<Record<string, unknown>> | undefined
 ): boolean {
-  const column = columnMap.get(condition.field);
+  const column = columnMap.get(condition.columnId ?? condition.field);
   if (isServerOnlyFilter(column)) {
     return true;
   }
 
-  const value = readFilterValue(node, condition.field, column);
+  const field = column?.field ?? condition.field;
+  const value = readFilterValue(node, field, column);
 
   if (condition.kind === "custom") {
+    const columnId = column === undefined ? condition.columnId : resolveDataColumnId(column);
     return column?.filter && typeof column.filter === "object" && column.filter.predicate
       ? column.filter.predicate({
           row: node.data,
           rowIndex: node.sourceIndex,
           rowKey: node.key,
-          field: condition.field,
+          columnId: columnId ?? field,
+          field,
           column: column,
           value,
           filterValue: condition.value,
@@ -110,12 +114,12 @@ function matchesCondition<TData>(
 
 function readFilterValue<TData>(
   node: ClientRowNode<TData>,
-  field: string,
+  field: string | undefined,
   column: DataColumnDef<TData> | undefined
 ): unknown {
   return column?.valueGetter
     ? column.valueGetter({ row: node.data, rowIndex: node.sourceIndex, rowKey: node.key })
-    : readField(node.data, field);
+    : field === undefined ? undefined : readField(node.data, field);
 }
 
 function isServerOnlyFilter<TData>(column: DataColumnDef<TData> | undefined): boolean {
@@ -190,7 +194,12 @@ function createFilterColumnMap<TData>(
   }
 
   for (const column of collectDataColumns(columns)) {
-    map.set(column.field, column);
+    if (column.field) {
+      map.set(column.field, column);
+    }
+    if (column.columnId) {
+      map.set(column.columnId, column);
+    }
     if (column.id) {
       map.set(column.id, column);
     }

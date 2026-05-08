@@ -41,6 +41,7 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     }
 
     this.dataRows = Object.freeze([...rows]);
+    this.clearEditRuntimeForDataChange();
     this.virtualScrollTop = 0;
     this.paginationPage = 1;
     void this.render(invalidate(["rows", "layout", "overlay"], "data-api-set"));
@@ -95,7 +96,9 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     this.infiniteEntries = this.infiniteEntries.filter((entry) =>
       !("data" in entry && removals.has(String(entry.key)))
     );
-    this.viewportEntries = this.viewportEntries.filter((entry) => !removals.has(String(entry.key)));
+    this.viewportEntries = this.viewportEntries.filter((entry) =>
+      entry.kind === "skeleton" || !removals.has(String(entry.key))
+    );
     this.treeEntries = this.treeEntries.filter((entry) => !removals.has(String(entry.key)));
     void this.render(invalidate(["rows", "layout", "overlay"], "data-api-remove"));
   }
@@ -310,7 +313,7 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
         : entry
     );
     this.viewportEntries = this.viewportEntries.map((entry) =>
-      byKey.has(String(entry.key))
+      entry.kind === "data" && byKey.has(String(entry.key))
         ? { ...entry, data: mergeRowPatch(entry.data, byKey.get(String(entry.key)) ?? {}) }
         : entry
     );

@@ -1,4 +1,5 @@
 import { normalizeSortModel } from "../sorting/index.js";
+import { resolveDataColumnId } from "../column/index.js";
 import { readField } from "./rowIdentity.js";
 import type { ColumnDef, DataColumnDef } from "../types/column.js";
 import type { ClientRowNode } from "./rowIdentity.js";
@@ -33,11 +34,14 @@ function compareRows<TData>(
 ): number {
   for (const sort of sortModel) {
     const direction = sort.direction === "desc" ? -1 : 1;
-    const column = columnMap.get(sort.field);
-    const leftValue = readSortValue(left, sort.field, column);
-    const rightValue = readSortValue(right, sort.field, column);
+    const column = columnMap.get(sort.columnId ?? sort.field);
+    const field = column?.field ?? sort.field;
+    const columnId = column === undefined ? sort.columnId : resolveDataColumnId(column);
+    const leftValue = readSortValue(left, field, column);
+    const rightValue = readSortValue(right, field, column);
     const result = compareSortValues(leftValue, rightValue, {
-      field: sort.field,
+      ...(columnId === undefined ? {} : { columnId }),
+      field,
       leftRow: left.data,
       rightRow: right.data,
       leftRowIndex: left.sourceIndex,
@@ -53,12 +57,12 @@ function compareRows<TData>(
 
 function readSortValue<TData>(
   node: ClientRowNode<TData>,
-  field: string,
+  field: string | undefined,
   column: DataColumnDef<TData> | undefined
 ): unknown {
   return column?.valueGetter
     ? column.valueGetter({ row: node.data, rowIndex: node.sourceIndex, rowKey: node.key })
-    : readField(node.data, field);
+    : field === undefined ? undefined : readField(node.data, field);
 }
 
 function compareSortValues<TData>(
@@ -113,7 +117,12 @@ function createSortColumnMap<TData>(
   }
 
   for (const column of collectDataColumns(columns)) {
-    map.set(column.field, column);
+    if (column.field) {
+      map.set(column.field, column);
+    }
+    if (column.columnId) {
+      map.set(column.columnId, column);
+    }
     if (column.id) {
       map.set(column.id, column);
     }
