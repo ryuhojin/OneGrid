@@ -5369,6 +5369,19 @@ EX-005 shared verification:
 
 작업 중 방향이 흔들릴 수 있는 결정은 여기에 기록한다.
 
+#### D-20260515-003 README 상용급 제품 진입점 정리
+
+- Date: 2026-05-15
+- Status: accepted
+- Context: 기존 README는 구현 범위와 예제는 담고 있었지만, 상용 그리드 라이브러리를 검토하는 개발자/아키텍트 관점에서 가치 제안, 빠른 시작, 아키텍처, 기능 매트릭스, 보안/성능/검증 경로가 한 화면에서 충분히 드러나지 않았다.
+- Decision: README를 제품 랜딩 문서 겸 개발자 진입점으로 재구성한다. 프리릴리즈 상태는 명확히 유지하되, OneGrid의 core/dom/wrapper 분리, 대용량 row model, merge/layout/security/theming/export/import 품질 기준을 섹션별로 드러낸다.
+- Evidence:
+  - README.md
+- Verified:
+  - git diff --check
+  - pnpm lint
+  - pnpm docs:build
+
 #### D-20260514-001 실제 성능 지표 리포트 계약
 
 - Date: 2026-05-14
