@@ -46,6 +46,8 @@ export interface BodyRowRenderOptions<TData> {
   readonly editing?: EditingOptions;
   readonly i18n: LocaleFormatterBridge;
   readonly rowHeight?: BodyRowHeightResolver<TData>;
+  readonly autoRowHeight?: boolean;
+  readonly getRowSpanHeight?: (rowIndex: number, rowSpan: number) => number | undefined;
 }
 
 export function createBodyRow<TData>(options: BodyRowRenderOptions<TData>): HTMLElement {
@@ -94,7 +96,9 @@ export function createBodyRow<TData>(options: BodyRowRenderOptions<TData>): HTML
     options.security,
     options.editing,
     options.i18n,
-    options.rowHeight
+    options.rowHeight,
+    options.autoRowHeight === true,
+    options.getRowSpanHeight
   );
 }
 
@@ -112,9 +116,11 @@ function createDataRow<TData>(
   security: SecurityOptions | undefined,
   editing: EditingOptions | undefined,
   i18n: LocaleFormatterBridge,
-  rowHeight: BodyRowHeightResolver<TData> | undefined
+  rowHeight: BodyRowHeightResolver<TData> | undefined,
+  autoRowHeight: boolean,
+  getRowSpanHeight: ((rowIndex: number, rowSpan: number) => number | undefined) | undefined
 ): HTMLElement {
-  const row = createPaneRow("og-grid__row", columnTemplate, rowIndex, rowKey, exposeRowKey);
+  const row = createPaneRow(getBodyRowClassName(autoRowHeight), columnTemplate, rowIndex, rowKey, exposeRowKey);
   applyRowHeight(row, rowHeight?.(rowData, rowIndex));
 
   columns.forEach((column, columnIndex) => {
@@ -133,12 +139,17 @@ function createDataRow<TData>(
       ...(editing === undefined ? {} : { editing }),
       i18n,
       ...(security === undefined ? {} : { security }),
-      ...(spanState === undefined ? {} : { spanState })
+      ...(spanState === undefined ? {} : { spanState }),
+      ...(getRowSpanHeight === undefined ? {} : { getRowSpanHeight })
     });
     row.append(cell);
   });
 
   return row;
+}
+
+function getBodyRowClassName(autoRowHeight: boolean): string {
+  return autoRowHeight ? "og-grid__row og-grid__row--auto-height" : "og-grid__row";
 }
 
 function applyRowHeight(row: HTMLElement, height: number | undefined): void {
@@ -217,6 +228,7 @@ function createDataCell<TData>(input: {
   readonly editing?: EditingOptions;
   readonly i18n: LocaleFormatterBridge;
   readonly spanState?: CellSpanCellState;
+  readonly getRowSpanHeight?: (rowIndex: number, rowSpan: number) => number | undefined;
 }): HTMLElement {
   if (input.spanState?.kind === "covered") {
     return createCoveredCell(
@@ -249,7 +261,11 @@ function createDataCell<TData>(input: {
   });
 
   if (input.spanState?.kind === "anchor") {
-    applyAnchorSpan(cell, input.spanState);
+    applyAnchorSpan(
+      cell,
+      input.spanState,
+      input.getRowSpanHeight?.(input.rowIndex, input.spanState.rowSpan)
+    );
   }
 
   return cell;
@@ -319,7 +335,8 @@ function createCoveredCell<TData>(
 
 function applyAnchorSpan(
   cell: HTMLElement,
-  state: Extract<CellSpanCellState, { readonly kind: "anchor" }>
+  state: Extract<CellSpanCellState, { readonly kind: "anchor" }>,
+  blockSize: number | undefined
 ): void {
   cell.classList.add("og-grid__cell--merged");
   if (state.clippedTop) {
@@ -330,6 +347,9 @@ function applyAnchorSpan(
   }
   cell.style.gridColumn = `${cell.style.gridColumn} / span ${state.colSpan}`;
   cell.style.setProperty("--og-cell-row-span", String(state.rowSpan));
+  if (blockSize !== undefined && blockSize > 0) {
+    cell.style.setProperty("--og-cell-row-span-height", `${blockSize}px`);
+  }
   cell.setAttribute("aria-rowspan", String(state.rowSpan));
   cell.setAttribute("aria-colspan", String(state.colSpan));
   cell.dataset.cellSpanId = state.span.id;

@@ -36,6 +36,7 @@ module.exports = {
         "features/column-model",
         "features/group-header",
         "features/column-ui",
+        "features/row-model-capabilities",
         "features/client-row-model",
         "features/infinite-row-model",
         "features/server-row-model",
@@ -70,7 +71,7 @@ module.exports = {
     {
       type: "category",
       label: "Security",
-      items: ["security/csp", "security/xss"]
+      items: ["security/csp", "security/xss", "security/wrapper-renderers"]
     }
   ]
 };

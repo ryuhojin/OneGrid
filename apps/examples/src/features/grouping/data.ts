@@ -23,6 +23,24 @@ export interface GroupingServerStats {
   readonly groupModel: string;
 }
 
+export const groupingFieldSummary = Object.freeze({
+  fields: "region",
+  aggregates: "amountTotal=sum(amount), rowCount=count(id)",
+  filter: "status in Approved, Review",
+  sort: "amount desc"
+});
+
+export const clientGroupKeys = Object.freeze([
+  "group:region=Capital",
+  "group:region=Digital",
+  "group:region=Regional"
+]);
+
+export const initialClientGroupKeys = Object.freeze([
+  "group:region=Capital",
+  "group:region=Digital"
+]);
+
 export const groupingColumns: readonly ColumnDef<GroupingRow>[] = [
   { field: "id", headerName: "ID", pinned: "left", width: 112 },
   { field: "region", headerName: "Region", width: 130 },
@@ -83,7 +101,7 @@ export const clientGroupingOptions: Pick<
     footer: "bottom",
     model: {
       fields: ["region"],
-      expandedKeys: ["group:region=Capital", "group:region=Digital"]
+      expandedKeys: initialClientGroupKeys
     }
   },
   aggregation: { enabled: true, model: groupingAggregateModel },

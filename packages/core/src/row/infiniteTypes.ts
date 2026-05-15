@@ -1,5 +1,5 @@
 import type { AggregateModel, FilterModel, GroupModel, RowKey, SortModel } from "../types/shared.js";
-import type { DataSource } from "../types/data.js";
+import type { DataSource, DataSourceRetryPolicy, DataSourceStatusSnapshot } from "../types/data.js";
 
 export interface InfiniteRowModelOptions<TData = unknown> {
   readonly dataSource: DataSource<TData>;
@@ -10,6 +10,7 @@ export interface InfiniteRowModelOptions<TData = unknown> {
   readonly filterModel?: FilterModel;
   readonly groupModel?: GroupModel;
   readonly aggregateModel?: AggregateModel;
+  readonly retryPolicy?: DataSourceRetryPolicy;
 }
 
 export type InfiniteBlockStatus = "loading" | "loaded" | "cancelled" | "error";
@@ -24,6 +25,7 @@ export interface InfiniteBlock<TData = unknown> {
   readonly hasMore?: boolean;
   readonly requestId?: string;
   readonly error?: unknown;
+  readonly dataSourceStatus?: DataSourceStatusSnapshot;
   readonly lastAccess: number;
 }
 
@@ -46,4 +48,5 @@ export interface InfiniteSkeletonRowEntry {
 export interface InfiniteLoadResult<TData = unknown> {
   readonly block: InfiniteBlock<TData>;
   readonly deduped: boolean;
+  readonly status: DataSourceStatusSnapshot;
 }

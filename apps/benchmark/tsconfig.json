@@ -5,8 +5,12 @@
     "lib": ["ES2022"],
     "outDir": "dist",
     "rootDir": ".",
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../packages/testing" }]
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/testing" }
+  ]
 }

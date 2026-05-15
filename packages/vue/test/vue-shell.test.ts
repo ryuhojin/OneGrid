@@ -167,6 +167,7 @@ function createParityProps(): OneGridProps {
       getRows: async () => ({ rows, rowCount: rows.length })
     },
     rowKey: "id",
+    duplicateRowKeyPolicy: "error",
     rowModel: "client",
     rowHeight: 32,
     width: "100%",

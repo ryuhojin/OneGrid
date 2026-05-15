@@ -26,6 +26,11 @@ Users can copy with keyboard shortcuts when a grid cell is focused. Applications
 `api.copyToClipboard({ includeHeaders: true })`. Paste uses plain text only and routes through the
 same editor parser and validator used by normal editing.
 
+Copy output is also spreadsheet-hardened. String values that look like formulas after leading
+whitespace, such as `=...`, `+...`, `-...`, or `@...`, are prefixed with an apostrophe in the copied
+`text/plain` payload. The grid data itself is not mutated; the neutralization happens only at the
+clipboard boundary so Excel or Google Sheets treat the value as text after paste.
+
 When `preserveMerge` is enabled, merge anchors are copied once and covered cells are emitted as
 blank TSV cells. Pasting into a covered merged cell routes the value back to the merge anchor so
 selection, editing, and merge layout use the same coordinate contract.

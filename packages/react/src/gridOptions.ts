@@ -33,6 +33,9 @@ export function createReactGridOptions<TData>(
     ...(props.server === undefined ? {} : { server: props.server }),
     ...(props.viewport === undefined ? {} : { viewport: props.viewport }),
     ...(props.rowKey === undefined ? {} : { rowKey: props.rowKey }),
+    ...(props.duplicateRowKeyPolicy === undefined
+      ? {}
+      : { duplicateRowKeyPolicy: props.duplicateRowKeyPolicy }),
     ...(props.width === undefined ? {} : { width: props.width }),
     ...(props.height === undefined ? {} : { height: props.height }),
     ...(props.bodyHeight === undefined ? {} : { bodyHeight: props.bodyHeight }),
@@ -86,6 +89,7 @@ export function getGridOptionDeps<TData>(
     props.server,
     props.viewport,
     props.rowKey,
+    props.duplicateRowKeyPolicy,
     props.width,
     props.height,
     props.bodyHeight,

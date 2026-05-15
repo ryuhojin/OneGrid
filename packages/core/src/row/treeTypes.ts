@@ -1,6 +1,6 @@
-import type { RowKeyInput } from "./rowIdentity.js";
+import type { DuplicateRowKeyPolicy, RowKeyInput } from "./rowIdentity.js";
 import type { ColumnDef } from "../types/column.js";
-import type { DataSource } from "../types/data.js";
+import type { DataSource, DataSourceRetryPolicy, DataSourceStatusSnapshot } from "../types/data.js";
 import type { FilterModel, RowKey, SortModel } from "../types/shared.js";
 
 export type TreeSelectionPolicy = "self" | "descendants";
@@ -10,6 +10,7 @@ export type TreeSelectionState = "checked" | "unchecked" | "mixed";
 
 export interface TreeRowModelOptions<TData = unknown> {
   readonly rowKey?: RowKeyInput<TData>;
+  readonly duplicateRowKeyPolicy?: DuplicateRowKeyPolicy;
   readonly columns?: readonly ColumnDef<TData>[];
   readonly childrenField?: string;
   readonly hasChildrenField?: string;
@@ -23,6 +24,7 @@ export interface TreeRowModelOptions<TData = unknown> {
   readonly serverOnly?: boolean;
   readonly selection?: TreeRowSelectionOptions;
   readonly dataSource?: Pick<DataSource<TData>, "getChildren">;
+  readonly retryPolicy?: DataSourceRetryPolicy;
 }
 
 export interface TreeRowSelectionOptions {
@@ -54,6 +56,13 @@ export interface TreeRowEntry<TData = unknown> {
   readonly selected: boolean;
   readonly selectionState: TreeSelectionState;
   readonly loading: boolean;
+}
+
+export interface TreeLoadChildrenResult<TData = unknown> {
+  readonly parentKey: RowKey;
+  readonly requestId: string;
+  readonly rows: readonly TreeNode<TData>[];
+  readonly status: DataSourceStatusSnapshot;
 }
 
 export interface TreeRowStore<TData = unknown> {

@@ -1,10 +1,10 @@
 import {
-  calculateFixedColumnVirtualWindow,
   clipHeaderRowsToColumns,
   createLocaleFormatter
 } from "@onegrid/core";
 import { createBodyPane } from "./bodyPaneRenderer.js";
 import { syncColumnScroll } from "./columnScrollSync.js";
+import { createColumnVirtualWindowResolver } from "./columnVirtualWindowResolver.js";
 import { replaceFrozenCenterPanes } from "./frozenColumnVirtualization.js";
 import { createHeaderPane } from "./headerRenderer.js";
 import { applyGridSelection } from "./selectionRuntime.js";
@@ -40,7 +40,9 @@ import type { GroupRowRuntime } from "./groupRowRenderer.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
 import type { RowRenderState } from "./renderGridShell.js";
 import { createBodyRowHeightResolver } from "./rowHeightRuntime.js";
+import type { GridScrollCoordinator } from "./scrollCoordinator.js";
 import type { HeaderSortRuntime } from "./sortRuntime.js";
+import { observeElementResize } from "./resizeObserver.js";
 
 type PaneRecord<TData> = Readonly<Record<LayoutPaneKey, LayoutPane<TData>>>;
 
@@ -57,13 +59,8 @@ export function createColumnVirtualWindow<TData>(
     return undefined;
   }
 
-  return calculateFixedColumnVirtualWindow({
-    columnWidths: pane.columns.map((column) => column.width),
-    scrollLeft: runtime.scrollLeft,
-    viewportWidth: runtime.viewportWidth,
-    overscan: options.virtualization?.columns?.overscan,
-    maxDomColumns: options.virtualization?.columns?.maxDomColumns
-  });
+  return createColumnVirtualWindowResolver(options, pane)
+    .resolve(runtime.scrollLeft, runtime.viewportWidth);
 }
 
 export function getRenderedPanes<TData>(
@@ -116,6 +113,7 @@ export interface ColumnVirtualScrollAttachInput<TData> {
   readonly selectionRuntime?: GridSelectionRuntime;
   readonly columnVirtualScrollRuntime: ColumnVirtualScrollRuntime | undefined;
   readonly columnWindow: FixedColumnVirtualWindow | undefined;
+  readonly scrollCoordinator?: GridScrollCoordinator;
   readonly security?: SecurityOptions;
 }
 
@@ -123,14 +121,21 @@ export function attachColumnVirtualScroll<TData>(
   input: ColumnVirtualScrollAttachInput<TData>
 ): void {
   if (!input.columnWindow || !input.columnVirtualScrollRuntime?.enabled) {
-    attachStaticColumnScrollSync(input.grid, input.scrollElement, input.columnVirtualScrollRuntime);
+    attachStaticColumnScrollSync(
+      input.grid,
+      input.scrollElement,
+      input.columnVirtualScrollRuntime,
+      input.scrollCoordinator
+    );
     return;
   }
 
   const runtime = input.columnVirtualScrollRuntime;
+  const columnWindowResolver = createColumnVirtualWindowResolver(input.options, input.panes.center);
   let currentWindow = input.columnWindow;
   const updateColumns = (nextWindow: FixedColumnVirtualWindow): void => {
     syncColumnScroll(input.grid, input.scrollElement);
+    input.scrollCoordinator?.sync();
     runtime.onScroll(nextWindow.scrollLeft, nextWindow.viewportWidth);
     if (sameRenderedColumnWindow(currentWindow, nextWindow)) {
       currentWindow = nextWindow;
@@ -144,14 +149,10 @@ export function attachColumnVirtualScroll<TData>(
     currentWindow = nextWindow;
   };
   const getWindowForScrollLeft = (scrollLeft: number): FixedColumnVirtualWindow =>
-    calculateFixedColumnVirtualWindow({
-      columnWidths: input.panes.center.columns.map((column) => column.width),
+    columnWindowResolver.resolve(
       scrollLeft,
-      viewportWidth: resolveCenterViewportWidth(input.scrollElement, input.panes)
-        || runtime.viewportWidth,
-      overscan: input.options.virtualization?.columns?.overscan,
-      maxDomColumns: input.options.virtualization?.columns?.maxDomColumns
-    });
+      resolveCenterViewportWidth(input.scrollElement, input.panes) || runtime.viewportWidth
+    );
 
   input.scrollElement.addEventListener("wheel", (event) => {
     const wheelDeltaX = Math.abs(event.deltaX) >= 1 || !event.shiftKey
@@ -172,34 +173,41 @@ export function attachColumnVirtualScroll<TData>(
     }
 
     event.preventDefault();
-    input.scrollElement.scrollLeft = nextScrollLeft;
+    if (input.scrollCoordinator) {
+      input.scrollCoordinator.setScroll("horizontal", nextScrollLeft);
+    } else {
+      input.scrollElement.scrollLeft = nextScrollLeft;
+    }
     updateColumns(getWindowForScrollLeft(nextScrollLeft));
   }, { passive: false });
 
   input.scrollElement.addEventListener("scroll", () => {
-    const nextWindow = calculateFixedColumnVirtualWindow({
-      columnWidths: input.panes.center.columns.map((column) => column.width),
-      scrollLeft: input.scrollElement.scrollLeft,
-      viewportWidth: resolveCenterViewportWidth(input.scrollElement, input.panes)
-        || runtime.viewportWidth,
-      overscan: input.options.virtualization?.columns?.overscan,
-      maxDomColumns: input.options.virtualization?.columns?.maxDomColumns
-    });
+    input.scrollCoordinator?.sync();
+    const nextWindow = columnWindowResolver.resolve(
+      input.scrollElement.scrollLeft,
+      resolveCenterViewportWidth(input.scrollElement, input.panes) || runtime.viewportWidth
+    );
     updateColumns(nextWindow);
   }, { passive: true });
+  observeElementResize(input.scrollElement, () => {
+    updateColumns(getWindowForScrollLeft(input.scrollElement.scrollLeft));
+  });
 }
 
 function attachStaticColumnScrollSync(
   grid: HTMLElement,
   scrollElement: HTMLElement,
-  runtime?: ColumnVirtualScrollRuntime
+  runtime?: ColumnVirtualScrollRuntime,
+  scrollCoordinator?: GridScrollCoordinator
 ): void {
   const sync = (): void => {
     syncColumnScroll(grid, scrollElement);
+    scrollCoordinator?.sync();
     runtime?.onScroll(scrollElement.scrollLeft, scrollElement.clientWidth);
   };
   sync();
   scrollElement.addEventListener("scroll", sync, { passive: true });
+  observeElementResize(scrollElement, sync);
 }
 
 export function restoreColumnVirtualScroll(

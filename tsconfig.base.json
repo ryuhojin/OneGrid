@@ -17,6 +17,8 @@
     "noUncheckedIndexedAccess": true,
     "paths": {
       "@onegrid/adapters": ["./packages/adapters/src/index.ts"],
+      "@onegrid/adapter-pdf-pdfkit": ["./packages/adapter-pdf-pdfkit/src/index.ts"],
+      "@onegrid/adapter-xlsx-exceljs": ["./packages/adapter-xlsx-exceljs/src/index.ts"],
       "@onegrid/core": ["./packages/core/src/index.ts"],
       "@onegrid/dom": ["./packages/dom/src/index.ts"],
       "@onegrid/pagination": ["./packages/pagination/src/index.ts"],

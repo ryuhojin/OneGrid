@@ -1,7 +1,16 @@
 import type { ExportOptions, ImportOptions } from "../types/grid-options.js";
-import type { GridExportResult } from "../types/shared.js";
+import type { GridExportResult, GridImportResult } from "../types/shared.js";
 
 export type GridExportFormat = NonNullable<ExportOptions["format"]>;
+export type GridImportFormat = NonNullable<ImportOptions["format"]>;
+
+export interface GridDocumentAdapterCapabilities {
+  readonly cjkFonts?: boolean;
+  readonly customFonts?: boolean;
+  readonly compressedXlsx?: boolean;
+  readonly externalWorkbook?: boolean;
+  readonly mergedLayout?: boolean;
+}
 
 export interface GridExportColumn {
   readonly id: string;
@@ -30,11 +39,24 @@ export interface GridExportAdapterContext<TData = unknown> {
 
 export interface GridExportAdapterPayload<TData = unknown> {
   readonly format: GridExportFormat;
+  readonly capabilities?: GridDocumentAdapterCapabilities;
   export(context: GridExportAdapterContext<TData>): GridExportResult | Promise<GridExportResult>;
 }
 
 export interface GridImportMatrix {
   readonly rows: readonly (readonly string[])[];
+}
+
+export interface GridImportAdapterContext<TData = unknown> {
+  readonly content: string | Uint8Array;
+  readonly options: ImportOptions<TData>;
+  readonly fallbackColumns?: readonly GridExportColumn[];
+}
+
+export interface GridImportAdapterPayload<TData = unknown> {
+  readonly format: GridImportFormat;
+  readonly capabilities?: GridDocumentAdapterCapabilities;
+  import(context: GridImportAdapterContext<TData>): GridImportResult<TData> | Promise<GridImportResult<TData>>;
 }
 
 export interface GridExportFile {

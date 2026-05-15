@@ -57,6 +57,28 @@ describe("infinite row model", () => {
     expect(second.deduped).toBe(true);
   });
 
+  it("keeps standardized error status on failed blocks", async () => {
+    const model = new InfiniteRowModel<InfiniteOrderRow>({
+      blockSize: 4,
+      dataSource: {
+        async getRows() {
+          throw Object.assign(new Error("Service unavailable"), { statusCode: 503 });
+        }
+      }
+    });
+
+    const result = await model.loadBlock(0);
+
+    expect(result.block.status).toBe("error");
+    expect(result.status).toMatchObject({
+      status: "error",
+      requestKind: "getRows",
+      retryable: true,
+      recoverable: true
+    });
+    expect(result.block.dataSourceStatus).toMatchObject({ status: "error" });
+  });
+
   it("cancels stale requests and keeps a cancelled block state", async () => {
     let capturedRequest: GetRowsRequest | undefined;
     let resolveRows: ((result: GetRowsResult<InfiniteOrderRow>) => void) | undefined;
@@ -121,6 +143,80 @@ describe("infinite row model", () => {
     expect(requests).toEqual([0, 2, 4]);
     expect(model.cachedBlocks.map((block) => block.index)).toEqual([1, 2]);
     expect(model.getAppendRows().filter((entry) => entry.kind === "data")).toHaveLength(4);
+  });
+
+  it("loads an arbitrary sparse row window without append-order coupling", async () => {
+    const requests: number[] = [];
+    const model = new InfiniteRowModel<InfiniteOrderRow>({
+      blockSize: 10,
+      maxBlocksInCache: 4,
+      initialRowCount: 1_000,
+      dataSource: {
+        async getRows(request) {
+          requests.push(request.startRow);
+          return { rows: createRows(request.startRow, request.endRow), rowCount: 1_000 };
+        }
+      }
+    });
+
+    const rows = await model.ensureRowsWindow(95, 105);
+
+    expect(requests).toEqual([90, 100]);
+    expect(rows).toHaveLength(10);
+    expect(rows[0]).toMatchObject({ kind: "data", rowIndex: 95 });
+    expect(rows.at(-1)).toMatchObject({ kind: "data", rowIndex: 104 });
+  });
+
+  it("caps arbitrary sparse windows to known row count", async () => {
+    const model = new InfiniteRowModel<InfiniteOrderRow>({
+      blockSize: 10,
+      initialRowCount: 23,
+      dataSource: {
+        async getRows(request) {
+          return { rows: createRows(request.startRow, Math.min(request.endRow, 23)), rowCount: 23 };
+        }
+      }
+    });
+
+    const rows = await model.ensureRowsWindow(20, 40);
+
+    expect(rows.map((entry) => entry.rowIndex)).toEqual([20, 21, 22]);
+  });
+
+  it("captures and restores append cursor row model state", async () => {
+    const requests: number[] = [];
+    const model = new InfiniteRowModel<InfiniteOrderRow>({
+      blockSize: 5,
+      dataSource: {
+        async getRows(request) {
+          return { rows: createRows(request.startRow, request.endRow), rowCount: 20 };
+        }
+      }
+    });
+    await model.loadNextAppendBlock();
+    await model.loadNextAppendBlock();
+
+    const restored = new InfiniteRowModel<InfiniteOrderRow>({
+      blockSize: 5,
+      dataSource: {
+        async getRows(request) {
+          requests.push(request.startRow);
+          return { rows: createRows(request.startRow, request.endRow), rowCount: 20 };
+        }
+      }
+    });
+    restored.restoreState(model.getState());
+
+    await restored.loadNextAppendBlock();
+
+    expect(model.getState()).toMatchObject({
+      rowModel: "infinite",
+      rowCount: 20,
+      blockSize: 5,
+      nextAppendBlockIndex: 2,
+      hasMore: true
+    });
+    expect(requests).toEqual([10]);
   });
 
   it("shows skeleton rows while a block is loading", () => {

@@ -1,4 +1,5 @@
 import {
+  executeDataSourceRequest,
   getNextSortModel,
   normalizeFilterModel,
   normalizeSortModel,
@@ -6,7 +7,7 @@ import {
   setColumnFilterConditions,
   setQuickFilterText
 } from "@onegrid/core";
-import type { FilterModel, SortModel } from "@onegrid/core";
+import type { DataSourceStatusSnapshot, FilterModel, SortModel } from "@onegrid/core";
 import { showColumnFilterPanel } from "./filterPanel.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
 import { invalidate } from "./renderInvalidation.js";
@@ -101,6 +102,7 @@ export abstract class OneGridSortingFiltering<TData = unknown> extends OneGridRo
     }
     this.virtualScrollTop = 0;
     this.paginationPage = 1;
+    this.clearAutoRowHeightCache();
     this.emitGridEvent("sortChanged", { type: "sortChanged", sortModel: this.sortModel });
     if (this.resetRemoteRowModel(reason)) {
       return;
@@ -131,6 +133,7 @@ export abstract class OneGridSortingFiltering<TData = unknown> extends OneGridRo
     }
     this.virtualScrollTop = 0;
     this.paginationPage = 1;
+    this.clearAutoRowHeightCache();
     this.emitGridEvent("filterChanged", { type: "filterChanged", filterModel: this.filterModel });
     if (this.resetRemoteRowModel(reason)) {
       return;
@@ -142,12 +145,30 @@ export abstract class OneGridSortingFiltering<TData = unknown> extends OneGridRo
   private async getDistinctFilterValues(field: string): Promise<readonly unknown[]> {
     if (this.options.dataSource?.getDistinctValues) {
       const requestId = `filter:distinct:${++this.filterRequestSequence}`;
-      const result = await this.options.dataSource.getDistinctValues({
-        field,
-        filterModel: this.filterModel,
-        requestId
-      });
-      return Object.freeze([...result.values]);
+      let status: DataSourceStatusSnapshot | undefined;
+      try {
+        const pending = executeDataSourceRequest(() =>
+          this.options.dataSource?.getDistinctValues?.({
+            field,
+            filterModel: this.filterModel,
+            requestId
+          }) ?? Promise.resolve({ values: [] }), {
+          requestKind: "getDistinctValues",
+          requestId,
+          ...(this.options.dataSourceOptions?.retry === undefined
+            ? {}
+            : { retryPolicy: this.options.dataSourceOptions.retry }),
+          status: (snapshot) => {
+            status = snapshot;
+          }
+        });
+        this.emitRemoteDataRequested(status);
+        const result = await pending;
+        return Object.freeze([...result.values]);
+      } catch (error) {
+        this.emitRemoteError(error);
+        return Object.freeze([]);
+      }
     }
 
     return this.getClientDistinctValues(field);

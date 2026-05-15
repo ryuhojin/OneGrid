@@ -1,36 +1,25 @@
-import type {
-  RowUpdate,
-  ServerLoadResult,
-  ScrollToRowAlign,
-  ViewportLiveUpdate,
-  ViewportRowEntry
-} from "@onegrid/core";
+import type { DataSourceStatusSnapshot, RowModelStateSnapshot, RowUpdate, ScrollToRowAlign, ServerLoadResult, ViewportLiveUpdate } from "@onegrid/core";
 import { invalidate } from "./renderInvalidation.js";
 import { createDomInfiniteRowModel, createDomServerRowModel, createDomViewportRowModel } from "./rowModelFactory.js";
-import {
-  getViewportHeight,
-  getViewportRowHeight
-} from "./rowModelOptions.js";
-import type { DomGridOptions } from "./OneGrid.js";
+import { getViewportHeight, getViewportRowHeight } from "./rowModelOptions.js";
 import { resolveScrollTopForRow } from "./scrollPosition.js";
 import { OneGridScrolling } from "./oneGridScrolling.js";
-
+import { isRecoverableDataSourceError } from "./remoteDataSourceError.js";
+import { createViewportSkeletonEntries, hasViewportVisibleRange } from "./viewportSkeletonRows.js";
+import { resolveViewportLoadTarget } from "./viewportLoadTarget.js";
 interface PendingServerLoad {
   readonly refresh: boolean;
   readonly page: number;
 }
-
 interface PendingServerGroupExpansion {
   readonly groupKey: string;
   readonly expanded: boolean;
   readonly reason: string;
 }
-
 interface PendingViewportLoad {
   readonly rowIndex: number;
   readonly scrollTop: number;
 }
-
 export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrolling<TData> {
   private pendingServerLoad: PendingServerLoad | undefined;
   private pendingServerGroupExpansion: PendingServerGroupExpansion | undefined;
@@ -57,8 +46,20 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
       return;
     }
 
-    await this.serverRowModel.applyTransaction(updates);
-    this.serverEntries = this.serverRowModel.entries;
+    try {
+      const pending = this.serverRowModel.applyTransaction(updates);
+      this.emitRemoteDataRequested(this.serverRowModel.status);
+      const result = await pending;
+      this.serverEntries = this.serverRowModel.entries;
+      this.emitGridEvent("dataLoaded", {
+        type: "dataLoaded",
+        requestId: this.serverRowModel.status?.requestId ?? "server:update",
+        rows: result.rows
+      });
+    } catch (error) {
+      this.renderError = error;
+      this.emitRemoteError(error);
+    }
     await this.render(invalidate(["rows", "overlay"], "server-transaction"));
   }
 
@@ -76,7 +77,6 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
 
     await this.render(invalidate(["rows"], "scroll-row"));
   }
-
   applyViewportLiveUpdate(update: ViewportLiveUpdate<TData>): void {
     if (!this.viewportRowModel || this.destroyed) {
       return;
@@ -86,11 +86,14 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
     void this.render(invalidate(["rows", "overlay"], "viewport-live-update"));
   }
 
-  protected resetRemoteRowModel(reason: string): boolean {
+  protected resetRemoteRowModel(reason: string, rowModelState?: RowModelStateSnapshot): boolean {
     this.renderError = undefined;
     if (this.infiniteRowModel) {
       this.infiniteRowModel.cancelAll(reason);
       this.infiniteRowModel = createDomInfiniteRowModel(this.getRenderOptions());
+      if (rowModelState?.rowModel === "infinite") {
+        this.infiniteRowModel?.restoreState(rowModelState);
+      }
       this.infiniteLoading = false;
       this.infiniteEntries = this.infiniteRowModel?.getAppendRows() ?? [];
       void this.render(invalidate(["rows", "columns", "overlay"], reason));
@@ -100,8 +103,15 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
 
     if (this.serverRowModel) {
       this.serverRowModel = createDomServerRowModel(this.getRenderOptions());
+      if (rowModelState?.rowModel === "server") {
+        this.serverRowModel?.restoreState(rowModelState);
+        if (rowModelState.page !== undefined) {
+          this.paginationPage = rowModelState.page + 1;
+        }
+      }
       this.serverLoading = false;
       this.serverEntries = [];
+      this.serverResultColumns = undefined;
       this.serverMergeMeta = [];
       this.serverAggregate = undefined;
       void this.loadServerRows(true);
@@ -110,9 +120,14 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
 
     if (this.viewportRowModel) {
       this.viewportRowModel = createDomViewportRowModel(this.getRenderOptions());
+      if (rowModelState?.rowModel === "viewport") {
+        this.viewportRowModel?.restoreState(rowModelState);
+      }
       this.viewportLoading = false;
       this.viewportEntries = [];
-      void this.scrollViewportTo(0);
+      void this.scrollViewportTo(rowModelState?.rowModel === "viewport"
+        ? rowModelState.range?.firstRow ?? 0
+        : 0);
       return true;
     }
 
@@ -130,7 +145,8 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
       infiniteEntries: this.infiniteEntries,
       serverRowModel: this.serverRowModel,
       viewportRowModel: this.viewportRowModel,
-      treeRowModel: this.treeRowModel
+      treeRowModel: this.treeRowModel,
+      ...(this.options.rowHeight === "auto" ? { autoRowHeightCache: this.autoRowHeightCache } : {})
     });
   }
 
@@ -145,9 +161,22 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
     await this.render(invalidate(["rows", "overlay"], "infinite-loading"));
 
     try {
-      await this.infiniteRowModel.loadNextAppendBlock();
+      const load = this.infiniteRowModel.loadNextAppendBlock();
+      this.emitRemoteDataRequested(this.infiniteRowModel.status);
+      const result = await load;
+      if (result.block.status === "loaded") {
+        this.emitGridEvent("dataLoaded", {
+          type: "dataLoaded",
+          requestId: result.block.requestId ?? result.status.requestId,
+          rows: result.block.rows
+        });
+      } else if (result.block.status === "error") {
+        this.renderError = result.block.error;
+        this.emitRemoteError(result.block.error);
+      }
     } catch (error) {
       this.renderError = error;
+      this.emitRemoteError(error);
     } finally {
       if (!this.destroyed) {
         this.infiniteEntries = this.infiniteRowModel.getAppendRows();
@@ -176,15 +205,21 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
     await this.render(invalidate(["rows", "overlay"], "server-loading"));
 
     try {
-      const result = refresh
-        ? await rowModel.refresh()
-        : await rowModel.loadPage(page);
+      const load = refresh ? rowModel.refresh() : rowModel.loadPage(page);
+      this.emitRemoteDataRequested(rowModel.status);
+      const result = await load;
       if (this.serverRowModel !== rowModel) {
         return;
       }
       this.applyServerLoadResult(result);
+      this.emitGridEvent("dataLoaded", {
+        type: "dataLoaded",
+        requestId: result.request.requestId,
+        rows: result.rows
+      });
     } catch (error) {
       this.renderError = error;
+      this.emitRemoteError(error);
     } finally {
       if (!this.destroyed) {
         this.serverLoading = false;
@@ -220,15 +255,21 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
     await this.render(invalidate(["rows", "overlay"], `${reason}-loading`));
 
     try {
-      const result = expanded
-        ? await rowModel.expandGroup(groupKey)
-        : await rowModel.collapseGroup(groupKey);
+      const load = expanded ? rowModel.expandGroup(groupKey) : rowModel.collapseGroup(groupKey);
+      this.emitRemoteDataRequested(rowModel.status);
+      const result = await load;
       if (this.serverRowModel !== rowModel) {
         return;
       }
       this.applyServerLoadResult(result);
+      this.emitGridEvent("dataLoaded", {
+        type: "dataLoaded",
+        requestId: result.request.requestId,
+        rows: result.rows
+      });
     } catch (error) {
       this.renderError = error;
+      this.emitRemoteError(error);
     } finally {
       if (!this.destroyed) {
         this.serverLoading = false;
@@ -240,6 +281,7 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
 
   private applyServerLoadResult(result: ServerLoadResult<TData>): void {
     this.serverEntries = result.entries;
+    this.serverResultColumns = result.columns;
     this.serverMergeMeta = result.mergeMeta ?? [];
     this.serverAggregate = result.aggregate;
   }
@@ -257,12 +299,20 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
   protected async loadViewportRows(rowIndex: number, scrollTop?: number): Promise<void> {
     const rowHeight = getViewportRowHeight(this.options);
     const viewportHeight = this.virtualViewportHeight ?? getViewportHeight(this.options);
-    const targetScrollTop = Math.max(0, scrollTop ?? Math.max(0, Math.trunc(rowIndex)) * rowHeight);
-    const normalizedRowIndex = Math.max(0, Math.trunc(targetScrollTop / rowHeight));
     if (!this.viewportRowModel) {
       return;
     }
 
+    const target = resolveViewportLoadTarget({
+      options: this.options,
+      rowCount: this.viewportRowModel.rowCount,
+      rowHeight,
+      viewportHeight,
+      rowIndex,
+      ...(scrollTop === undefined ? {} : { scrollTop })
+    });
+    const targetScrollTop = target.scrollTop;
+    const normalizedRowIndex = target.rowIndex;
     this.virtualScrollTop = targetScrollTop;
     if (this.viewportLoading) {
       this.pendingViewportLoad = { rowIndex: normalizedRowIndex, scrollTop: targetScrollTop };
@@ -273,7 +323,12 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
     this.renderError = undefined;
     let shouldRender = false;
     let nextViewportLoad: PendingViewportLoad | undefined;
-    const skeletonEntries = this.createViewportSkeletonEntries(normalizedRowIndex, viewportHeight);
+    const skeletonEntries = createViewportSkeletonEntries(
+      this.viewportRowModel,
+      normalizedRowIndex,
+      viewportHeight,
+      this.options
+    );
     if (skeletonEntries.length > 0 && !hasViewportVisibleRange(
       this.viewportEntries,
       normalizedRowIndex,
@@ -281,21 +336,29 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
       viewportHeight
     )) {
       this.viewportEntries = skeletonEntries;
-      await this.render(invalidate(["rows", "overlay"], "viewport-skeleton"));
+      this.renderNow(invalidate(["rows", "overlay"], "viewport-skeleton"));
     }
 
     try {
-      const result = await this.viewportRowModel.loadViewport({
+      const load = this.viewportRowModel.loadViewport({
         scrollTop: targetScrollTop,
         viewportHeight
       });
+      this.emitRemoteDataRequested(this.viewportRowModel.status);
+      const result = await load;
       const pending = this.pendingViewportLoad;
       if (!result.stale && (pending === undefined || pending.rowIndex === normalizedRowIndex)) {
         this.viewportEntries = result.entries;
         shouldRender = true;
+        this.emitGridEvent("dataLoaded", {
+          type: "dataLoaded",
+          requestId: result.request.requestId,
+          rows: result.entries.flatMap((entry) => entry.kind === "data" ? [entry.data] : [])
+        });
       }
     } catch (error) {
       this.renderError = error;
+      this.emitRemoteError(error);
       shouldRender = true;
     } finally {
       if (!this.destroyed) {
@@ -316,40 +379,22 @@ export abstract class OneGridRemoteRows<TData = unknown> extends OneGridScrollin
     }
   }
 
-  private createViewportSkeletonEntries(
-    rowIndex: number,
-    viewportHeight: number
-  ): readonly ViewportRowEntry<TData>[] {
-    const rowModel = this.viewportRowModel;
-    if (!rowModel) {
-      return Object.freeze([]);
+  protected emitRemoteDataRequested(status: DataSourceStatusSnapshot | undefined): void {
+    if (status?.status !== "loading") {
+      return;
     }
 
-    const rowHeight = getViewportRowHeight(this.options);
-    const overscan = normalizeViewportOverscan(this.options.viewport?.overscan);
-    const visibleCount = Math.max(1, Math.ceil(viewportHeight / rowHeight));
-    const firstRow = Math.max(0, rowIndex - overscan);
-    const lastRow = Math.min(rowModel.rowCount - 1, rowIndex + visibleCount - 1 + overscan);
-    const entries: ViewportRowEntry<TData>[] = [];
-    for (let nextRowIndex = firstRow; nextRowIndex <= lastRow; nextRowIndex += 1) {
-      entries.push(Object.freeze({ kind: "skeleton", rowIndex: nextRowIndex }));
-    }
-    return Object.freeze(entries);
+    this.emitGridEvent("dataRequested", {
+      type: "dataRequested",
+      requestId: status.requestId
+    });
   }
-}
 
-function normalizeViewportOverscan(value: number | undefined): number {
-  return Number.isFinite(value) && value !== undefined && value > 0 ? Math.trunc(value) : 0;
-}
-
-function hasViewportVisibleRange<TData>(
-  entries: readonly ViewportRowEntry<TData>[],
-  firstRow: number,
-  options: DomGridOptions<TData>,
-  viewportHeight = getViewportHeight(options)
-): boolean {
-  const rowHeight = getViewportRowHeight(options);
-  const lastRow = firstRow + Math.max(1, Math.ceil(viewportHeight / rowHeight)) - 1;
-  return entries.some((entry) => entry.rowIndex <= firstRow)
-    && entries.some((entry) => entry.rowIndex >= lastRow);
+  protected emitRemoteError(error: unknown): void {
+    this.emitGridEvent("error", {
+      type: "error",
+      error,
+      recoverable: isRecoverableDataSourceError(error) ?? true
+    });
+  }
 }

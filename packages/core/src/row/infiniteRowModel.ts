@@ -1,19 +1,11 @@
-import {
-  createInfiniteBlockCache,
-  evictInfiniteBlocks,
-  getCachedBlock,
-  listCachedBlocks,
-  setCachedBlock
-} from "./infiniteCache.js";
+import { createInfiniteBlockCache, evictInfiniteBlocks, getCachedBlock, listCachedBlocks, setCachedBlock } from "./infiniteCache.js";
 import { createInfiniteBlockRequest } from "./infiniteRequest.js";
+import { createDataSourceSuccessStatus, executeDataSourceRequest } from "../dataSource/index.js";
 import type { InfiniteRequestController } from "./infiniteCancellation.js";
 import type { InfiniteBlockCache } from "./infiniteCache.js";
-import type {
-  InfiniteBlock,
-  InfiniteLoadResult,
-  InfiniteRowEntry,
-  InfiniteRowModelOptions
-} from "./infiniteTypes.js";
+import type { InfiniteRowModelStateSnapshot, RowModelStateSnapshot } from "./rowModelState.js";
+import type { DataSourceStatusSnapshot } from "../types/data.js";
+import type { InfiniteBlock, InfiniteLoadResult, InfiniteRowEntry, InfiniteRowModelOptions } from "./infiniteTypes.js";
 
 const DEFAULT_BLOCK_SIZE = 100;
 const DEFAULT_MAX_BLOCKS = 10;
@@ -29,6 +21,7 @@ export class InfiniteRowModel<TData = unknown> {
   private nextAppendBlockIndex = 0;
   private totalRowCount: number | undefined;
   private reachedEnd = false;
+  private dataSourceStatus: DataSourceStatusSnapshot | undefined;
 
   constructor(options: InfiniteRowModelOptions<TData>) {
     this.options = options;
@@ -51,6 +44,30 @@ export class InfiniteRowModel<TData = unknown> {
     return listCachedBlocks(this.cache);
   }
 
+  get status(): DataSourceStatusSnapshot | undefined {
+    return this.dataSourceStatus;
+  }
+
+  getState(): InfiniteRowModelStateSnapshot {
+    return Object.freeze({
+      rowModel: "infinite",
+      blockSize: this.blockSize,
+      nextAppendBlockIndex: this.nextAppendBlockIndex,
+      hasMore: this.hasMore,
+      ...(this.totalRowCount === undefined ? {} : { rowCount: this.totalRowCount })
+    });
+  }
+
+  restoreState(state: RowModelStateSnapshot): void {
+    if (state.rowModel !== "infinite") {
+      return;
+    }
+
+    this.totalRowCount = state.rowCount;
+    this.nextAppendBlockIndex = normalizeBlockIndex(state.nextAppendBlockIndex ?? 0);
+    this.reachedEnd = state.hasMore === false;
+  }
+
   getBlock(blockIndex: number): InfiniteBlock<TData> | undefined {
     const block = getCachedBlock(this.cache, blockIndex);
     return block ? this.touchBlock(block) : undefined;
@@ -60,7 +77,11 @@ export class InfiniteRowModel<TData = unknown> {
     const normalizedIndex = normalizeBlockIndex(blockIndex);
     const cached = getCachedBlock(this.cache, normalizedIndex);
     if (cached?.status === "loaded") {
-      return { block: this.touchBlock(cached), deduped: false };
+      return {
+        block: this.touchBlock(cached),
+        deduped: false,
+        status: cached.dataSourceStatus ?? createDataSourceSuccessStatus("getRows", cached.requestId ?? "cached")
+      };
     }
 
     const pendingRequest = this.pending.get(normalizedIndex);
@@ -80,24 +101,47 @@ export class InfiniteRowModel<TData = unknown> {
     setCachedBlock(this.cache, loadingBlock);
     this.controllers.set(normalizedIndex, controller);
 
-    const promise = this.options.dataSource.getRows(request).then(
+    const promise = executeDataSourceRequest(
+      () => this.options.dataSource.getRows(request),
+      {
+        requestKind: "getRows",
+        requestId,
+        ...(this.options.retryPolicy === undefined ? {} : { retryPolicy: this.options.retryPolicy }),
+        status: (status) => {
+          this.dataSourceStatus = status;
+        }
+      }
+    ).then(
       (result) => {
         if (controller.signal.aborted) {
-          return { block: this.setCancelledBlock(normalizedIndex, requestId), deduped: false };
+          const status = this.dataSourceStatus ?? createDataSourceSuccessStatus("getRows", requestId);
+          return {
+            block: this.setCancelledBlock(normalizedIndex, requestId, status),
+            deduped: false,
+            status
+          };
         }
 
+        const status = this.dataSourceStatus ?? createDataSourceSuccessStatus("getRows", requestId);
         const block = this.createBlock(normalizedIndex, "loaded", result.rows, requestId, {
           ...(result.rowCount === undefined ? {} : { rowCount: result.rowCount }),
-          ...(result.hasMore === undefined ? {} : { hasMore: result.hasMore })
+          ...(result.hasMore === undefined ? {} : { hasMore: result.hasMore }),
+          dataSourceStatus: status
         });
         this.applyResultMeta(block);
         setCachedBlock(this.cache, block);
         evictInfiniteBlocks(this.cache, new Set([normalizedIndex]));
-        return { block, deduped: false };
+        return { block, deduped: false, status };
       },
       (error: unknown) => ({
-        block: this.setErrorBlock(normalizedIndex, requestId, error),
-        deduped: false
+        block: this.setErrorBlock(
+          normalizedIndex,
+          requestId,
+          error,
+          this.dataSourceStatus ?? createDataSourceSuccessStatus("getRows", requestId)
+        ),
+        deduped: false,
+        status: this.dataSourceStatus ?? createDataSourceSuccessStatus("getRows", requestId)
       })
     ).finally(() => {
       this.pending.delete(normalizedIndex);
@@ -117,6 +161,28 @@ export class InfiniteRowModel<TData = unknown> {
     }
 
     return result;
+  }
+
+  async ensureRowsWindow(
+    startRow: number,
+    endRow: number
+  ): Promise<readonly InfiniteRowEntry<TData>[]> {
+    const start = Math.max(0, Math.trunc(startRow));
+    const end = this.totalRowCount === undefined
+      ? Math.max(start, Math.trunc(endRow))
+      : Math.min(Math.max(start, Math.trunc(endRow)), this.totalRowCount);
+    if (end <= start) {
+      return Object.freeze([]);
+    }
+
+    const firstBlock = Math.floor(start / this.blockSize);
+    const lastBlock = Math.floor((end - 1) / this.blockSize);
+    await Promise.all(
+      Array.from({ length: lastBlock - firstBlock + 1 }, (_, index) =>
+        this.loadBlock(firstBlock + index)
+      )
+    );
+    return this.getRowsWindow(start, end);
   }
 
   cancelBlock(blockIndex: number, reason?: unknown): boolean {
@@ -168,7 +234,11 @@ export class InfiniteRowModel<TData = unknown> {
     status: InfiniteBlock<TData>["status"],
     rows: readonly TData[],
     requestId: string,
-    meta: { readonly rowCount?: number; readonly hasMore?: boolean } = {}
+    meta: {
+      readonly rowCount?: number;
+      readonly hasMore?: boolean;
+      readonly dataSourceStatus?: DataSourceStatusSnapshot;
+    } = {}
   ): InfiniteBlock<TData> {
     const startRow = blockIndex * this.blockSize;
     return Object.freeze({
@@ -179,6 +249,7 @@ export class InfiniteRowModel<TData = unknown> {
       rows: Object.freeze([...rows]),
       ...(meta.rowCount === undefined ? {} : { rowCount: meta.rowCount }),
       ...(meta.hasMore === undefined ? {} : { hasMore: meta.hasMore }),
+      ...(meta.dataSourceStatus === undefined ? {} : { dataSourceStatus: meta.dataSourceStatus }),
       requestId,
       lastAccess: ++this.accessSequence
     });
@@ -190,8 +261,14 @@ export class InfiniteRowModel<TData = unknown> {
     return touched;
   }
 
-  private setCancelledBlock(blockIndex: number, requestId: string): InfiniteBlock<TData> {
-    const block = this.createBlock(blockIndex, "cancelled", [], requestId);
+  private setCancelledBlock(
+    blockIndex: number,
+    requestId: string,
+    dataSourceStatus?: DataSourceStatusSnapshot
+  ): InfiniteBlock<TData> {
+    const block = this.createBlock(blockIndex, "cancelled", [], requestId, {
+      ...(dataSourceStatus === undefined ? {} : { dataSourceStatus })
+    });
     setCachedBlock(this.cache, block);
     return block;
   }
@@ -199,10 +276,11 @@ export class InfiniteRowModel<TData = unknown> {
   private setErrorBlock(
     blockIndex: number,
     requestId: string,
-    error: unknown
+    error: unknown,
+    dataSourceStatus: DataSourceStatusSnapshot
   ): InfiniteBlock<TData> {
     const block = Object.freeze({
-      ...this.createBlock(blockIndex, "error", [], requestId),
+      ...this.createBlock(blockIndex, "error", [], requestId, { dataSourceStatus }),
       error
     });
     setCachedBlock(this.cache, block);

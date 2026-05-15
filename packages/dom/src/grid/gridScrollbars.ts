@@ -1,15 +1,28 @@
 import type { LayoutPane } from "@onegrid/core";
+import {
+  getKeyboardDelta,
+  getMaxScroll,
+  getPointerPosition,
+  getScrollPosition,
+  getThumbOffset,
+  getThumbSize,
+  getTrackRectSize,
+  getTrackSize,
+  setScrollPosition
+} from "./gridScrollbarMetrics.js";
+import type { Orientation, ScrollPositionOptions } from "./gridScrollbarMetrics.js";
+import type { GridScrollCoordinator, GridScrollLayoutState } from "./scrollCoordinator.js";
+import { readGridScrollLayoutState } from "./scrollCoordinator.js";
 
 const MIN_THUMB_SIZE = 28;
-const SCROLL_LINE = 40;
-const LOGICAL_SCROLL_EVENT = "onegrid:logical-scroll";
-const CONTROLLED_SCROLL_RESTORE = "true";
 let nextScrollbarViewportId = 0;
 
 export interface GridScrollbarInput<TData> {
   readonly grid: HTMLElement;
+  readonly layerHost?: HTMLElement;
   readonly viewport: HTMLElement;
   readonly panes: Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>;
+  readonly scrollCoordinator?: GridScrollCoordinator;
 }
 
 export interface GridScrollbarHandle {
@@ -37,21 +50,27 @@ export function attachGridScrollbars<TData>(input: GridScrollbarInput<TData>): G
   const layer = document.createElement("div");
   layer.className = "og-grid__scrollbar-layer";
   layer.setAttribute("role", "presentation");
+  layer.style.visibility = "hidden";
+  const layerHost = input.layerHost ?? input.grid;
 
   const viewportId = ensureViewportId(input.viewport);
   const vertical = createTrack("vertical", viewportId);
   const horizontal = createTrack("horizontal", viewportId);
   layer.append(vertical.track, horizontal.track);
-  input.grid.append(layer);
+  syncLayerBounds(layerHost, input.grid, layer);
+  layerHost.append(layer);
 
   const sync = () => {
     frame = 0;
-    const changed = syncScrollbarPresence(input.grid, input.viewport);
-    syncTrack(input.viewport, vertical, "vertical");
-    syncTrack(input.viewport, horizontal, "horizontal");
+    syncLayerBounds(layerHost, input.grid, layer);
+    const state = input.scrollCoordinator?.sync() ?? readGridScrollLayoutState(input.viewport);
+    const changed = syncScrollbarPresence(input.grid, state);
+    syncTrack(input.viewport, vertical, "vertical", state);
+    syncTrack(input.viewport, horizontal, "horizontal", state);
     if (changed) {
       scheduleSync();
     }
+    layer.style.visibility = "";
   };
   const scheduleSync = () => {
     if (frame === 0) {
@@ -63,17 +82,18 @@ export function attachGridScrollbars<TData>(input: GridScrollbarInput<TData>): G
     passive: true,
     signal: abortController.signal
   });
-  addTrackInteractions(input.viewport, vertical, "vertical", abortController.signal);
-  addTrackInteractions(input.viewport, horizontal, "horizontal", abortController.signal);
+  addTrackInteractions(input.viewport, vertical, "vertical", abortController.signal, input.scrollCoordinator);
+  addTrackInteractions(input.viewport, horizontal, "horizontal", abortController.signal, input.scrollCoordinator);
 
   let resizeObserver: ResizeObserver | undefined;
   if (typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(scheduleSync);
+    resizeObserver.observe(layerHost);
     resizeObserver.observe(input.grid);
     resizeObserver.observe(input.viewport);
   }
 
-  scheduleSync();
+  sync();
 
   return {
     destroy() {
@@ -87,26 +107,45 @@ export function attachGridScrollbars<TData>(input: GridScrollbarInput<TData>): G
   };
 }
 
-type Orientation = "vertical" | "horizontal";
+function syncLayerBounds(layerHost: HTMLElement, grid: HTMLElement, layer: HTMLElement): void {
+  if (layerHost === grid) {
+    layer.style.inset = "0";
+    layer.style.blockSize = "";
+    layer.style.inlineSize = "";
+    return;
+  }
+
+  const hostRect = layerHost.getBoundingClientRect();
+  const gridRect = grid.getBoundingClientRect();
+  layer.style.inset = "";
+  layer.style.insetBlockStart = `${gridRect.top - hostRect.top}px`;
+  layer.style.insetInlineStart = `${gridRect.left - hostRect.left}px`;
+  layer.style.inlineSize = `${gridRect.width}px`;
+  layer.style.blockSize = `${gridRect.height}px`;
+}
 
 interface ScrollbarTrack {
   readonly track: HTMLElement;
   readonly thumb: HTMLElement;
 }
 
-interface ScrollPositionOptions {
-  readonly deferRemoteLoad?: boolean;
-}
-
 function createTrack(orientation: Orientation, viewportId: string): ScrollbarTrack {
   const track = document.createElement("div");
   track.className = `og-grid__scrollbar og-grid__scrollbar--${orientation}`;
   track.dataset.scrollbarOrientation = orientation;
-  track.setAttribute("aria-hidden", "true");
   track.dataset.scrollbarControls = viewportId;
+  track.setAttribute("aria-controls", viewportId);
+  track.setAttribute("aria-label", orientation === "vertical"
+    ? "Vertical grid scrollbar"
+    : "Horizontal grid scrollbar");
+  track.setAttribute("aria-orientation", orientation);
+  track.setAttribute("aria-valuemin", "0");
+  track.setAttribute("role", "scrollbar");
+  track.tabIndex = 0;
 
   const thumb = document.createElement("div");
   thumb.className = "og-grid__scrollbar-thumb";
+  thumb.setAttribute("aria-hidden", "true");
   track.append(thumb);
   return { track, thumb };
 }
@@ -118,9 +157,9 @@ function ensureViewportId(viewport: HTMLElement): string {
   return viewport.id;
 }
 
-function syncScrollbarPresence(host: HTMLElement, viewport: HTMLElement): boolean {
-  const hasVertical = getMaxScroll(viewport, "vertical") > 0;
-  const hasHorizontal = getMaxScroll(viewport, "horizontal") > 0;
+function syncScrollbarPresence(host: HTMLElement, state: GridScrollLayoutState): boolean {
+  const hasVertical = state.hasVerticalScroll;
+  const hasHorizontal = state.hasHorizontalScroll;
   const root = host.closest(".og-grid");
   const rootElement = root instanceof HTMLElement ? root : undefined;
   const hostVerticalChanged = setDatasetFlag(host, "scrollbarVertical", hasVertical);
@@ -165,31 +204,37 @@ function setRootDatasetFlag(
 function syncTrack(
   viewport: HTMLElement,
   scrollbar: ScrollbarTrack,
-  orientation: Orientation
+  orientation: Orientation,
+  state: GridScrollLayoutState
 ): void {
-  const maxScroll = getMaxScroll(viewport, orientation);
+  const maxScroll = orientation === "vertical" ? state.maxScrollTop : state.maxScrollLeft;
   scrollbar.track.hidden = maxScroll <= 0;
   if (maxScroll <= 0) {
+    scrollbar.track.tabIndex = -1;
     return;
   }
+  scrollbar.track.tabIndex = 0;
 
   const trackSize = getTrackSize(scrollbar.track, orientation);
-  const viewportSize = getViewportSize(viewport, orientation);
-  const scrollSize = getScrollSize(viewport, orientation);
+  const viewportSize = orientation === "vertical" ? state.viewportHeight : state.viewportWidth;
+  const scrollSize = orientation === "vertical" ? state.scrollHeight : state.scrollWidth;
   const thumbSize = Math.max(MIN_THUMB_SIZE, Math.round((trackSize * viewportSize) / scrollSize));
   const travel = Math.max(0, trackSize - thumbSize);
-  const offset = Math.round((travel * getScrollPosition(viewport, orientation)) / maxScroll);
+  const scrollPosition = orientation === "vertical" ? state.scrollTop : state.scrollLeft;
+  const offset = Math.round((travel * scrollPosition) / maxScroll);
 
   setThumbGeometry(scrollbar.thumb, orientation, thumbSize, offset);
   scrollbar.track.setAttribute("aria-valuemax", String(Math.round(maxScroll)));
-  scrollbar.track.setAttribute("aria-valuenow", String(Math.round(getScrollPosition(viewport, orientation))));
+  scrollbar.track.setAttribute("aria-valuenow", String(Math.round(scrollPosition)));
+  scrollbar.track.setAttribute("aria-valuetext", createScrollValueText(scrollPosition, maxScroll));
 }
 
 function addTrackInteractions(
   viewport: HTMLElement,
   scrollbar: ScrollbarTrack,
   orientation: Orientation,
-  signal: AbortSignal
+  signal: AbortSignal,
+  scrollCoordinator: GridScrollCoordinator | undefined
 ): void {
   scrollbar.track.addEventListener("pointerdown", (event) => {
     event.preventDefault();
@@ -200,16 +245,20 @@ function addTrackInteractions(
     const setScrollFromPointer = (pointer: number, options: ScrollPositionOptions = {}) => {
       const trackRect = scrollbar.track.getBoundingClientRect();
       const trackStart = orientation === "vertical" ? trackRect.top : trackRect.left;
-      const trackSize = getTrackSize(scrollbar.track, orientation);
+      const trackSize = getTrackRectSize(trackRect, orientation);
       const thumbSize = getThumbSize(scrollbar.thumb, orientation);
       const travel = Math.max(1, trackSize - thumbSize);
       const maxScroll = getMaxScroll(viewport, orientation);
-      const nextOffset = !thumbDrag && pointer >= trackStart + trackSize - thumbSize / 2
-        ? travel
-        : !thumbDrag && pointer <= trackStart + thumbSize / 2
-          ? 0
-          : Math.max(0, Math.min(travel, pointer - trackStart - pointerAnchor));
-      setScrollPosition(viewport, orientation, (nextOffset * maxScroll) / travel, options);
+      const nextOffset = !thumbDrag
+        ? getTrackClickOffset(pointer, trackStart, trackSize, thumbSize, travel)
+        : Math.max(0, Math.min(travel, pointer - trackStart - pointerAnchor));
+      setScrollbarPosition(
+        viewport,
+        orientation,
+        (nextOffset * maxScroll) / travel,
+        options,
+        scrollCoordinator
+      );
     };
 
     scrollbar.track.setPointerCapture(event.pointerId);
@@ -222,7 +271,13 @@ function addTrackInteractions(
     };
     const onUp = (upEvent: PointerEvent) => {
       if (thumbDrag) {
-        setScrollPosition(viewport, orientation, getScrollPosition(viewport, orientation));
+        setScrollbarPosition(
+          viewport,
+          orientation,
+          getScrollPosition(viewport, orientation),
+          {},
+          scrollCoordinator
+        );
       }
       scrollbar.track.releasePointerCapture(upEvent.pointerId);
       scrollbar.track.removeEventListener("pointermove", onMove);
@@ -242,8 +297,47 @@ function addTrackInteractions(
     }
 
     event.preventDefault();
-    setScrollPosition(viewport, orientation, getScrollPosition(viewport, orientation) + delta);
+    setScrollbarPosition(
+      viewport,
+      orientation,
+      getScrollPosition(viewport, orientation) + delta,
+      {},
+      scrollCoordinator
+    );
   }, { signal });
+}
+
+function setScrollbarPosition(
+  viewport: HTMLElement,
+  orientation: Orientation,
+  value: number,
+  options: ScrollPositionOptions,
+  scrollCoordinator: GridScrollCoordinator | undefined
+): void {
+  if (scrollCoordinator) {
+    scrollCoordinator.setScroll(orientation, value, options);
+    return;
+  }
+
+  setScrollPosition(viewport, orientation, value, options);
+}
+
+function getTrackClickOffset(
+  pointer: number,
+  trackStart: number,
+  trackSize: number,
+  thumbSize: number,
+  travel: number
+): number {
+  if (pointer >= trackStart + trackSize - thumbSize / 2) {
+    return travel;
+  }
+  if (pointer <= trackStart + thumbSize / 2) {
+    return 0;
+  }
+
+  const pointerOffset = pointer - trackStart + (Number.isInteger(pointer) ? 0.5 : 0);
+  return Math.max(0, Math.min(travel, (pointerOffset / trackSize) * travel));
 }
 
 function getPointerAnchor(
@@ -280,115 +374,9 @@ function setThumbGeometry(
   thumb.style.transform = `translateX(${offset}px)`;
 }
 
-function getKeyboardDelta(key: string, viewport: HTMLElement, orientation: Orientation): number {
-  const page = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
-  const line = SCROLL_LINE;
-  if (key === "ArrowDown" || key === "ArrowRight") return line;
-  if (key === "ArrowUp" || key === "ArrowLeft") return -line;
-  if (key === "PageDown") return page;
-  if (key === "PageUp") return -page;
-  if (key === "Home") return -getScrollPosition(viewport, orientation);
-  if (key === "End") return getMaxScroll(viewport, orientation);
-  return 0;
-}
-
-function getPointerPosition(event: PointerEvent, orientation: Orientation): number {
-  return orientation === "vertical" ? event.clientY : event.clientX;
-}
-
-function getScrollPosition(viewport: HTMLElement, orientation: Orientation): number {
-  if (orientation === "vertical") {
-    return getLogicalScrollMetric(viewport, "logicalScrollTop") ?? viewport.scrollTop;
-  }
-
-  return viewport.scrollLeft;
-}
-
-function getMaxScroll(viewport: HTMLElement, orientation: Orientation): number {
-  if (orientation === "vertical") {
-    return getLogicalScrollMetric(viewport, "logicalScrollMax")
-      ?? Math.max(0, viewport.scrollHeight - viewport.clientHeight);
-  }
-
-  return Math.max(0, viewport.scrollWidth - viewport.clientWidth);
-}
-
-function getViewportSize(viewport: HTMLElement, orientation: Orientation): number {
-  return orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
-}
-
-function getScrollSize(viewport: HTMLElement, orientation: Orientation): number {
-  if (orientation === "vertical") {
-    return getLogicalScrollMetric(viewport, "logicalScrollHeight") ?? viewport.scrollHeight;
-  }
-
-  return viewport.scrollWidth;
-}
-
-function setScrollPosition(
-  viewport: HTMLElement,
-  orientation: Orientation,
-  value: number,
-  options: ScrollPositionOptions = {}
-): void {
-  const maxScroll = getMaxScroll(viewport, orientation);
-  const nextValue = Math.max(0, Math.min(maxScroll, value));
-  if (orientation === "vertical" && hasLogicalVerticalScroll(viewport)) {
-    viewport.dataset.logicalScrollTop = String(nextValue);
-    viewport.dataset.logicalScrollRestoring = CONTROLLED_SCROLL_RESTORE;
-    viewport.dispatchEvent(new CustomEvent(LOGICAL_SCROLL_EVENT, {
-      detail: {
-        scrollTop: nextValue,
-        deferRemoteLoad: options.deferRemoteLoad === true
-      }
-    }));
-    viewport.dispatchEvent(new Event("scroll"));
-    requestAnimationFrame(() => {
-      if (viewport.dataset.logicalScrollRestoring === CONTROLLED_SCROLL_RESTORE) {
-        delete viewport.dataset.logicalScrollRestoring;
-      }
-    });
-    return;
-  }
-
-  if (orientation === "vertical") {
-    viewport.scrollTop = nextValue;
-    return;
-  }
-
-  viewport.scrollLeft = nextValue;
-}
-
-function hasLogicalVerticalScroll(viewport: HTMLElement): boolean {
-  return getLogicalScrollMetric(viewport, "logicalScrollMax") !== undefined
-    && getLogicalScrollMetric(viewport, "logicalScrollHeight") !== undefined;
-}
-
-function getLogicalScrollMetric(
-  viewport: HTMLElement,
-  key: "logicalScrollTop" | "logicalScrollMax" | "logicalScrollHeight"
-): number | undefined {
-  const rawValue = viewport.dataset[key];
-  if (rawValue === undefined) {
-    return undefined;
-  }
-
-  const value = Number(rawValue);
-  return Number.isFinite(value) && value >= 0 ? value : undefined;
-}
-
-function getTrackSize(track: HTMLElement, orientation: Orientation): number {
-  return orientation === "vertical" ? track.clientHeight : track.clientWidth;
-}
-
-function getThumbSize(thumb: HTMLElement, orientation: Orientation): number {
-  return orientation === "vertical" ? thumb.offsetHeight : thumb.offsetWidth;
-}
-
-function getThumbOffset(thumb: HTMLElement, orientation: Orientation): number {
-  const style = getComputedStyle(thumb).transform;
-  const transform = style === "none"
-    ? new DOMMatrixReadOnly()
-    : new DOMMatrixReadOnly(style);
-  return orientation === "vertical" ? transform.m42 : transform.m41;
+function createScrollValueText(scrollPosition: number, maxScroll: number): string {
+  const percent = maxScroll <= 0
+    ? 0
+    : Math.round((Math.max(0, Math.min(scrollPosition, maxScroll)) / maxScroll) * 100);
+  return `${percent}%`;
 }

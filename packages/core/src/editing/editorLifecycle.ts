@@ -43,15 +43,6 @@ export interface ResolvedEditorDef<TData = unknown> {
   readonly validate?: ValueValidator<TData>;
 }
 
-export interface ResolvedEditingKeyboardPolicy {
-  readonly startOnEnter: boolean;
-  readonly commitOnEnter: boolean;
-  readonly moveOnTab: boolean;
-  readonly commitOnTab: boolean;
-  readonly cancelOnEscape: boolean;
-  readonly clearOnBackspace: boolean;
-}
-
 export interface CommitCellEditInput<TData = unknown> {
   readonly session: CellEditSession<TData>;
   readonly rawValue: unknown;
@@ -204,20 +195,6 @@ export function resolveEditStartMode<TData>(
   return resolveEditorDef(column).kind === "checkbox" ? "singleClick" : "doubleClick";
 }
 
-export function resolveEditKeyboardPolicy(
-  editing: EditingOptions | undefined
-): ResolvedEditingKeyboardPolicy {
-  const keyboard = editing?.keyboard;
-  return Object.freeze({
-    startOnEnter: getKeyboardFlag(keyboard?.startOnEnter, true),
-    commitOnEnter: getKeyboardFlag(keyboard?.commitOnEnter, true),
-    moveOnTab: getKeyboardFlag(keyboard?.moveOnTab, true),
-    commitOnTab: getKeyboardFlag(keyboard?.commitOnTab, true),
-    cancelOnEscape: getKeyboardFlag(keyboard?.cancelOnEscape, true),
-    clearOnBackspace: getKeyboardFlag(keyboard?.clearOnBackspace, true)
-  });
-}
-
 function parseEditedValue<TData>(
   rawValue: unknown,
   editorKind: EditorKind,
@@ -343,10 +320,6 @@ function inferEditorKind<TData>(column: DataColumnDef<TData>): EditorKind {
     return "checkbox";
   }
   return "text";
-}
-
-function getKeyboardFlag(value: boolean | undefined, fallback: boolean): boolean {
-  return value ?? fallback;
 }
 
 function getParamOptions(params: Readonly<Record<string, unknown>> | undefined): readonly EditorOption[] {

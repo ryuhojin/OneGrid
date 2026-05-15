@@ -12,6 +12,8 @@
   opacity: 1;
   pointer-events: auto;
   position: absolute;
+  touch-action: none;
+  user-select: none;
 }
 
 .og-grid__scrollbar[hidden] {
@@ -55,4 +57,9 @@
 .og-grid__scrollbar:hover .og-grid__scrollbar-thumb,
 .og-grid__scrollbar:focus-visible .og-grid__scrollbar-thumb {
   background: var(--og-color-scrollbar-thumb-hover);
+}
+
+.og-grid__scrollbar:focus-visible {
+  outline: 2px solid var(--og-color-focus-ring);
+  outline-offset: -2px;
 }

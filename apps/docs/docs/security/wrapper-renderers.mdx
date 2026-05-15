@@ -1,0 +1,121 @@
+# Wrapper Renderer Security Boundary
+
+React and Vue custom renderers are framework-owned content mounted inside
+OneGrid-owned placeholder elements. OneGrid secures the placeholder and the
+shared DOM renderer path, but it does not sanitize the framework subtree after
+React or Vue has mounted it.
+
+## Boundary Model
+
+OneGrid wrapper renderers follow this flow:
+
+1. The React or Vue wrapper resolves a renderer slot by `columnId`.
+2. The wrapper converts the slot into a shared `kind: "element"` renderer.
+3. The DOM renderer creates a safe placeholder element through OneGrid's element
+   renderer path.
+4. React or Vue mounts the user-provided node tree into that placeholder.
+
+The placeholder element is still protected by OneGrid's safe element boundary.
+The child subtree rendered by React or Vue is application code and follows the
+framework's own escaping and DOM rules.
+
+## Safe Defaults
+
+These wrapper patterns are safe by default because React and Vue render text
+bindings as text:
+
+```tsx
+reactRenderers={{
+  cells: {
+    status: ({ value }) => <strong>{String(value)}</strong>
+  }
+}}
+```
+
+```vue
+<template #cell-status="{ value }">
+  <strong>{{ value }}</strong>
+</template>
+```
+
+The examples above do not use an HTML sink. User data is not interpreted as
+markup.
+
+## What OneGrid Still Enforces
+
+OneGrid still enforces these controls around wrapper renderers:
+
+- column lookup uses the shared `columnId` contract;
+- wrappers delegate to the shared DOM renderer instead of reimplementing grid
+  features;
+- the renderer host is created by the safe `kind: "element"` path;
+- core `kind: "text"` and `kind: "html"` renderers keep the same sanitizer,
+  Trusted Types, and URL protocol policy;
+- clipboard, export, selection, focus, and layout use grid values and state, not
+  framework-rendered HTML.
+
+## Application-Owned Risks
+
+These patterns bypass OneGrid's sanitizer because they are created by the
+framework after the wrapper mount:
+
+```tsx
+<span dangerouslySetInnerHTML={{ __html: valueFromServer }} />
+```
+
+```vue
+<span v-html="valueFromServer" />
+```
+
+Direct DOM writes from refs, third-party React/Vue components that write raw
+HTML, unreviewed URL attributes, and style attributes generated from untrusted
+data are also application-owned risks.
+
+If a wrapper renderer must preserve markup, sanitize the markup before passing it
+to the framework sink. For regulated SI projects, keep that sanitizer owned by
+the application security team and document the allowed tags, attributes, and URL
+protocols.
+
+## Recommended Policy
+
+Use this policy for custom wrapper renderers:
+
+| Renderer need | Recommended path |
+|---|---|
+| Plain text or formatted values | React text bindings or Vue mustache bindings |
+| Icons, badges, buttons | React/Vue elements with text bindings and reviewed event handlers |
+| Simple shared HTML renderer | Core `renderer: { kind: "html", sanitize: true }` plus `security.html.sanitizer` |
+| Organization-specific HTML | Security-team-owned sanitizer adapter, then framework HTML sink only when required |
+| Untrusted links | Validate URLs before rendering; prefer core `kind: "element"` when URL allowlist enforcement is required |
+
+Prefer classes and theme tokens over style attributes in strict CSP
+deployments. OneGrid's theme and renderer infrastructure is CSP-friendly, but
+framework slot content is application code and must meet the same deployment CSP.
+
+## Do Not Rely On
+
+Do not rely on OneGrid to sanitize:
+
+- React `dangerouslySetInnerHTML`;
+- Vue `v-html`;
+- DOM writes performed by wrapper renderer refs;
+- third-party component internals;
+- URLs or style values produced inside the framework-rendered subtree.
+
+Those paths are outside the OneGrid renderer host. They must be handled by the
+application.
+
+## Review Checklist
+
+Before approving a custom React/Vue renderer in a financial or public-sector SI
+deployment, verify:
+
+- no raw HTML sink is used, or it is backed by an approved sanitizer;
+- user-provided values are rendered as text bindings;
+- URL attributes are validated against an allowlist;
+- event handlers do not call `eval`, `new Function`, or string-based handlers;
+- style values are static, token-based, or reviewed;
+- the renderer does not mutate grid DOM outside its placeholder;
+- the same renderer behavior is covered in vanilla, React, Vue, and Playwright
+  examples when it becomes a documented feature.
+

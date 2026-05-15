@@ -1,4 +1,5 @@
 import type { ColumnDef, SecurityOptions } from "@onegrid/core";
+import { createAllowlistHtmlSanitizer } from "@onegrid/dom";
 
 export interface XssDefenseRow {
   readonly id: string;
@@ -72,13 +73,7 @@ export const xssDefenseSecurity: SecurityOptions = {
   html: {
     allowHtmlRenderer: true,
     trustedTypesPolicyName: "onegrid-xss-example",
-    sanitizer: {
-      sanitize: (html) =>
-        html
-          .replace(/<script[\s\S]*?<\/script>/giu, "")
-          .replace(/<img\b[^>]*>/giu, "")
-          .replace(/\s+on[a-z]+=(?:"[^"]*"|'[^']*'|[^\s>]*)/giu, "")
-    }
+    sanitizer: createAllowlistHtmlSanitizer()
   },
   url: {
     allowedProtocols: ["https:", "mailto:", "tel:"]

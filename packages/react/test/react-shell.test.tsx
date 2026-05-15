@@ -94,6 +94,7 @@ function createParityOptions(): OneGridOptionProps<ParityRow> & OneGridEventProp
     server: Object.freeze({ pageSize: 50 }),
     viewport: Object.freeze({ viewportSize: 20 }),
     rowKey: "id",
+    duplicateRowKeyPolicy: "error",
     width: "100%",
     height: 320,
     bodyHeight: 260,

@@ -7,6 +7,8 @@ import { attachOverlayFocusTrap } from "./focusTrap.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
 import type { FocusTrapHandle } from "./focusTrap.js";
 import { positionOverlay } from "./overlayPosition.js";
+import { attachOverlayScrollSync } from "./overlayScrollSync.js";
+import type { OverlayScrollSyncHandle } from "./overlayScrollSync.js";
 
 let nextFilterPanelId = 0;
 
@@ -35,6 +37,7 @@ export function showColumnFilterPanel<TData>(
 
   const closePanel = attachPanelClose(panel, anchor);
   let focusTrap: FocusTrapHandle | undefined;
+  let scrollSync: OverlayScrollSyncHandle | undefined;
   const conditions = getColumnConditions(runtime, column.field);
   if (kind === "set") {
     renderSetFilter(body, column, runtime, closePanel);
@@ -45,7 +48,15 @@ export function showColumnFilterPanel<TData>(
   }
 
   document.body.append(panel);
-  positionOverlay({ anchor, overlay: panel });
+  const reposition = (): void => {
+    positionOverlay({ anchor, overlay: panel });
+  };
+  reposition();
+  scrollSync = attachOverlayScrollSync({
+    anchor,
+    onUpdate: reposition,
+    onAnchorMissing: closePanel
+  });
   focusTrap = attachOverlayFocusTrap(panel, {
     restoreFocusTo: anchor,
     onEscape: closePanel
@@ -53,6 +64,8 @@ export function showColumnFilterPanel<TData>(
   panel.addEventListener("filter-panel-close", () => {
     focusTrap?.destroy();
     focusTrap = undefined;
+    scrollSync?.destroy();
+    scrollSync = undefined;
   });
   panel.querySelector<HTMLElement>("input,select,button")?.focus();
 }

@@ -1,9 +1,11 @@
+import type { GridScrollLayoutState } from "./scrollCoordinator.js";
+
 export type EditTrigger = "api" | "keyboard" | "pointer";
 
 export interface GridEditRuntime {
   startEditFromCell(cell: HTMLElement, trigger: EditTrigger, initialValue?: string): boolean;
   toggleCheckboxCell(cell: HTMLElement, trigger: "pointer"): boolean;
-  syncActiveEditOnScroll(viewport: HTMLElement): void;
+  syncActiveEditOnScroll(viewport: HTMLElement, scrollState?: GridScrollLayoutState): void;
   stopEdit(options?: GridStopEditOptions): void;
   isEditingCell(cell: HTMLElement): boolean;
 }

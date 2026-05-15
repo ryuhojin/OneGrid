@@ -58,6 +58,11 @@ const dataSource: DataSource<TreeRow> = {
 
 Set `tree.serverOnly: true` when the server owns child filtering and sibling sorting.
 
+Lazy child requests also use the shared DataSource retry/status contract. Configure
+`dataSourceOptions.retry` on `GridOptions`; `TreeRowModel.status` reports `loading`, `retrying`,
+`success`, or `error` for the latest `getChildren` request, and DOM wrappers surface standardized
+`dataRequested` and `error` events.
+
 ## Filtering And Sorting
 
 Tree filters use `tree.filterPolicy`:

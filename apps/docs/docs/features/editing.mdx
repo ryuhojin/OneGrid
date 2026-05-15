@@ -105,5 +105,12 @@ Batch sessions emit `batchEditSessionStarted`, `batchEditSessionCommitted`, and
 `batchEditSessionCancelled` with a session snapshot and the edits included in that session.
 Undo/redo emits `editUndo`, `editRedo`, and `editHistoryChanged`.
 
+## Full Row Editing Decision
+
+OneGrid 1.0 does not expose full row editing. The supported enterprise flow is cell-scoped editing
+with Tab/Shift+Tab movement, pending edit history, named batch sessions, explicit commit/cancel,
+and optional external state integration. Row-form workflows should be implemented as an external
+detail panel or application form that reads pending edits through the public batch APIs.
+
 The executable example is available as `F-EDIT` in the examples app and includes vanilla, React,
 and Vue variants.

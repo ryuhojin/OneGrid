@@ -1,6 +1,7 @@
 export * from "./column/index.js";
 export * from "./clipboard/index.js";
 export * from "./commands/index.js";
+export * from "./dataSource/index.js";
 export * from "./editing/index.js";
 export * from "./events/index.js";
 export * from "./export/index.js";

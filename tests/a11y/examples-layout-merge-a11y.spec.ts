@@ -14,7 +14,7 @@ test("EX-002 variable row height keeps grid semantics @a11y", async ({ page }) =
   await page.goto("/#EX-002-008");
 
   const grid = page.getByRole("grid", { name: "Variable row height grid" });
-  await expect(grid).toHaveAttribute("aria-rowcount", "4");
+  await expect(grid).toHaveAttribute("aria-rowcount", "48");
   await expect(grid).toHaveAttribute("aria-colcount", "5");
   await expect(page.getByRole("gridcell", { name: /Longer memo/ })).toBeVisible();
 });

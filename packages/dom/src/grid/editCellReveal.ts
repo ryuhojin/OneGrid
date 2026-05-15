@@ -4,6 +4,7 @@ import {
   getCenterEditViewportWidth
 } from "./editCellVisibility.js";
 import type { CellEditTarget } from "./editRuntime.js";
+import type { GridScrollCoordinator } from "./scrollCoordinator.js";
 
 export interface EditCellRevealRuntime {
   readonly root: HTMLElement;
@@ -11,6 +12,7 @@ export interface EditCellRevealRuntime {
   getColumnScrollLeft(): number;
   setColumnScrollToField(columnId: string, align: ScrollAlign): void;
   setColumnViewportWidth(width: number): void;
+  readonly scrollCoordinator?: GridScrollCoordinator;
 }
 
 export function revealEditCell(
@@ -37,7 +39,12 @@ export function scrollEditPositionIntoView(
   );
   runtime.setColumnScrollToField(position.columnId ?? position.field, "nearest");
   const nextScrollLeft = runtime.getColumnScrollLeft();
-  if (Math.abs(viewport.scrollLeft - nextScrollLeft) > 1) {
+  const currentScrollLeft = runtime.scrollCoordinator?.read().scrollLeft ?? viewport.scrollLeft;
+  if (Math.abs(currentScrollLeft - nextScrollLeft) > 1) {
+    if (runtime.scrollCoordinator) {
+      runtime.scrollCoordinator.setScroll("horizontal", nextScrollLeft);
+      return;
+    }
     viewport.scrollLeft = nextScrollLeft;
     viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
   }

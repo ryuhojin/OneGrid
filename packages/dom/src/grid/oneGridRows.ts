@@ -1,18 +1,13 @@
-import type {
-  GroupModel,
-  RefreshOptions,
-  RowUpdate,
-  RowKey
-} from "@onegrid/core";
-import { createClientRowModel } from "@onegrid/core";
+import { appendClientRowsWithResult, type ClientRowTransactionResult, type GroupModel, removeClientRowsWithResult, type RefreshOptions, type RowKey, type RowUpdate, setClientRowsWithResult, updateClientRowsWithResult } from "@onegrid/core";
 import type { GroupRowRuntime } from "./groupRowRenderer.js";
 import { isGroupKeyExpanded, setGroupKeyExpanded } from "./groupExpansionState.js";
 import { invalidate } from "./renderInvalidation.js";
 import { createRowRenderState } from "./rowRenderStateFactory.js";
 import type { RowRenderState } from "./renderGridShell.js";
-import { OneGridRemoteRows } from "./oneGridRemoteRows.js";
+import { OneGridPivot } from "./oneGridPivot.js";
+import { collectVisibleRowKeys, createClientTransactionStore, createRowIdentityInput, findRowDataInEntries, getClientRowsFromTransaction, mergeRowPatch, resolveClientGroupKeys, resolveClientStoreKey, toClientRowUpdates } from "./rowDataMutationRuntime.js";
 
-export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TData> {
+export abstract class OneGridRows<TData = unknown> extends OneGridPivot<TData> {
   async refresh(options?: RefreshOptions): Promise<void> {
     if (this.destroyed) {
       return;
@@ -22,6 +17,7 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     if (options?.purgeCache === true && this.resetRemoteRowModel(reason)) {
       return;
     }
+    this.clearAutoRowHeightCache();
 
     if (this.serverRowModel) {
       await this.loadServerRows(true);
@@ -35,59 +31,63 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     await this.render(invalidate(["rows", "columns", "layout", "overlay"], reason));
   }
 
-  setData(rows: readonly TData[]): void {
+  setData(rows: readonly TData[]): ClientRowTransactionResult<TData> | undefined {
     if (this.destroyed) {
-      return;
+      return undefined;
     }
 
-    this.dataRows = Object.freeze([...rows]);
-    this.clearEditRuntimeForDataChange();
-    this.virtualScrollTop = 0;
-    this.paginationPage = 1;
-    void this.render(invalidate(["rows", "layout", "overlay"], "data-api-set"));
+    const result = setClientRowsWithResult(rows, this.getRowIdentityInput(), this.getClientRowStore());
+    this.applyClientTransactionResult(result, "data-api-set", true);
+    return result;
   }
 
-  appendRows(rows: readonly TData[]): void {
-    if (this.destroyed || rows.length === 0) {
-      return;
+  appendRows(rows: readonly TData[]): ClientRowTransactionResult<TData> | undefined {
+    if (this.destroyed) {
+      return undefined;
     }
 
-    this.setData([...(this.dataRows ?? this.options.data ?? []), ...rows]);
+    const result = appendClientRowsWithResult(this.getClientRowStore(), rows, this.getRowIdentityInput());
+    this.applyClientTransactionResult(result, "data-api-append");
+    return result;
   }
 
-  updateRows(updates: readonly RowUpdate<TData>[]): void {
+  updateRows(updates: readonly RowUpdate<TData>[]): ClientRowTransactionResult<TData> | undefined {
     if (this.destroyed || updates.length === 0) {
-      return;
+      return undefined;
     }
 
     if (this.serverRowModel) {
       void this.updateServerRows(updates);
-      return;
+      return undefined;
     }
 
-    const byKey = new Map(updates.map((update) => [String(update.rowKey), update.row]));
     const rows = this.dataRows ?? this.options.data;
     if (Array.isArray(rows)) {
-      this.setData(rows.map((row, index) => {
-        const patch = byKey.get(String(this.resolveDistinctRowKey(row, index)));
-        return patch === undefined ? row : mergeRowPatch(row, patch);
-      }));
-      return;
+      const store = this.getClientRowStore(rows);
+      const result = updateClientRowsWithResult(store, toClientRowUpdates(store, updates));
+      this.applyClientTransactionResult(result, "data-api-update");
+      return result;
     }
 
     this.updateRemoteEntries(updates);
+    return undefined;
   }
 
-  removeRows(rowKeys: readonly RowKey[]): void {
+  removeRows(rowKeys: readonly RowKey[]): ClientRowTransactionResult<TData> | undefined {
     if (this.destroyed || rowKeys.length === 0) {
-      return;
+      return undefined;
     }
 
     const removals = new Set(rowKeys.map((rowKey) => String(rowKey)));
     const rows = this.dataRows ?? this.options.data;
     if (Array.isArray(rows)) {
-      this.setData(rows.filter((row, index) => !removals.has(String(this.resolveDistinctRowKey(row, index)))));
-      return;
+      const store = this.getClientRowStore(rows);
+      const result = removeClientRowsWithResult(
+        store,
+        rowKeys.map((rowKey) => resolveClientStoreKey(store, rowKey))
+      );
+      this.applyClientTransactionResult(result, "data-api-remove");
+      return result;
     }
 
     this.serverEntries = this.serverEntries.filter((entry) =>
@@ -101,6 +101,7 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     );
     this.treeEntries = this.treeEntries.filter((entry) => !removals.has(String(entry.key)));
     void this.render(invalidate(["rows", "layout", "overlay"], "data-api-remove"));
+    return undefined;
   }
 
   getRow(rowKey: RowKey): TData | undefined {
@@ -125,6 +126,7 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
         : { expandedKeys: Object.freeze([...model.expandedKeys]) })
     });
     this.virtualScrollTop = 0;
+    this.clearAutoRowHeightCache();
     if (this.resetRemoteRowModel("group-model")) {
       return;
     }
@@ -154,10 +156,15 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     }
 
     const pending = this.treeRowModel.expand(key);
+    this.emitRemoteDataRequested(this.treeRowModel.status);
     this.treeEntries = this.treeRowModel.visibleRows;
     await this.render(invalidate(["rows", "overlay"], "tree-expand"));
-    await pending;
-    await this.refreshTreeRows("tree-expanded");
+    try {
+      await pending;
+      await this.refreshTreeRows("tree-expanded");
+    } catch (error) {
+      await this.handleTreeLoadError(error, "tree-expand-error");
+    }
   }
 
   collapseTreeNode(key: string | number): void {
@@ -176,12 +183,17 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     }
 
     const pending = this.treeRowModel.toggle(key);
+    this.emitRemoteDataRequested(this.treeRowModel.status);
     this.treeEntries = this.treeRowModel.visibleRows;
     await this.render(invalidate(["rows", "overlay"], "tree-toggle"));
-    await pending;
-    if (!this.destroyed) {
-      this.treeEntries = this.treeRowModel.visibleRows;
-      await this.render(invalidate(["rows", "overlay"], "tree-children-loaded"));
+    try {
+      await pending;
+      if (!this.destroyed) {
+        this.treeEntries = this.treeRowModel.visibleRows;
+        await this.render(invalidate(["rows", "overlay"], "tree-children-loaded"));
+      }
+    } catch (error) {
+      await this.handleTreeLoadError(error, "tree-toggle-error");
     }
   }
 
@@ -216,6 +228,17 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
     await this.render(invalidate(["rows", "overlay"], reason));
   }
 
+  protected async handleTreeLoadError(error: unknown, reason: string): Promise<void> {
+    if (!this.treeRowModel || this.destroyed) {
+      return;
+    }
+
+    this.renderError = error;
+    this.emitRemoteError(error);
+    this.treeEntries = this.treeRowModel.visibleRows;
+    await this.render(invalidate(["rows", "overlay"], reason));
+  }
+
   protected setGroupExpanded(groupKey: string, expanded: boolean, reason: string): void {
     if (this.destroyed) {
       return;
@@ -238,6 +261,7 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
       ...(this.groupModel.fields === undefined ? {} : { fields: this.groupModel.fields }),
       expandedKeys: Object.freeze([...expandedKeys])
     });
+    this.clearAutoRowHeightCache();
     void this.render(invalidate(["rows", "layout", "overlay"], reason));
   }
 
@@ -286,18 +310,7 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
   }
 
   protected getCurrentVisibleRowKeys(): readonly RowKey[] {
-    const rowKeys: RowKey[] = [];
-    const seen = new Set<string>();
-    for (const cell of this.root.querySelectorAll<HTMLElement>(
-      '[data-layout-section="body"] [data-edit-row-key]'
-    )) {
-      const rowKey = cell.dataset.editRowKey;
-      if (rowKey !== undefined && !seen.has(rowKey)) {
-        seen.add(rowKey);
-        rowKeys.push(rowKey);
-      }
-    }
-    return Object.freeze(rowKeys);
+    return collectVisibleRowKeys(this.root);
   }
 
   private updateRemoteEntries(updates: readonly RowUpdate<TData>[]): void {
@@ -322,21 +335,40 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
         ? { ...entry, data: mergeRowPatch(entry.data, byKey.get(String(entry.key)) ?? {}) }
         : entry
     );
+    this.clearAutoRowHeightCache();
     void this.render(invalidate(["rows", "layout", "overlay"], "data-api-update"));
   }
 
+  private applyClientTransactionResult(
+    result: ClientRowTransactionResult<TData>,
+    reason: string,
+    resetScroll = false
+  ): void {
+    if (!result.changed && result.kind !== "set") {
+      return;
+    }
+
+    this.dataRows = getClientRowsFromTransaction(result);
+    this.clearEditRuntimeForDataChange();
+    this.clearAutoRowHeightCache();
+    if (resetScroll) {
+      this.virtualScrollTop = 0;
+      this.paginationPage = 1;
+    }
+    void this.render(invalidate(["rows", "layout", "overlay"], reason));
+  }
+
+  private getClientRowStore(rows: readonly TData[] = this.dataRows ?? this.options.data ?? []) {
+    return createClientTransactionStore(rows, this.options.rowKey, this.options.duplicateRowKeyPolicy);
+  }
+
   private findRemoteRow(rowKey: string): TData | undefined {
-    for (const entry of [
+    return findRowDataInEntries<TData>(rowKey, [
       ...this.serverEntries,
       ...this.infiniteEntries,
       ...this.viewportEntries,
       ...this.treeEntries
-    ]) {
-      if ("data" in entry && String(entry.key) === rowKey) {
-        return entry.data;
-      }
-    }
-    return undefined;
+    ]);
   }
 
   private getResolvedClientGroupKeys(): Set<string> {
@@ -344,13 +376,13 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
       return new Set(this.groupModel.expandedKeys);
     }
 
-    if (!Array.isArray(this.dataRows) && !Array.isArray(this.options.data)) {
-      return new Set<string>();
-    }
-
-    const rows = this.dataRows ?? this.options.data ?? [];
-    const model = createClientRowModel(rows, {
+    return resolveClientGroupKeys({
+      ...(this.dataRows === undefined ? {} : { dataRows: this.dataRows }),
+      ...(this.options.data === undefined ? {} : { optionRows: this.options.data }),
       ...(this.options.rowKey === undefined ? {} : { rowKey: this.options.rowKey }),
+      ...(this.options.duplicateRowKeyPolicy === undefined
+        ? {}
+        : { duplicateRowKeyPolicy: this.options.duplicateRowKeyPolicy }),
       columns: this.options.columns,
       filterModel: this.filterModel,
       sortModel: this.sortModel,
@@ -359,23 +391,9 @@ export abstract class OneGridRows<TData = unknown> extends OneGridRemoteRows<TDa
         ? {}
         : { aggregateModel: this.options.aggregation.model })
     });
-
-    return new Set(
-      model.visibleRows
-        .filter((entry) => entry.kind === "group")
-        .map((entry) => entry.key)
-    );
-  }
-}
-
-function mergeRowPatch<TData>(row: TData, patch: Partial<TData>): TData {
-  if (isRecord(row) && isRecord(patch)) {
-    return { ...row, ...patch } as TData;
   }
 
-  return patch as TData;
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return value !== null && typeof value === "object";
+  private getRowIdentityInput() {
+    return createRowIdentityInput(this.options.rowKey, this.options.duplicateRowKeyPolicy);
+  }
 }

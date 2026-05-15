@@ -14,6 +14,7 @@ export function createGridExport(
   options: ExportOptions = {}
 ): GridExportResult {
   const format = options.format ?? "csv";
+  assertBuiltInExportFormat(format);
   const filename = resolveFilename(options.filename, format);
   if (format === "xlsx") {
     return {
@@ -56,7 +57,9 @@ export function createGridImport<TData = Record<string, unknown>>(
   fallbackColumns: readonly { readonly id: string; readonly field: string; readonly headerName: string }[] =
     Object.freeze([])
 ): GridImportResult<TData> {
-  const matrix = parseImportMatrix(content, options.format ?? inferImportFormat(content));
+  const format = options.format ?? inferImportFormat(content);
+  assertBuiltInImportFormat(format);
+  const matrix = parseImportMatrix(content, format);
   const result = buildImportedRows({ matrix, options, fallbackColumns });
   return Object.freeze({
     rows: result.rows,
@@ -75,7 +78,10 @@ function parseImportMatrix(
   if (format === "json") {
     return parseJsonImport(content);
   }
-  return importCsv(typeof content === "string" ? content : decodeUtf8(content));
+  if (format === "csv") {
+    return importCsv(typeof content === "string" ? content : decodeUtf8(content));
+  }
+  throw new Error(`Unsupported OneGrid import format: ${format}`);
 }
 
 function parseJsonImport(content: string | Uint8Array): GridImportMatrix {
@@ -111,6 +117,20 @@ function inferImportFormat(content: string | Uint8Array): NonNullable<ImportOpti
     return "json";
   }
   return "csv";
+}
+
+function assertBuiltInExportFormat(format: NonNullable<ExportOptions["format"]>): void {
+  if (format === "csv" || format === "xlsx" || format === "pdf" || format === "json" || format === "print") {
+    return;
+  }
+  throw new Error(`Unsupported OneGrid export format: ${format}. Register an export.adapter plugin for custom formats.`);
+}
+
+function assertBuiltInImportFormat(format: NonNullable<ImportOptions["format"]>): void {
+  if (format === "csv" || format === "xlsx" || format === "json") {
+    return;
+  }
+  throw new Error(`Unsupported OneGrid import format: ${format}. Register an import.adapter plugin for custom formats.`);
 }
 
 function isZip(content: Uint8Array): boolean {

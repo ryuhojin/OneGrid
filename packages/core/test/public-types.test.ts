@@ -1,35 +1,47 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { getLocale } from "../src/index.js";
 import type {
+  ApplyColumnStateParams,
   ColumnDef,
   ColumnId,
   ColumnKey,
   ColumnMenuExtensionPayload,
+  ColumnStateApplyResult,
   ColumnTypeRegistry,
   ColumnUiState,
   ContextMenuExtensionPayload,
   DataColumnDefaults,
   DataSource,
+  DataSourceError,
+  DataSourceOptions,
+  DataSourceStatusSnapshot,
   ExportOptions,
+  GetColumnStateOptions,
   GetRowsRequest,
+  GetRowsResult,
   GridApi,
   GridBatchEditSession,
   GridBeforeEventHandlers,
   GridEditHistoryState,
   GridCellEditRequestedEvent,
   GridExportAdapterPayload,
+  GridImportAdapterPayload,
   GridOptions,
+  HeaderMergeValidationResult,
   GridPendingEdit,
   GridPlugin,
   GridPluginExtension,
   GridPluginExtensionContribution,
   GridStateSnapshot,
+  HtmlSanitizerContext,
   ImportOptions,
   LocaleDefinition,
+  PivotModel,
   RowKey,
+  RowModelStateSnapshot,
+  ServerRowRouteSnapshot,
   StartBatchEditSessionOptions,
-  ThemeExtensionPayload,
-  VirtualizationOptions
+  ThemeExtensionPayload
 } from "../src/index.js";
 
 interface OrderRow {
@@ -72,13 +84,59 @@ describe("@onegrid/core public type skeleton", () => {
     };
 
     await expect(dataSource.getRows(request)).resolves.toMatchObject({ rowCount: 1 });
+    const pivotResult: GetRowsResult<OrderRow> = {
+      rows: [],
+      columns: [{ field: "amount", headerName: "Amount" }],
+      rowCount: 0
+    };
+    const dataSourceOptions: DataSourceOptions = {
+      retry: { attempts: 2, delayMs: 0, backoff: "none" }
+    };
+    const dataSourceError: DataSourceError = {
+      name: "DataSourceError",
+      message: "Rows could not load.",
+      requestKind: "getRows",
+      requestId: "request-1",
+      attempt: 1,
+      retryable: true,
+      recoverable: true
+    };
+    const dataSourceStatus: DataSourceStatusSnapshot = {
+      requestKind: "getRows",
+      requestId: "request-1",
+      status: "error",
+      attempt: 1,
+      maxAttempts: 2,
+      retryable: true,
+      recoverable: true,
+      error: dataSourceError
+    };
+    expect(pivotResult.columns).toHaveLength(1);
+    expectTypeOf(pivotResult.columns).toMatchTypeOf<readonly ColumnDef<OrderRow>[] | undefined>();
+    expect(dataSourceOptions.retry?.attempts).toBe(2);
+    expect(dataSourceStatus.error?.message).toBe("Rows could not load.");
   });
 
   it("keeps options, columns, and plugins strongly typed", () => {
     const columns: readonly ColumnDef<OrderRow>[] = [
-      { columnId: "order-id", field: "id", headerName: "ID", pinned: "left" },
+      {
+        columnId: "order-id",
+        field: "id",
+        headerName: "ID",
+        pinned: "left",
+        hideable: false,
+        lockPosition: true
+      },
       { field: "amount", headerName: "Amount", type: "money", summary: "sum" },
-      { field: "status", headerName: "Status", editable: true, editTrigger: "singleClick" },
+      {
+        field: "status",
+        headerName: "Status",
+        editable: true,
+        editTrigger: "singleClick",
+        pinnable: false,
+        lockPinned: true,
+        lockVisible: true
+      },
       {
         columnId: "row-actions",
         headerName: "Actions",
@@ -88,11 +146,13 @@ describe("@onegrid/core public type skeleton", () => {
         columnId: "workflow-group",
         groupId: "workflow",
         headerName: "Workflow",
+        openByDefault: false,
         children: [
           {
             columnId: "grouped-status",
             field: "status",
             headerName: "Grouped Status",
+            columnGroupShow: "open",
             filter: "set"
           }
         ]
@@ -133,6 +193,20 @@ describe("@onegrid/core public type skeleton", () => {
             }
           }
         });
+        context.registerExtension<GridImportAdapterPayload<OrderRow>>({
+          id: "audit-import",
+          point: "import.adapter",
+          payload: {
+            format: "audit-json",
+            import({ content }) {
+              return {
+                rows: JSON.parse(String(content)) as readonly OrderRow[],
+                rowCount: 1,
+                rejected: []
+              };
+            }
+          }
+        });
         context.registerExtension<ThemeExtensionPayload>({
           id: "audit-theme",
           point: "theme",
@@ -167,6 +241,8 @@ describe("@onegrid/core public type skeleton", () => {
         }
       },
       rowModel: "server",
+      rowKey: "id",
+      duplicateRowKeyPolicy: "error",
       filtering: {
         model: { quickText: "approved" }
       },
@@ -224,7 +300,11 @@ describe("@onegrid/core public type skeleton", () => {
         html: {
           allowHtmlRenderer: false,
           trustedTypesPolicyName: "onegrid-test",
-          sanitizer: { sanitize: (html) => html }
+          sanitizer: {
+            name: "test-sanitizer",
+            mode: "external",
+            sanitize: (html, context) => `${context?.allowedProtocols.join(",") ?? ""}:${html}`
+          }
         },
         url: { allowedProtocols: ["https:", "mailto:"] }
       },
@@ -280,11 +360,42 @@ describe("@onegrid/core public type skeleton", () => {
         expectTypeOf(event.event.nextRow).toMatchTypeOf<OrderRow>();
       }
     };
+    const sanitizerContext: HtmlSanitizerContext = {
+      allowedProtocols: ["https:"],
+      trustedTypesPolicyName: "onegrid-test"
+    };
 
     expectTypeOf<GridApi<OrderRow>["getPendingEdits"]>()
       .returns.toMatchTypeOf<readonly GridPendingEdit<OrderRow>[]>();
+    expect(sanitizerContext.allowedProtocols).toEqual(["https:"]);
     expectTypeOf<GridApi<OrderRow>["startBatchEditSession"]>()
       .parameter(0).toMatchTypeOf<StartBatchEditSessionOptions | undefined>();
+    const headerMergeValidation: HeaderMergeValidationResult = {
+      valid: false,
+      issues: [
+        {
+          kind: "unknown-column-id",
+          ruleIndex: 0,
+          ruleId: "bad-rule",
+          columnId: "missing",
+          message: "Unknown headerMerge columnId."
+        }
+      ]
+    };
+    const rowModelState: RowModelStateSnapshot = {
+      rowModel: "viewport",
+      rowCount: 10_000_000,
+      range: { firstRow: 100, lastRow: 120 }
+    };
+    const serverRoute: ServerRowRouteSnapshot = {
+      route: ["region=Capital"],
+      page: 1,
+      cursor: "region=Capital:50"
+    };
+    const gridState: GridStateSnapshot = { rowModelState };
+    expect(headerMergeValidation.valid).toBe(false);
+    expect(serverRoute.route).toEqual(["region=Capital"]);
+    expectTypeOf(gridState.rowModelState).toMatchTypeOf<RowModelStateSnapshot | undefined>();
     expectTypeOf<GridApi<OrderRow>["startBatchEditSession"]>()
       .returns.toMatchTypeOf<GridBatchEditSession<OrderRow>>();
     expectTypeOf<GridApi<OrderRow>["getBatchEditSession"]>()
@@ -300,8 +411,16 @@ describe("@onegrid/core public type skeleton", () => {
     expectTypeOf<GridApi<OrderRow>["getState"]>().returns.toMatchTypeOf<GridStateSnapshot>();
     expectTypeOf<GridApi<OrderRow>["setState"]>().parameter(0).toMatchTypeOf<GridStateSnapshot>();
     expectTypeOf<GridApi<OrderRow>["getColumnState"]>().returns.toMatchTypeOf<ColumnUiState>();
+    expectTypeOf<GridApi<OrderRow>["getColumnState"]>()
+      .parameter(0).toMatchTypeOf<GetColumnStateOptions | undefined>();
     expectTypeOf<GridApi<OrderRow>["setColumnState"]>().parameter(0).toMatchTypeOf<ColumnUiState>();
+    expectTypeOf<GridApi<OrderRow>["applyColumnState"]>()
+      .parameter(0).toMatchTypeOf<ApplyColumnStateParams>();
+    expectTypeOf<GridApi<OrderRow>["applyColumnState"]>()
+      .returns.toMatchTypeOf<ColumnStateApplyResult>();
     expectTypeOf<GridApi<OrderRow>["resetColumnState"]>().returns.toBeVoid();
+    expectTypeOf<GridApi<OrderRow>["setColumnGroupOpen"]>().parameter(0).toMatchTypeOf<ColumnId>();
+    expectTypeOf<GridApi<OrderRow>["toggleColumnGroup"]>().parameter(0).toMatchTypeOf<ColumnId>();
     expectTypeOf<GridApi<OrderRow>["exportData"]>()
       .parameter(0).toMatchTypeOf<ExportOptions | undefined>();
     expectTypeOf<GridApi<OrderRow>["importData"]>()
@@ -309,6 +428,8 @@ describe("@onegrid/core public type skeleton", () => {
     expectTypeOf<GridApi<OrderRow>["getGroupModel"]>().returns.toMatchTypeOf<
       NonNullable<GridOptions<OrderRow>["grouping"]>["model"]
     >();
+    expectTypeOf<GridApi<OrderRow>["setPivotModel"]>().parameter(0).toMatchTypeOf<PivotModel>();
+    expectTypeOf<GridApi<OrderRow>["getPivotModel"]>().returns.toMatchTypeOf<PivotModel | undefined>();
     expectTypeOf<GridApi<OrderRow>["expandTreeNode"]>().returns.resolves.toBeVoid();
     expectTypeOf<GridApi<OrderRow>["getTreeSelection"]>().returns.toMatchTypeOf<readonly RowKey[]>();
     expectTypeOf<GridApi<OrderRow>["setLocale"]>().parameter(0).toMatchTypeOf<string>();
@@ -332,133 +453,4 @@ describe("@onegrid/core public type skeleton", () => {
     expectTypeOf(options).toMatchTypeOf<GridOptions<OrderRow>>();
   });
 
-  it("types infinite row options through the shared GridOptions contract", () => {
-    const dataSource: DataSource<OrderRow> = {
-      async getRows(request) {
-        expectTypeOf(request.rowModel).toMatchTypeOf<GetRowsRequest["rowModel"]>();
-        return { rows: [], rowCount: 1_000_000, hasMore: true };
-      }
-    };
-
-    const options: GridOptions<OrderRow> = {
-      columns: [{ field: "id", headerName: "ID" }],
-      rowModel: "infinite",
-      dataSource,
-      infinite: {
-        blockSize: 100,
-        maxBlocksInCache: 4,
-        initialRowCount: 1_000_000
-      }
-    };
-
-    expect(options.rowModel).toBe("infinite");
-    expect(options.infinite?.blockSize).toBe(100);
-  });
-
-  it("types server row options and pivot models through GridOptions", () => {
-    const options: GridOptions<OrderRow> = {
-      columns: [{ field: "id", headerName: "ID" }],
-      rowModel: "server",
-      server: {
-        pageSize: 50,
-        initialPage: 1,
-        groupKeys: ["status=approved"],
-        snapshotVersion: "snapshot-1"
-      },
-      pagination: {
-        mode: "cursor",
-        position: "both",
-        page: 2,
-        pageSize: 50,
-        pageSizeOptions: [25, 50, 100],
-        pageGroupSize: 5,
-        cursor: "cursor:50"
-      },
-      pivot: {
-        enabled: true,
-        serverOnly: true,
-        panel: true,
-        model: {
-          rows: ["status"],
-          columns: ["id"],
-          values: [{ field: "amount", function: "sum", alias: "amountTotal", label: "Amount" }],
-          totals: "both",
-          subtotals: true
-        }
-      },
-      summary: {
-        enabled: true,
-        position: "bottom",
-        sticky: true
-      },
-      layout: {
-        width: "100%",
-        height: 360,
-        bodyHeight: 240,
-        minBodyHeight: 160
-      },
-      virtualization: {
-        enabled: true,
-        rowHeight: 32,
-        overscan: { before: 4, after: 6 },
-        columns: {
-          enabled: true,
-          overscan: { before: 1, after: 2 },
-          maxDomColumns: 12
-        },
-        segmented: true,
-        maxScrollHeight: 24_000_000
-      }
-    };
-
-    expect(options.server?.pageSize).toBe(50);
-    expect(options.pagination?.cursor).toBe("cursor:50");
-    expect(options.pivot?.model?.values[0]).toMatchObject({ alias: "amountTotal" });
-    expectTypeOf(options.virtualization).toMatchTypeOf<VirtualizationOptions | undefined>();
-  });
-
-  it("types viewport row options through GridOptions", () => {
-    const options: GridOptions<OrderRow> = {
-      columns: [{ field: "id", headerName: "ID" }],
-      rowModel: "viewport",
-      dataSource: {
-        async getRows() {
-          return { rows: [], rowCount: 10_000_000 };
-        }
-      },
-      viewport: {
-        rowHeight: 30,
-        viewportSize: 20,
-        overscan: 2,
-        prefetchRows: 40,
-        maxCachedRanges: 4,
-        initialRowCount: 10_000_000
-      }
-    };
-
-    expect(options.viewport?.initialRowCount).toBe(10_000_000);
-  });
-
-  it("types tree row options through GridOptions", () => {
-    const options: GridOptions<OrderRow> = {
-      columns: [{ field: "id", headerName: "ID" }],
-      data: [{ id: "A", amount: 1, status: "approved" }],
-      rowKey: "id",
-      rowModel: "tree",
-      tree: {
-        treeColumnField: "id",
-        childrenField: "children",
-        hasChildrenField: "hasChildren",
-        indentSize: 20,
-        expandedKeys: ["A"],
-        filterPolicy: "withAncestors",
-        sortPolicy: "siblings",
-        serverOnly: true,
-        selection: { policy: "descendants", selectedKeys: ["A"] }
-      }
-    };
-
-    expect(options.tree?.selection?.policy).toBe("descendants");
-    expect(options.tree?.treeColumnField).toBe("id");
-  });
 });

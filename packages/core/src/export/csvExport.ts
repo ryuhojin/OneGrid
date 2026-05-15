@@ -1,4 +1,5 @@
 import type { GridExportMatrix, GridImportMatrix } from "./exportTypes.js";
+import { formatSpreadsheetTextCell } from "../security/spreadsheetFormula.js";
 
 export function exportCsv(matrix: GridExportMatrix, includeHeaders = true): string {
   const rows = [
@@ -58,7 +59,7 @@ export function importCsv(text: string): GridImportMatrix {
 }
 
 function serializeCsvCell(value: unknown): string {
-  const text = value === null || value === undefined ? "" : String(value);
+  const text = formatSpreadsheetTextCell(value);
   return /[",\r\n]/u.test(text) ? `"${text.replaceAll("\"", "\"\"")}"` : text;
 }
 

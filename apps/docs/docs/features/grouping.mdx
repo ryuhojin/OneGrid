@@ -43,10 +43,11 @@ new OneGrid({
 });
 ```
 
-The DOM renderer displays group rows with an expand/collapse button. Group labels render in the
-center pane so pinned ID columns do not clip long aggregate labels. Group footer rows use the same
-summary mapping rules as summary rows: `SummaryDef.aggregateKey` maps aggregate aliases to the
-visible columns.
+The DOM renderer displays group rows with an expand/collapse button, a stable group label, and
+separate aggregate chips. Group labels render in the center pane so pinned ID columns do not clip
+long aggregate labels. The aggregate chips keep totals scan-friendly while group footer rows use
+the same summary mapping rules as summary rows: `SummaryDef.aggregateKey` maps aggregate aliases to
+the visible columns.
 
 ## Server Grouping
 
@@ -74,3 +75,10 @@ return {
 
 Calling `api.expandGroup("Capital")` sets `groupKeys` to `["Capital"]` for the next server request.
 Calling `api.collapseGroup("Capital")` returns to the root server group list.
+
+## UX Contract
+
+The example catalog exposes separate client and server grouping sections. Client grouping shows
+expand-all, collapse-all, and reset flows against the same `GroupModel.expandedKeys` contract.
+Server grouping keeps route expansion explicit: root group rows and expanded child routes are
+separate request states, not hidden client-side filtering.

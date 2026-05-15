@@ -32,6 +32,15 @@ export interface CellSpanAnchorPosition {
 export interface CellSpanModel {
   readonly spans: readonly CellSpan[];
   readonly byCell: ReadonlyMap<string, CellSpan>;
+  readonly index: CellSpanIndex;
+}
+
+export interface CellSpanIndex {
+  readonly byAnchorCell: ReadonlyMap<string, CellSpan>;
+  readonly byRow: ReadonlyMap<number, readonly CellSpan[]>;
+  readonly byColumn: ReadonlyMap<number, readonly CellSpan[]>;
+  readonly coveredRowsBySpanId: ReadonlyMap<string, readonly number[]>;
+  readonly coveredColumnsBySpanId: ReadonlyMap<string, readonly number[]>;
 }
 
 export interface CellSpanWindow {

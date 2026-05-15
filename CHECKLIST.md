@@ -249,7 +249,43 @@
 - [x] C-001-004 `DataSource<TData>` 정의
   - Evidence:
     - packages/core/src/types/data.ts
+    - packages/core/src/dataSource/dataSourceRequest.ts
     - packages/core/test/public-types.test.ts
+    - packages/core/test/data-source-request.test.ts
+  - Notes:
+    - 2026-05-11: `DataSourceError`, `DataSourceStatusSnapshot`, `DataSourceRetryPolicy`,
+      `GridOptions.dataSourceOptions.retry`를 추가하고 `getRows`, `getChildren`, `updateRows`,
+      `getDistinctValues` 공통 retry/status 실행기로 표준화했다.
+    - Evidence: packages/core/src/dataSource/dataSourceRequest.ts,
+      packages/core/src/row/serverRowModel.ts,
+      packages/core/src/row/infiniteRowModel.ts,
+      packages/core/src/row/viewportRowModel.ts,
+      packages/core/src/row/treeRowModel.ts,
+      packages/dom/src/grid/oneGridSortingFiltering.ts,
+      packages/dom/src/grid/oneGridRemoteRows.ts,
+      packages/dom/src/grid/oneGridRows.ts,
+      packages/dom/src/grid/rowModelOptions.ts,
+      packages/dom/test/data-source-events.test.ts,
+      apps/docs/docs/api/grid-options.mdx,
+      apps/docs/docs/api/datasource.mdx,
+      apps/docs/docs/features/server-row-model.mdx,
+      apps/docs/docs/features/tree.mdx,
+      API_CHANGELOG.md
+    - Verified: pnpm exec vitest run packages/core/test/data-source-request.test.ts
+      packages/core/test/server-row-model.test.ts
+      packages/core/test/infinite-row-model.test.ts
+      packages/core/test/viewport-row-model.test.ts
+      packages/core/test/tree-row-model.test.ts
+      packages/core/test/public-types.test.ts
+      packages/dom/test/data-source-events.test.ts
+      packages/dom/test/onegrid-shell.test.ts,
+      pnpm typecheck,
+      pnpm lint,
+      pnpm test:unit,
+      pnpm test:e2e,
+      pnpm build,
+      pnpm docs:build,
+      git diff --check
 - [x] C-001-005 `GetRowsRequest` 정의
   - Evidence:
     - packages/core/src/types/data.ts
@@ -340,6 +376,12 @@
 - [x] C-002-007 `GridStateSnapshot` / `getState` / `setState` / `initialState` contract 구현
   - Evidence:
     - packages/core/src/state/gridState.ts
+    - packages/core/src/row/rowModelState.ts
+    - packages/core/src/row/infiniteRowModel.ts
+    - packages/core/src/row/serverRowModel.ts
+    - packages/core/src/row/serverRowUtils.ts
+    - packages/core/src/row/viewportRowModel.ts
+    - packages/core/src/row/treeRowModel.ts
     - packages/core/src/types/grid-api.ts
     - packages/core/src/types/grid-options.ts
     - packages/dom/src/grid/gridStateRuntime.ts
@@ -352,12 +394,15 @@
     - apps/docs/docs/api/grid-options.mdx
     - API_CHANGELOG.md
   - Notes:
-    - snapshot 범위는 column UI state, sort/filter/group model, selection, pagination, scroll, locale로 한정한다.
+    - snapshot 범위는 column UI state, sort/filter/group model, row model runtime state, selection, pagination, scroll, locale로 한정한다.
     - `columns`, `data`, `dataSource`, renderer/security configuration은 정적 옵션으로 남긴다.
+    - 2026-05-11: `RowModelStateSnapshot`을 추가해 infinite append cursor, server page/group/cursor, viewport range, tree expansion/selection을 `GridStateSnapshot.rowModelState`로 저장/복원한다.
+    - 2026-05-11: remote row model의 데이터 cache 자체는 snapshot에 저장하지 않고, restore 후 configured `DataSource`로 재요청하는 계약으로 제한한다.
   - Verified:
     - pnpm lint
     - pnpm typecheck
     - pnpm test:unit
+    - pnpm test:e2e
     - pnpm build
     - pnpm docs:build
     - pnpm exec vitest run packages/core/test/public-types.test.ts packages/core/test/client-row-model.test.ts packages/core/test/column-model.test.ts packages/dom/test/onegrid-shell.test.ts packages/react/test/react-shell.test.tsx packages/vue/test/vue-shell.test.ts
@@ -525,6 +570,56 @@
     - pnpm test:unit
     - pnpm build
     - pnpm docs:build
+- [x] C-004-005 중복 explicit column identity 검증 구현
+  - Evidence:
+    - packages/core/src/column/columnIds.ts
+    - packages/core/src/column/columnModel.ts
+    - packages/core/test/column-model.test.ts
+    - apps/docs/docs/api/column-def.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - 명시 `columnId`, legacy `id`, legacy `groupId`는 data/group column 전체에서 하나의 identity namespace로 검증한다.
+    - 중복 또는 빈 explicit identity는 column model 생성 시 즉시 예외를 발생시킨다.
+    - `field`만 중복되는 기존 호환 케이스는 `amount__2` 같은 fallback suffix를 유지한다.
+  - Verified:
+    - pnpm exec vitest run packages/core/test/column-model.test.ts
+    - pnpm exec vitest run packages/core/test/column-model.test.ts packages/core/test/client-row-model.test.ts packages/core/test/header-model.test.ts packages/core/test/cell-span-model.test.ts packages/dom/test/onegrid-shell.test.ts
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+- [x] C-004-006 Column State API 성숙도 보강
+  - Evidence:
+    - packages/core/src/column/columnStateApi.ts
+    - packages/core/src/column/index.ts
+    - packages/core/src/types/grid-api.ts
+    - packages/core/src/wrapper/apiParity.ts
+    - packages/dom/src/grid/oneGridApiBase.ts
+    - packages/dom/src/grid/oneGridBase.ts
+    - packages/react/src/gridHandle.ts
+    - packages/vue/src/gridExpose.ts
+    - packages/core/test/column-ui.test.ts
+    - packages/core/test/public-types.test.ts
+    - packages/dom/test/onegrid-shell.test.ts
+    - apps/docs/docs/api/grid-api.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/features/column-ui.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - `getColumnState({ includeDefaults: true })`는 effective width/hidden/pinned와 leaf order를 포함한 전체 snapshot을 반환한다.
+    - `applyColumnState()`는 부분 state, `defaultState`, `applyOrder`, missing column validation, `ignoreMissingColumns`를 지원한다.
+    - `setColumnState()`는 기존처럼 전체 교체 API로 유지한다.
+  - Verified:
+    - pnpm exec vitest run packages/core/test/column-ui.test.ts packages/core/test/public-types.test.ts
+    - pnpm exec vitest run packages/dom/test/onegrid-shell.test.ts
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm build
+    - pnpm docs:build
+    - git diff --check
 
 ---
 
@@ -600,23 +695,34 @@
 - [x] COL-001-008 Column State API 구현
   - Evidence:
     - packages/core/src/column/columnUi.ts
+    - packages/core/src/column/columnGroupState.ts
+    - packages/core/src/column/columnStateApi.ts
     - packages/core/src/types/grid-api.ts
     - packages/core/src/wrapper/apiParity.ts
     - packages/dom/src/grid/oneGridApiBase.ts
     - packages/react/src/gridHandle.ts
     - packages/vue/src/gridExpose.ts
+    - packages/core/test/column-model.test.ts
+    - packages/core/test/column-ui.test.ts
     - packages/core/test/public-types.test.ts
     - packages/dom/test/onegrid-shell.test.ts
     - apps/docs/docs/api/grid-api.mdx
     - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/column-def.mdx
+    - apps/docs/docs/features/group-header.mdx
     - API_CHANGELOG.md
   - Notes:
     - `getColumnState`, `setColumnState`, `resetColumnState`는 `ColumnUiState`를 그대로 사용한다.
     - `resetColumnState`는 `GridOptions.columnState`와 `frozenColumns` 초기값으로 복원한다.
+    - 2026-05-11: `ColumnGroupDef.openByDefault`를 type-only 옵션에서 실제 `ColumnUiState.groups`와 `GridApi.setColumnGroupOpen()` / `toggleColumnGroup()` 계약으로 승격했다.
   - Verified:
-    - pnpm lint
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm exec vitest run packages/core/test/column-model.test.ts packages/core/test/column-ui.test.ts packages/core/test/public-types.test.ts packages/dom/test/onegrid-shell.test.ts
     - pnpm typecheck
+    - pnpm lint
     - pnpm test:unit
+    - pnpm test:e2e
+    - pnpm test:a11y
     - pnpm build
     - pnpm docs:build
     - pnpm exec vitest run packages/core/test/public-types.test.ts packages/dom/test/onegrid-shell.test.ts packages/react/test/react-shell.test.tsx packages/vue/test/vue-shell.test.ts
@@ -697,6 +803,55 @@
     - pnpm --filter @onegrid/core typecheck
     - pnpm test:unit -- packages/core/test/header-model.test.ts
     - pnpm test:a11y
+- [x] COL-002-009 group header `marryChildren` order 제약 구현
+  - Evidence:
+    - packages/core/src/column/columnOrder.ts
+    - packages/core/src/column/columnModel.ts
+    - packages/core/src/column/columnUi.ts
+    - packages/core/src/column/columnStateApi.ts
+    - packages/dom/src/grid/oneGridBase.ts
+    - packages/dom/src/grid/oneGridApiBase.ts
+    - packages/core/test/column-model.test.ts
+    - packages/core/test/column-ui.test.ts
+    - packages/core/test/header-model.test.ts
+    - packages/dom/test/onegrid-shell.test.ts
+    - apps/docs/docs/features/group-header.mdx
+    - apps/docs/docs/api/column-def.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - `marryChildren: true`인 group header의 leaf columns는 `columnOrder`, `columnState.order`, `applyColumnState()`, column move 경로에서 contiguous block으로 유지한다.
+    - pinned region clipping은 기존 header region 모델에서 계속 수행하며, 이번 제약은 clipping 전 logical order를 안정화한다.
+  - Verified:
+    - pnpm exec vitest run packages/core/test/column-model.test.ts packages/core/test/column-ui.test.ts packages/core/test/header-model.test.ts packages/dom/test/onegrid-shell.test.ts
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/group-header.spec.ts tests/e2e/features/column-ui.spec.ts tests/e2e/features/column-model.spec.ts --project=chromium
+    - git diff --check
+- [x] COL-002-010 header merge rule validation 구현
+  - Evidence:
+    - packages/core/src/header/headerMergeValidation.ts
+    - packages/core/src/header/headerModel.ts
+    - packages/core/src/header/headerMerge.ts
+    - packages/core/src/header/headerLabels.ts
+    - packages/core/test/header-model.test.ts
+    - apps/docs/docs/features/group-header.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - `headerMerge.rules`는 header matrix 생성 전에 unique id, leaf column id, non-empty id/name, row-rule contiguity, row-rule overlap, label target을 검증한다.
+    - 숨김 leaf column만 참조하는 rule은 column show 이후 적용될 수 있으므로 유효한 schema rule로 유지한다.
+  - Verified:
+    - pnpm exec vitest run packages/core/test/header-model.test.ts
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/group-header.spec.ts --project=chromium
+    - git diff --check
 
 ### COL-003 Column UI Features
 
@@ -775,10 +930,75 @@
     - pnpm test:perf:smoke
     - pnpm build
     - pnpm docs:build
+- [x] COL-003-008 column policy flags
+  - Evidence:
+    - packages/core/src/types/column.ts
+    - packages/core/src/column/columnPolicy.ts
+    - packages/core/src/column/columnStateApi.ts
+    - packages/core/src/column/columnUi.ts
+    - packages/dom/src/grid/columnControls.ts
+    - packages/dom/src/grid/columnToolPanel.ts
+    - packages/dom/src/grid/columnUiRuntimeFactory.ts
+    - apps/examples/src/features/column-ui/data.ts
+    - packages/core/test/column-model.test.ts
+    - packages/core/test/column-ui.test.ts
+    - packages/dom/test/onegrid-shell.test.ts
+    - apps/docs/docs/api/column-def.mdx
+    - apps/docs/docs/features/column-ui.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+  - Notes:
+    - `hideable`/`lockVisible`, `pinnable`/`lockPinned`, `lockPosition`, `resizable:false`, `movable:false`를 column policy layer로 통합했다.
+    - 메뉴, columns panel, public column API, `setColumnState()`, `applyColumnState()`가 동일한 policy를 사용한다.
+    - 전체 교체 API인 `setColumnState()`도 기존 컬럼 순서를 기준으로 `lockPosition`을 보존하도록 보강했다.
+    - `columnUi.ts`의 auto-size 측정 로직을 `columnMeasure.ts`로 분리해 core source LOC 권장 기준 안으로 되돌렸다.
+    - 2026-05-11 cleanup: `columnControls.ts`의 columns tool panel DOM 생성 책임을 `columnToolPanel.ts`로 분리해 396 LOC에서 317 LOC로 낮췄다.
+  - Verified:
+    - pnpm exec vitest run packages/core/test/column-model.test.ts packages/core/test/column-ui.test.ts packages/dom/test/onegrid-shell.test.ts packages/core/test/public-types.test.ts
+    - pnpm exec vitest run packages/core/test/column-ui.test.ts packages/dom/test/onegrid-shell.test.ts
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/column-ui.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/column-ui-a11y.spec.ts --project=chromium
+    - pnpm test:a11y
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+    - git diff --check
 
 ---
 
 ## 5. Phase 4 — Row Models / Data
+
+### ROW-000 Row Model Capability Matrix
+
+- [x] ROW-000-001 row model capability matrix 계약화
+  - Evidence:
+    - packages/core/src/row/rowModelCapabilities.ts
+    - packages/core/src/row/index.ts
+    - packages/core/test/row-model-capabilities.test.ts
+    - packages/core/test/row-model-public-types.test.ts
+    - packages/core/test/public-types.test.ts
+    - apps/docs/docs/features/row-model-capabilities.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/sidebars.cjs
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm exec vitest run packages/core/test/row-model-capabilities.test.ts packages/core/test/row-model-public-types.test.ts packages/core/test/public-types.test.ts
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm lint
+    - pnpm docs:build
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm build
+    - git diff --check
+  - Notes:
+    - `client`, `infinite`, `server`, `viewport`, `tree`별 ownership, scale, recommended use,
+      capability support(`native`, `request`, `partial`, `notSupported`)를 public core matrix로 고정했다.
+    - 2026-05-12: capability entry immutability, support level, note quality, model selection guidance
+      회귀 테스트를 보강했다.
+    - 2026-05-12 cleanup: row model public type 테스트를 `row-model-public-types.test.ts`로 분리해
+      `public-types.test.ts`를 420 LOC로 낮췄다.
 
 ### ROW-001 Client Row Model
 
@@ -813,6 +1033,69 @@
     - packages/core/test/client-row-model.test.ts
   - Verified:
     - pnpm test:unit
+- [x] ROW-001-005a Client Row Model transaction 결과 계약 구현
+  - Evidence:
+    - packages/core/src/row/clientTransactions.ts
+    - packages/core/src/types/grid-api.ts
+    - packages/dom/src/grid/oneGridRows.ts
+    - packages/dom/src/grid/rowDataMutationRuntime.ts
+    - packages/react/src/gridHandle.ts
+    - packages/vue/src/gridExpose.ts
+    - packages/core/test/client-row-model.test.ts
+    - packages/dom/test/client-row-transactions.test.ts
+    - apps/docs/docs/features/client-row-model.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm --filter @onegrid/core test -- client-row-model
+    - pnpm --filter @onegrid/dom test -- client-row-transactions
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm --filter @onegrid/dom typecheck
+    - pnpm --filter @onegrid/react typecheck
+    - pnpm --filter @onegrid/vue typecheck
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+    - git diff --check
+    - pnpm lint
+    - pnpm test:unit
+    - pnpm build
+    - pnpm docs:build
+    - git diff --check
+- [x] ROW-001-005b 중복 row id 정책 구현
+  - Evidence:
+    - packages/core/src/row/rowIdentity.ts
+    - packages/core/src/row/clientTransactions.ts
+    - packages/core/src/row/serverEntries.ts
+    - packages/core/src/row/treeNormalize.ts
+    - packages/core/src/row/viewportRowModel.ts
+    - packages/core/src/types/grid-options.ts
+    - packages/dom/src/grid/rowKeyRuntime.ts
+    - packages/react/src/gridOptions.ts
+    - packages/vue/src/gridOptions.ts
+    - packages/core/test/client-row-model.test.ts
+    - packages/core/test/server-row-model.test.ts
+    - packages/core/test/tree-row-model.test.ts
+    - packages/core/test/viewport-row-model.test.ts
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/features/client-row-model.mdx
+    - apps/docs/docs/features/server-row-model.mdx
+    - apps/docs/docs/features/tree-row-model.mdx
+    - apps/docs/docs/features/viewport-row-model.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm --filter @onegrid/core test -- client-row-model server-row-model viewport-row-model tree-row-model
+    - pnpm --filter @onegrid/dom test -- client-row-transactions onegrid-shell
+    - pnpm --filter @onegrid/react test -- react-shell
+    - pnpm --filter @onegrid/vue test -- vue-shell
+    - pnpm --filter @onegrid/core typecheck
+    - pnpm --filter @onegrid/dom typecheck
+    - pnpm --filter @onegrid/react typecheck
+    - pnpm --filter @onegrid/vue typecheck
+  - Notes:
+    - 명시적 `rowKey` 중복은 기본 `"error"`로 실패하며, 레거시 데이터만 `duplicateRowKeyPolicy: "suffix"`로 opt-in한다.
 - [x] ROW-001-006 client filter pipeline 연결
   - Evidence:
     - packages/core/src/row/clientFilter.ts
@@ -936,6 +1219,13 @@
     - pnpm test:perf:smoke
     - pnpm build
     - pnpm docs:build
+  - Notes:
+    - 2026-05-11: 대용량 seek 계약 보강으로 `InfiniteRowModel.ensureRowsWindow(startRow, endRow)`를 추가했다.
+      append 순서와 무관하게 sparse block window를 선로딩하고, 알려진 `rowCount`를 넘는 window는 안전하게 clamp한다.
+    - Evidence: packages/core/src/row/infiniteRowModel.ts,
+      packages/core/test/infinite-row-model.test.ts
+    - Verified: pnpm exec vitest run packages/core/test/viewport-row-model.test.ts
+      packages/core/test/infinite-row-model.test.ts tests/perf/smoke.test.ts
 
 ### ROW-003 Server Row Model
 
@@ -1005,12 +1295,33 @@
 - [x] ROW-003-007 server cache refresh 구현
   - Evidence:
     - packages/core/src/row/serverCache.ts
+    - packages/core/src/row/serverRouteCache.ts
     - packages/core/src/row/serverRowModel.ts
     - packages/dom/src/grid/OneGrid.ts
     - tests/e2e/features/server-row-model.spec.ts
   - Verified:
     - pnpm test:unit
     - pnpm test:e2e
+  - Notes:
+    - 2026-05-11: Server Row Model route cache를 `groupKeys`별로 분리하고,
+      route별 cursor snapshot/restore 및 `loadRoutePage(groupKeys, page, refresh)` 계약을 추가했다.
+    - Evidence: packages/core/src/row/serverRouteCache.ts,
+      packages/core/src/row/serverCache.ts,
+      packages/core/src/row/serverRowModel.ts,
+      packages/core/src/row/rowModelState.ts,
+      packages/core/test/server-row-model.test.ts,
+      apps/docs/docs/features/server-row-model.mdx,
+      API_CHANGELOG.md
+    - Verified: pnpm exec tsc -p packages/core/tsconfig.json --noEmit,
+      pnpm exec vitest run packages/core/test/server-row-model.test.ts,
+      pnpm exec vitest run packages/core/test/server-row-model.test.ts packages/core/test/public-types.test.ts,
+      pnpm typecheck,
+      pnpm lint,
+      pnpm test:unit,
+      pnpm exec playwright test tests/e2e/features/server-row-model.spec.ts --project=chromium,
+      pnpm build,
+      pnpm docs:build,
+      git diff --check
 - [x] ROW-003-008 transaction update 구현
   - Evidence:
     - packages/core/src/row/serverRowModel.ts
@@ -1121,6 +1432,24 @@
     - pnpm test:perf:smoke
     - pnpm build
     - pnpm docs:build
+  - Notes:
+    - 2026-05-11: viewport 대용량 스크롤 계약을 `resolveLogicalRowWindow`로 통합했다.
+      terminal range, overscan, logical max scroll, row offset 계산을 core에서 단일화하고 DOM viewport jump/track click/drag가 같은 계약을 사용한다.
+    - Safari/WebKit의 integer pointer 좌표에서도 custom scrollbar track click이 클릭한 비율과 일치하도록 보정했다.
+    - Evidence: packages/core/src/row/logicalRowWindow.ts,
+      packages/core/src/row/viewportRange.ts,
+      packages/dom/src/grid/oneGridRemoteRows.ts,
+      packages/dom/src/grid/viewportVirtualBodyWindow.ts,
+      packages/dom/src/grid/gridScrollbars.ts,
+      packages/core/test/viewport-row-model.test.ts,
+      tests/e2e/features/examples-quality-security-performance.spec.ts
+    - Verified: pnpm typecheck; pnpm lint;
+      pnpm exec vitest run packages/core/test/viewport-row-model.test.ts
+      packages/core/test/infinite-row-model.test.ts tests/perf/smoke.test.ts;
+      pnpm exec playwright test --config playwright.config.ts
+      tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium;
+      pnpm exec playwright test --config playwright.config.ts
+      tests/e2e/features/examples-quality-security-performance.spec.ts --project=webkit
 
 ### ROW-005 Tree Row Model
 
@@ -1215,6 +1544,7 @@
     - pnpm test:e2e:visual
   - Notes:
     - 2026-04-29: 수평 스크롤 source를 grid root에서 body viewport로 이전하고 header/body/footer/pinned pane 동기화 회귀 테스트를 추가했다.
+    - 2026-05-12: `ScrollCoordinator`를 도입해 body viewport의 vertical/horizontal/logical scroll state를 root layout state로 단일화했다. Custom scrollbar, row virtualization, viewport row model, column virtualization은 같은 coordinator를 통해 `data-layout-scroll-*` 상태를 갱신한다.
     - pnpm test:a11y
   - Notes:
     - 2026-04-28: vertical row scroll ownership을 body viewport로 분리해 header/footer는 row scroll 콘텐츠가 아닌 grid chrome으로 유지
@@ -1258,6 +1588,18 @@
   - Verified:
     - pnpm test:a11y
     - pnpm build
+- [x] LAY-001-007 Layout Resize 안정성
+  - Evidence:
+    - packages/dom/src/grid/resizeObserver.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - packages/dom/src/grid/viewportVirtualBodyWindow.ts
+    - packages/dom/src/grid/virtualColumnWindow.ts
+    - tests/e2e/features/layout-resize.spec.ts
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/layout-resize.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/layout-resize.spec.ts --project=webkit
+  - Notes:
+    - 2026-05-14: host metadata observer와 별개로 body viewport resize를 row virtualization, viewport row model, column virtualization 소비 경로에 직접 연결했다. 컨테이너 폭/높이만 바뀌어도 rendered rows/columns, scrollbar track, pinned/frozen/merge pane alignment가 scroll event 없이 재계산된다.
 
 ### LAY-002 Row Virtualization
 
@@ -1325,14 +1667,86 @@
   - Verified:
     - pnpm test:unit
     - pnpm typecheck
+- [x] LAY-002-005A variable row height 실사용화
+  - Evidence:
+    - packages/core/src/virtualization/rowHeightIndex.ts
+    - packages/core/src/virtualization/variableRowVirtualization.ts
+    - packages/dom/src/grid/rowHeightRuntime.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - packages/dom/src/grid/scrollPosition.ts
+    - packages/core/test/row-virtualization.test.ts
+    - tests/perf/smoke.test.ts
+    - apps/examples/src/features/variable-row-height/data.ts
+    - apps/examples/src/features/variable-row-height/README.md
+    - apps/docs/docs/features/row-virtualization.mdx
+  - Verified:
+    - pnpm exec vitest run packages/core/test/row-virtualization.test.ts tests/perf/smoke.test.ts
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts tests/a11y/examples-layout-merge-a11y.spec.ts --project=chromium
+    - pnpm build
+  - Notes:
+    - local/client row virtualization에서 `rowHeight(row, index)`를 정확한 prefix height index로 연결해 top/bottom spacer, total scroll height, `scrollToRow` 계산이 실제 행 높이를 사용한다.
+    - 10M~100M segmented viewport는 기존 결정대로 고정 numeric rowHeight만 허용한다. 서버 offset-index 기반 variable height는 별도 후속 계약 대상이다.
+- [x] LAY-002-005B auto row height DOM measurement
+  - Evidence:
+    - packages/dom/src/grid/autoRowHeightMeasurement.ts
+    - packages/dom/src/grid/rowHeightRuntime.ts
+    - packages/dom/src/grid/virtualBodyWindow.ts
+    - packages/dom/src/grid/bodyPaneRenderer.ts
+    - packages/dom/src/grid/bodyRowRenderer.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/dom/src/grid/oneGridScrolling.ts
+    - packages/themes/src/body.css
+    - apps/examples/src/features/variable-row-height/data.ts
+    - packages/dom/test/onegrid-shell.test.ts
+    - tests/e2e/features/examples-layout-merge.spec.ts
+    - apps/docs/docs/features/row-virtualization.mdx
+  - Verified:
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm exec vitest run packages/core/test/row-virtualization.test.ts tests/perf/smoke.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=chromium -g "variable row height"
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=webkit -g "variable row height"
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-layout-merge.spec.ts --project=chromium
+    - Browser coordinate check: `#EX-002-008` root `--og-row-height` 36px, header 40px, header cell bottom gap 0px, first body row top = header bottom, first row height 34px.
+    - pnpm exec vitest run packages/dom/test/onegrid-shell.test.ts packages/core/test/row-virtualization.test.ts tests/perf/smoke.test.ts
+    - pnpm exec vitest run packages/dom/test/onegrid-shell.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/examples-layout-merge-a11y.spec.ts --project=chromium
+    - pnpm build
+  - Notes:
+    - `rowHeight: "auto"`는 local/client row virtualization에서 center pane DOM을 실측하고 `MeasuredRowHeightCache`로 spacer/scrollToRow 계산을 보정한다.
+    - 2026-05-14: row-span 병합 셀은 auto-height 측정 대상에서 제외하고, 병합 anchor 높이는 포함 행들의 measured height 합으로 계산해 pinned pane 정렬과 병합 표시가 동시에 깨지지 않도록 보강했다.
+    - 2026-05-14: `EX-002-008`은 자동 높이 예제 자체가 깨지지 않도록 value merge를 제거하고, 헤더-바디 gap/행 겹침/pinned pane 정렬을 E2E로 검증한다. row-span 높이 계산은 `onegrid-shell.test.ts`의 isolated DOM 테스트로 고정한다.
+    - 2026-05-14: `estimatedRowHeight`는 가상 offset/scroll height 추정 전용으로 유지하고, 미실측 auto row의 실제 DOM fallback 높이는 `AUTO_ROW_RENDER_FALLBACK_HEIGHT`로 분리했다. 이로써 스크롤 직후 짧은 행이 56px 추정 높이로 먼저 그려져 헤더 아래 빈 밴드처럼 보이는 현상을 제거했다.
+    - 2026-05-14: 추가 원인 분석 결과 `restoreVirtualScroll()`이 grid root의 `--og-row-height`를 `virtualWindow.rowHeight`로 덮어써 auto-height의 추정값 56px가 헤더 min-height에 전파되고 있었다. 가상 스크롤 복원은 루트 row-height token을 변경하지 않도록 분리하고, header CSS는 `--og-header-height`만 참조하도록 수정했다.
+    - remote/segmented 10M~100M row model은 상용 성능 계약상 고정 numeric rowHeight만 유지한다.
 - [x] LAY-002-006 segmented virtual scroll 구현
   - Evidence:
     - packages/core/src/virtualization/segmentedVirtualScroll.ts
+    - packages/dom/src/grid/viewportVirtualBodyWindow.ts
+    - packages/dom/src/grid/scrollPosition.ts
+    - packages/dom/src/grid/viewportLoadTarget.ts
+    - packages/dom/src/grid/viewportSkeletonRows.ts
     - packages/core/test/row-virtualization.test.ts
+    - packages/core/test/viewport-row-model.test.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
     - tests/perf/smoke.test.ts
   - Verified:
+    - pnpm lint
+    - pnpm typecheck
     - pnpm test:unit
     - pnpm test:perf:smoke
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=webkit
+    - pnpm build
+    - pnpm docs:build
+  - Notes:
+    - 2026-05-12: 100M viewport row의 물리 scrollbar 좌표와 논리 row 좌표를 `resolveSegmentedVirtualRowWindow` 계약으로 통합했다. Custom scrollbar track/end click, thumb drag, `scrollViewportTo`가 같은 maxLogical/maxPhysical/maxScrollHeight 기준을 사용한다.
+    - 2026-05-12: Bottom seek는 마지막 row(`VP100M-100000000`)를 포함한 visible window를 반환하고 DOM row 수는 viewport 범위로 제한한다.
+    - 2026-05-12: 상용 그리드 계약 검토 결과 10M~100M segmented viewport는 고정 numeric rowHeight만 허용한다. Variable/auto row height는 client/local virtualization 범위로 분리했다.
 - [x] LAY-002-007 10M row mock benchmark
   - Evidence:
     - packages/core/src/virtualization/segmentedVirtualScroll.ts
@@ -1344,10 +1758,23 @@
   - Evidence:
     - packages/core/src/virtualization/rowVirtualization.ts
     - packages/core/src/virtualization/segmentedVirtualScroll.ts
+    - packages/dom/src/grid/viewportVirtualBodyWindow.ts
+    - packages/dom/src/grid/oneGridRemoteRows.ts
+    - packages/dom/src/grid/viewportLoadTarget.ts
+    - packages/dom/src/grid/viewportSkeletonRows.ts
     - packages/core/test/row-virtualization.test.ts
+    - packages/core/test/viewport-row-model.test.ts
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
     - tests/perf/smoke.test.ts
   - Verified:
+    - pnpm typecheck
+    - pnpm test:e2e
+    - pnpm test:a11y
+    - pnpm build
+    - pnpm docs:build
     - pnpm test:perf:smoke
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=webkit
 
 ### LAY-003 Column Virtualization
 
@@ -1417,6 +1844,23 @@
     - pnpm test:unit
     - pnpm test:e2e
     - pnpm docs:build
+- [x] LAY-003-006 column virtualization 성능 구조 보강
+  - Evidence:
+    - packages/core/src/virtualization/columnVirtualizationIndex.ts
+    - packages/core/src/virtualization/columnVirtualization.ts
+    - packages/dom/src/grid/columnVirtualWindowResolver.ts
+    - packages/dom/src/grid/virtualColumnWindow.ts
+    - packages/core/test/column-virtualization.test.ts
+    - tests/perf/smoke.test.ts
+  - Verified:
+    - pnpm exec vitest run packages/core/test/column-virtualization.test.ts tests/perf/smoke.test.ts
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/column-virtualization.spec.ts --project=chromium
+    - pnpm build
+  - Notes:
+    - prefix offset index와 binary search 기반으로 visible column window를 계산해 넓은 컬럼셋에서 스크롤별 linear scan과 width slice/reduce를 제거했다.
+    - DOM column virtual scroll은 렌더 주기별 resolver를 재사용해 scroll/wheel event마다 center column width 배열과 offset index를 재생성하지 않는다.
 
 ### LAY-004 Cell Merge Layout
 
@@ -1543,6 +1987,40 @@
     - 2026-04-29: clipboard/export subsystem이 아직 구현되지 않아 `CellSpanModel`의 anchor/range contract를 후속 copy/export 구현에서 사용한다.
     - 2026-04-29: Phase 7 `F-CLIP-001~007` 및 `F-EXPORT-001~009` 구현 이후 완료 가능하다.
     - 2026-05-06: selected merged range copy는 merge span 전체를 선택 범위로 확장하고 covered cells를 빈 값으로 직렬화한다. DOM export matrix는 header/body merge 정보를 rowSpan/colSpan/covered cell로 유지한다.
+- [x] LAY-004-010 Merge Span Indexing
+  - Evidence:
+    - packages/core/src/merge/cellSpanIndex.ts
+    - packages/core/src/merge/cellSpanTypes.ts
+    - packages/core/src/merge/cellSpanModel.ts
+    - packages/core/src/merge/cellSpanWindow.ts
+    - packages/core/test/cell-span-model.test.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm exec vitest run packages/core/test/cell-span-model.test.ts
+    - pnpm typecheck
+    - pnpm lint
+    - pnpm test:unit
+    - pnpm build
+    - git diff --check
+  - Notes:
+    - 2026-05-14: `CellSpanModel.index`에 anchor/row/column/sparse covered-coordinate index를 추가해 selection range expansion과 window/range 계열 merge lookup이 전체 span 배열을 매번 스캔하지 않도록 했다.
+    - 2026-05-14: server mergeMeta가 큰 rowSpan을 제공해도 로드된 covered cell 기준으로만 row/column bucket을 만들며, 10M~100M row 계약을 깨는 full span height expansion은 하지 않는다.
+    - 2026-05-14: 전체 unit 검증 중 XSS guard가 inline handler가 아닌 `.onAutoRowHeightsMeasured ===` property read를 잡아내는 false positive가 있어, behavior 변경 없이 bracket access로 정리했다.
+- [x] LAY-004-011 Pinned/Frozen/Virtual/Merge 조합 매트릭스
+  - Evidence:
+    - tests/e2e/features/layout-composition-matrix.spec.ts
+    - tests/e2e/features/frozen.spec.ts
+    - tests/e2e/features/cell-merge.spec.ts
+    - tests/e2e/features/column-virtualization.spec.ts
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/layout-composition-matrix.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/layout-composition-matrix.spec.ts --project=webkit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/frozen.spec.ts tests/e2e/features/cell-merge.spec.ts tests/e2e/features/column-virtualization.spec.ts --project=chromium
+  - Notes:
+    - 2026-05-14: `F-FROZEN`에서 pinned left/right, frozen top/bottom, row virtualization, value merge가 동시에 켜진 상태의 row count bound, pane row height/top sync, merge rowSpan, pinned status alignment를 한 번에 검증한다.
+    - 2026-05-14: `LAY-004`는 pinned + server/custom/value merge + horizontal scroll 조합을, `LAY-003`은 pinned + column virtualization + right pinned clipping 조합을 matrix axis로 분리해 회귀 원인을 좁힐 수 있게 했다.
+    - 2026-05-14: `EX-002-008` variable row height + pinned left/right + virtual body 조합을 matrix에 추가해 auto-measured row height가 좌/중앙/우 pane top/height, right pinned alignment, header gap을 깨지 않는지 검증한다.
 
 ---
 
@@ -1775,6 +2253,30 @@
     - 2026-04-29: column menu open 중 `data-focus-active` mutation이 한 번도 발생하지 않는 transient focus 회귀 테스트를 추가했다.
     - 2026-04-29: 일반 header click 중 `data-focus-active` mutation이 한 번도 발생하지 않는 회귀 테스트를 추가했다.
     - 2026-04-29: Columns tool panel에서 left pinned `ID`를 숨겨도 center `Department/Service/Owner`와 right pinned `Status`가 함께 유지되는 Chromium/WebKit 회귀 테스트를 추가했다.
+- [x] DOM-003-009 custom scrollbar accessibility / browser consistency
+  - Evidence:
+    - packages/dom/src/grid/gridScrollbars.ts
+    - packages/dom/src/grid/gridScrollbarMetrics.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - packages/themes/src/scrollbars.css
+    - tests/e2e/features/virtual-scroll-scrollbars.spec.ts
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts --project=webkit
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/clipboard-a11y.spec.ts tests/a11y/editing-a11y.spec.ts tests/a11y/filtering-a11y.spec.ts --project=chromium
+    - pnpm test:a11y
+    - pnpm test:unit
+    - pnpm test:perf:smoke
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm build
+    - pnpm docs:build
+    - git diff --check
+  - Notes:
+    - custom scrollbar layer를 `role="grid"` 내부가 아닌 shell overlay에 붙이고 body shell bounds로 정렬해 axe `aria-required-children` 위반 없이 시각 위치를 유지한다.
+    - vertical/horizontal track은 `role="scrollbar"`, `aria-controls`, `aria-orientation`, `aria-valuemin/max/now/text`를 제공하고 hidden 상태에서는 focus 순서에서 제외한다.
+    - Chromium/WebKit 기준 pointer drag, track click, Home/End keyboard scroll, pinned pane gutter alignment를 같은 custom scrollbar path로 검증한다.
+    - 2026-05-14: auto row height 측정으로 grid shell이 재렌더되는 순간 scrollbar layer가 기본 shell `inset:0` 위치에 노출되지 않도록 append 전 body shell bounds를 계산하고 첫 sync 완료 전 layer를 숨긴다. `EX-002-008` 빠른 wheel 스크롤 회귀 테스트로 variable row height 중 track/body shell 좌표 일치를 검증한다.
 
 ---
 
@@ -1956,8 +2458,8 @@
     - pnpm build
     - pnpm docs:build
     - git diff --check
-  - Notes:
-    - DOM custom scrollbar는 grid ARIA required-children 구조를 깨지 않도록 accessibility tree에서 숨겼다. 시각/포인터 스크롤 동작은 기존 E2E로 유지 검증했다.
+	  - Notes:
+	    - DOM custom scrollbar는 grid ARIA required-children 구조를 깨지 않도록 `role="grid"` 외부 shell overlay에 렌더링한다. Track은 접근 가능한 `role="scrollbar"`로 노출하고 포인터/키보드 스크롤 동작은 Chromium/WebKit E2E와 axe 스캔으로 검증한다.
 
 ### F-EDIT Editing
 
@@ -2304,6 +2806,7 @@
 - [x] F-CLIP-007 clipboard security policy
   - Evidence:
     - packages/core/src/clipboard/clipboardModel.ts
+    - packages/core/src/security/spreadsheetFormula.ts
     - packages/dom/src/grid/clipboardRuntime.ts
     - apps/docs/docs/features/clipboard.mdx
 - [x] F-CLIP-008 JS/React/Vue examples
@@ -2332,6 +2835,12 @@
     - pnpm test:unit
     - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/clipboard.spec.ts --project=chromium
     - pnpm exec playwright test --config playwright.config.ts tests/a11y/clipboard-a11y.spec.ts --project=chromium
+  - Notes:
+    - 2026-05-15: Clipboard `text/plain` TSV는 HTML을 쓰지 않고, `=`, `+`, `-`, `@`로 시작하는 spreadsheet formula-like string을 복사 경계에서 apostrophe prefix로 neutralize한다. Grid source data는 변경하지 않는다.
+    - 2026-05-15 Verified:
+      - pnpm exec vitest run --config vitest.config.ts packages/core/test/clipboard.test.ts packages/core/test/export-import.test.ts
+      - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/clipboard.spec.ts tests/e2e/features/export.spec.ts --project=chromium
+      - pnpm audit
     - pnpm test:e2e
     - pnpm test:a11y
     - pnpm test:perf:smoke
@@ -2605,6 +3114,7 @@
     - 2026-04-30: Client grouping은 sort/filter 이후 group model을 적용하고 `GroupingOptions.footer = "bottom"`일 때 aggregate footer row를 생성한다.
     - 2026-04-30: Server grouping은 `GetRowsRequest.groupKeys`와 `GetRowsResult.groupMeta`로 root group row와 expanded group body/footer를 렌더링한다.
     - 2026-04-30: Group row/footer는 DOM에서 merged row로 렌더링하되 pinned pane 침범 없이 center/left pane label ownership을 분리했다.
+    - 2026-05-15: Group row aggregate를 단일 긴 문자열이 아니라 label + aggregate chip UI로 분리하고, 예제에 client expand-all/collapse-all/reset과 server route state inspector를 추가했다.
 
 ### F-TREE Tree
 
@@ -2765,6 +3275,106 @@
     - 2026-04-30: Client pivot는 filtered/sorted client rows를 core `createClientPivotModel()`로 동적 grouped columns와 pivot rows로 변환한 뒤 기존 DOM renderer로 렌더링한다.
     - 2026-04-30: `PivotModel.values`는 기존 string shorthand와 descriptor(`field`, `function`, `alias`, `label`)를 모두 지원한다.
     - 2026-04-30: Server pivot는 브라우저 계산 없이 `DataSource.getRows()`에 `pivotModel`을 전달하고 서버가 반환한 result columns/rows를 렌더링한다.
+    - 2026-05-15: Pivot panel을 `Pivot fields` 모델 패널로 성숙화해 client/server runtime mode, row/column/value bucket, totals, runtime metadata를 사용자 화면과 E2E에서 검증했다.
+- [x] F-PIVOT-011 pivot builder UX
+  - Evidence:
+    - packages/core/src/types/grid-api.ts
+    - packages/core/src/wrapper/apiParity.ts
+    - packages/dom/src/grid/pivotPanel.ts
+    - packages/dom/src/grid/pivotModelRuntime.ts
+    - packages/dom/src/grid/oneGridRows.ts
+    - packages/react/src/gridHandle.ts
+    - packages/vue/src/gridExpose.ts
+    - tests/e2e/features/pivot.spec.ts
+    - tests/a11y/pivot-a11y.spec.ts
+    - apps/docs/docs/features/pivot.mdx
+    - apps/docs/docs/api/grid-api.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pivot.spec.ts tests/a11y/pivot-a11y.spec.ts --project=chromium
+    - pnpm docs:build
+    - pnpm build
+  - Notes:
+    - 2026-05-15: Pivot panel은 field catalog와 row/column/value bucket 간 drag/drop 및 keyboard button mutation을 지원한다.
+    - 2026-05-15: Panel 변경은 draft 상태로 보관하고 `Apply pivot model`에서만 `GridApi.setPivotModel()`로 적용한다.
+    - 2026-05-15: Server pivot builder 적용은 `ServerRowModel` cache를 재생성해 다음 `DataSource.getRows()`에 갱신된 `pivotModel`을 전달한다.
+- [x] F-PIVOT-012 server result column schema
+  - Evidence:
+    - packages/core/src/types/data.ts
+    - packages/core/src/row/serverTypes.ts
+    - packages/core/src/row/serverRowUtils.ts
+    - packages/core/test/server-row-model.test.ts
+    - packages/dom/src/grid/OneGridBase.ts
+    - packages/dom/src/grid/oneGridRemoteRows.ts
+    - packages/dom/src/grid/renderGridShell.ts
+    - apps/examples/src/features/pivot/data.ts
+    - tests/e2e/features/pivot.spec.ts
+    - apps/docs/docs/features/pivot.mdx
+    - apps/docs/docs/api/datasource.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm exec vitest run --config vitest.config.ts packages/core/test/public-types.test.ts packages/core/test/server-row-model.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pivot.spec.ts --project=chromium
+    - pnpm typecheck
+    - pnpm docs:build
+    - pnpm build
+  - Notes:
+    - 2026-05-15: `GetRowsResult.columns`를 서버 projection 결과 스키마로 표준화하고 server row model을 통해 DOM 렌더링까지 전달한다.
+    - 2026-05-15: Server pivot builder는 원본 source columns를 field catalog로 유지하면서 서버가 반환한 result columns를 그리드 본문 스키마로 렌더링한다.
+- [x] F-PIVOT-013 pivot builder polish
+  - Evidence:
+    - packages/dom/src/grid/pivotPanel.ts
+    - packages/dom/src/grid/pivotPanelDom.ts
+    - packages/dom/src/grid/pivotModelRuntime.ts
+    - packages/themes/src/pivot.css
+    - tests/e2e/features/pivot.spec.ts
+    - tests/a11y/pivot-a11y.spec.ts
+    - apps/docs/docs/features/pivot.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pivot.spec.ts tests/a11y/pivot-a11y.spec.ts --project=chromium
+    - pnpm docs:build
+    - pnpm build
+  - Notes:
+    - 2026-05-15: Pivot field catalog에 검색 입력을 추가하고 검색 상태를 builder draft lifecycle과 함께 유지한다.
+    - 2026-05-15: Drag/drop은 중복 bucket drop을 invalid 상태로 표시하고, valid drop/dragging/drag preview 시각 피드백을 제공한다.
+    - 2026-05-15: Pivot panel z-index를 custom scrollbar layer 위로 올리고, panel이 scrollbar를 덮는지 browser hit-test E2E로 검증한다.
+- [x] F-PIVOT-014 pivot builder insertion drop
+  - Evidence:
+    - packages/dom/src/grid/pivotPanel.ts
+    - packages/dom/src/grid/pivotPanelDom.ts
+    - packages/dom/src/grid/pivotModelRuntime.ts
+    - packages/themes/src/pivot.css
+    - tests/e2e/features/pivot.spec.ts
+    - apps/docs/docs/features/pivot.mdx
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pivot.spec.ts tests/a11y/pivot-a11y.spec.ts --project=chromium
+    - pnpm docs:build
+    - pnpm build
+  - Notes:
+    - 2026-05-15: Bucket 내부 drag/drop 위치를 item midpoint 기준 insertion index로 계산하고 before/after/append indicator를 표시한다.
+    - 2026-05-15: Field catalog에서 추가하거나 bucket 간 이동할 때 append가 아니라 사용자가 지정한 drop 위치에 삽입한다.
+- [x] F-COMP-001 Pivot / Grouping composite browser regression
+  - Evidence:
+    - tests/e2e/features/pivot-grouping-composition.spec.ts
+    - tests/a11y/pivot-grouping-composition-a11y.spec.ts
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pivot-grouping-composition.spec.ts tests/a11y/pivot-grouping-composition-a11y.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/pivot-grouping-composition.spec.ts tests/a11y/pivot-grouping-composition-a11y.spec.ts --project=webkit
+    - pnpm test:perf:smoke
+  - Notes:
+    - 2026-05-15: 같은 브라우저 세션에서 grouping collapse/expand, server grouping route, pivot builder mutation, server pivot projection을 오가며 model/request scope가 섞이지 않는지 검증한다.
+    - 2026-05-15: Chromium/WebKit에서 실제 browser DOM bound, frame interval smoke metric, axe accessibility scan을 수행한다.
+    - 2026-05-15: Edge project는 `/Applications/Microsoft Edge.app` 미설치 및 `pnpm exec playwright install msedge`의 sudo 요구로 로컬 실행하지 못했다. Edge 실기기/설치 환경 검증은 REL-002 browser compatibility matrix에서 완료해야 한다.
 
 ### F-PAGE Pagination
 
@@ -3044,14 +3654,43 @@
     - 2026-05-06: print HTML은 `thead` 반복, page landscape, break-inside 방지, merged body cell styling을 포함하도록 보강했다.
     - 2026-05-06: F-EXPORT 예제는 standard export/import, paged row export, wide column export의 3개 scenario로 분리했고 vanilla/React/Vue 모두 동일 시나리오를 렌더링한다.
     - 2026-05-06: CJK/custom font embedded PDF와 임의 외부 XLSX의 deflate 압축 호환성은 core 내장 기능이 아니라 `D-20260506-001`의 adapter/plugin 후속 범위로 기록한다.
+    - 2026-05-15: 고급 document engine 연동을 위해 `GridImportAdapterPayload`와 `import.adapter` DOM 소비 경로를 추가하고, `@onegrid/adapters`의 IO adapter plugin factory로 CJK/custom PDF 및 외부 XLSX 엔진을 packaging할 수 있게 했다.
+    - 2026-05-15: 공식 document engine adapter 정리로 `@onegrid/adapter-xlsx-exceljs`, `@onegrid/adapter-pdf-pdfkit`, `createServerDocumentExportAdapter()`를 추가했다. Core는 dependency-free를 유지하고, CJK/custom font PDF와 external compressed XLSX는 검증된 adapter package 또는 server renderer로 승격한다.
+    - 2026-05-15: CSV export는 spreadsheet formula-like string을 delimited text boundary에서 apostrophe prefix로 neutralize한다. XLSX export는 formula-like string을 inline string cell로 유지하고, Clipboard TSV와 동일한 core security utility를 공유한다.
+    - 2026-05-15: Final export/clipboard security audit에서 docs build transitive audit high/moderate/low 항목을 pnpm override로 패치 버전에 고정했고 `pnpm audit` 기준 known vulnerability 0건을 확인했다.
     - 2026-05-06 Verified:
       - pnpm test:unit -- packages/core/test/export-import.test.ts packages/dom/test/export-data.test.ts
       - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/export.spec.ts --project=chromium
       - pnpm typecheck
+    - 2026-05-15 Verified:
+      - pnpm lint
+      - pnpm typecheck
+      - pnpm exec vitest run --config vitest.config.ts packages/core/test/clipboard.test.ts packages/core/test/export-import.test.ts
+      - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/clipboard.spec.ts tests/e2e/features/export.spec.ts --project=chromium
+      - pnpm docs:build
+      - pnpm audit
+      - git diff --check
       - pnpm lint
       - pnpm build
       - pnpm docs:build
       - pnpm test:perf:smoke
+    - 2026-05-15 Verified:
+      - pnpm exec vitest run --config vitest.config.ts packages/core/test/export-import.test.ts packages/adapters/test/io-adapter-plugin.test.ts packages/dom/test/onegrid-plugin-shell.test.ts packages/core/test/public-types.test.ts
+      - pnpm typecheck
+      - pnpm lint
+      - pnpm build
+      - pnpm docs:build
+    - 2026-05-15 Official adapter Verified:
+      - pnpm exec vitest run --config vitest.config.ts packages/adapter-xlsx-exceljs/test/exceljs-adapter.test.ts packages/adapter-pdf-pdfkit/test/pdfkit-adapter.test.ts packages/adapters/test/server-document-adapter.test.ts
+      - pnpm --filter @onegrid/adapters typecheck
+      - pnpm --filter @onegrid/adapter-xlsx-exceljs typecheck
+      - pnpm --filter @onegrid/adapter-pdf-pdfkit typecheck
+      - pnpm lint
+      - pnpm typecheck
+      - pnpm test:unit
+      - pnpm build
+      - pnpm docs:build
+      - git diff --check
 
 ### F-I18N Localization
 
@@ -3226,6 +3865,95 @@
     - pnpm docs:build
     - git diff --check
 
+### SEC-003 Sanitizer Adapter Hardening
+
+- [x] SEC-003-001 sanitizer public metadata/context contract
+  - Evidence:
+    - packages/core/src/types/shared.ts
+    - packages/core/test/public-types.test.ts
+- [x] SEC-003-002 DOM post-sanitize boundary
+  - Evidence:
+    - packages/dom/src/grid/htmlSecurity.ts
+    - packages/dom/test/xss.test.ts
+- [x] SEC-003-003 allowlist sanitizer adapter helper
+  - Evidence:
+    - packages/dom/src/grid/htmlSecurity.ts
+    - packages/dom/src/index.ts
+    - apps/examples/src/features/xss-defense/data.ts
+- [x] SEC-003-004 docs/security adapter guidance
+  - Evidence:
+    - apps/docs/docs/security/xss.mdx
+    - apps/docs/docs/api/grid-options.mdx
+    - apps/docs/docs/api/column-def.mdx
+    - SECURITY.md
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts packages/dom/test/xss.test.ts packages/core/test/public-types.test.ts tests/security/xss-source.test.ts
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test:unit
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/xss-defense.spec.ts --project=chromium
+    - pnpm exec playwright test --config playwright.config.ts tests/a11y/xss-defense-a11y.spec.ts --project=chromium
+    - pnpm docs:build
+    - pnpm build
+    - git diff --check
+- [x] SEC-003-005 Trusted Types real browser policy validation
+  - Evidence:
+    - tests/e2e/features/trusted-types.spec.ts
+    - packages/dom/src/grid/htmlSecurity.ts
+    - packages/dom/test/xss.test.ts
+    - apps/docs/docs/security/xss.mdx
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts packages/dom/test/xss.test.ts packages/core/test/public-types.test.ts tests/security/xss-source.test.ts
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/trusted-types.spec.ts --project=chromium
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm docs:build
+    - pnpm build
+    - git diff --check
+- [x] SEC-003-006 package/CDN CSP distribution validation
+  - Evidence:
+    - tests/e2e/packaging/package-csp.spec.ts
+    - packages/themes/package.json
+    - apps/docs/docs/security/csp.mdx
+  - Verified:
+    - pnpm build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/packaging/package-csp.spec.ts --project=chromium
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm docs:build
+    - git diff --check
+- [x] SEC-003-007 wrapper custom renderer security boundary documentation
+  - Evidence:
+    - apps/docs/docs/security/wrapper-renderers.mdx
+    - apps/docs/docs/security/xss.mdx
+    - apps/docs/docs/frameworks/react.mdx
+    - apps/docs/docs/frameworks/vue.mdx
+    - SECURITY.md
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm docs:build
+    - git diff --check
+- [x] SEC-003-008 real browser security matrix
+  - Evidence:
+    - tests/e2e/security/run-browser-security-matrix.mjs
+    - playwright.config.ts
+    - package.json
+    - eslint.config.mjs
+    - apps/docs/docs/security/csp.mdx
+  - Verified:
+    - pnpm build
+    - pnpm test:e2e:security:browser-matrix -- --skip-build
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm docs:build
+    - pnpm audit
+    - git diff --check
+  - Notes:
+    - 2026-05-15: Security matrix는 CSP, XSS, Trusted Types, Clipboard, Export, package/CDN CSP spec을 Chromium/WebKit에서 실행하고, 로컬에 설치된 Chrome/Edge channel은 자동 감지해 추가 실행한다. 이 머신에서는 Chrome은 설치되어 있고 Edge는 미설치라 Edge channel은 skip된다.
+
 ---
 
 ## 10. Phase 9 — Themes / Design Customization
@@ -3334,6 +4062,26 @@
     - SI 전용 token builder는 CSS variable만 생성하며 renderer/core 기능을 재구현하지 않는다.
     - `packages/themes/src/default.css` structural split은 2026-05-04 cleanup에서 해결했다. 세부 증빙은 `R-20260504-002`를 참조한다.
     - 2026-05-04: BNK CI RGB 기준 sample tenant palette `si-bnk-red`, `si-bnk-gold`, `si-bnk-gray`를 THEME-002 example/docs/visual snapshot에 추가했다. 고객사별 팔레트이므로 `@onegrid/themes` public preset으로 export하지 않는다.
+- [x] THEME-002-006 theme token validation / contrast gate
+  - Evidence:
+    - packages/themes/src/themeValidation.ts
+    - packages/themes/src/index.ts
+    - packages/themes/test/tokens.test.ts
+    - apps/examples/src/features/si-customization/vanilla.ts
+    - tests/e2e/features/si-customization.spec.ts
+    - apps/docs/docs/features/si-customization.mdx
+    - API_CHANGELOG.md
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts packages/themes/test/tokens.test.ts
+    - pnpm --filter @onegrid/themes build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/si-customization.spec.ts --project=chromium
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm docs:build
+    - git diff --check
+  - Notes:
+    - `validateSiTheme()`는 text contrast 4.5:1, UI contrast 3:1, row/header 최소 hit target, `--og-*` 변수 namespace, unsafe CSS value를 진단한다.
+    - SI color token은 hex, `rgb()`, `rgba()`만 통과시키며 HSL/OKLCH 같은 색상 형식은 기본 error로 처리한다.
 
 ---
 
@@ -4264,14 +5012,22 @@ EX-005 shared verification:
 
 - [ ] PERF-001-001 benchmark app route 구성
   - Evidence:
-- [ ] PERF-001-002 performance marker utility
+- [x] PERF-001-002 performance marker utility
   - Evidence:
+    - apps/benchmark/src/perfMarker.ts
+    - apps/benchmark/src/benchmarkData.ts
+    - apps/benchmark/src/scenarios.ts
+    - tests/perf/benchmark-report.test.ts
 - [ ] PERF-001-003 dataset generator
   - Evidence:
 - [ ] PERF-001-004 mock server generator
   - Evidence:
-- [ ] PERF-001-005 benchmark report format
+- [x] PERF-001-005 benchmark report format
   - Evidence:
+    - apps/benchmark/src/report.ts
+    - apps/benchmark/src/index.ts
+    - package.json (`bench:metrics`)
+    - Verified: `pnpm bench:metrics`
 
 ### PERF-002 Rendering Performance
 
@@ -4281,16 +5037,31 @@ EX-005 shared verification:
   - Evidence:
 - [ ] PERF-002-003 10M server rows mock
   - Evidence:
-- [ ] PERF-002-004 100M viewport rows mock
+- [x] PERF-002-004 100M viewport rows mock
   - Evidence:
-- [ ] PERF-002-005 horizontal virtualization 1K columns
+    - apps/benchmark/src/scenarios.ts (`viewport-100m-window`)
+    - tests/perf/benchmark-report.test.ts
+    - Latest metric: 5,000 ops / 4.963ms / 1,007,360 ops/s / maxDomRows 96 / rowAllocation 0
+- [x] PERF-002-005 horizontal virtualization 1K columns
   - Evidence:
-- [ ] PERF-002-006 frozen + virtual scroll benchmark
+    - apps/benchmark/src/scenarios.ts (`column-50k-window`)
+    - tests/perf/benchmark-report.test.ts
+    - Latest metric: 50K logical columns, 2,000 ops / 7.287ms / 274,461 ops/s / maxDomColumns 32
+- [x] PERF-002-006 frozen + virtual scroll benchmark
   - Evidence:
-- [ ] PERF-002-007 merge + virtual scroll benchmark
+    - apps/benchmark/src/scenarios.ts (`frozen-virtual-merge`)
+    - tests/perf/benchmark-report.test.ts
+    - Latest metric: pinned panes 2, 700 ops / 697.664ms / 1,003 ops/s / maxCenterDomColumns 24
+- [x] PERF-002-007 merge + virtual scroll benchmark
   - Evidence:
-- [ ] PERF-002-008 scroll frame budget report
+    - apps/benchmark/src/scenarios.ts (`merge-window-128`)
+    - tests/perf/benchmark-report.test.ts
+    - Latest metric: 128 visible window rows, 700 ops / 836.092ms / 837 ops/s
+- [x] PERF-002-008 scroll frame budget report
   - Evidence:
+    - apps/benchmark/src/perfMarker.ts (`avgOperation`, `opsPerSecond`)
+    - apps/benchmark/src/report.ts
+    - Latest report: `pnpm bench:metrics` generated PASS/FAIL threshold output with per-scenario ms/op
 
 ### PERF-003 Memory
 
@@ -4304,6 +5075,12 @@ EX-005 shared verification:
   - Evidence:
 - [ ] PERF-003-005 menu open/close memory test
   - Evidence:
+- [x] PERF-003-006 browser DOM/frame/heap smoke metrics
+  - Evidence:
+    - tests/e2e/features/examples-quality-security-performance.spec.ts
+    - Measures 100M viewport route rendered rows/cells, grid element count, average rAF frame interval, and Chromium heap availability.
+    - Verified: `pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium`
+    - Verified: `pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=webkit`
 
 ---
 
@@ -4317,8 +5094,13 @@ EX-005 shared verification:
   - Evidence:
 - [ ] DOC-001-003 Installation npm
   - Evidence:
-- [ ] DOC-001-004 Installation CDN
+- [x] DOC-001-004 Installation CDN
   - Evidence:
+    - apps/docs/docs/getting-started/installation.mdx
+    - tests/e2e/packaging/package-csp.spec.ts
+  - Verified:
+    - pnpm docs:build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/packaging/package-csp.spec.ts --project=chromium
 - [ ] DOC-001-005 TypeScript setup
   - Evidence:
 - [ ] DOC-001-006 Quick start vanilla
@@ -4401,44 +5183,119 @@ EX-005 shared verification:
 
 ### PKG-001 Build Outputs
 
-- [ ] PKG-001-001 ESM build
+- [x] PKG-001-001 ESM build
   - Evidence:
+    - packages/*/package.json (`exports["."].import`)
+    - tests/packaging/package-metadata.test.ts
+  - Verified:
+    - pnpm build
+    - pnpm exec vitest run --config vitest.config.ts tests/packaging/package-metadata.test.ts
 - [ ] PKG-001-002 CJS build
   - Evidence:
-- [ ] PKG-001-003 UMD build for CDN
+- [x] PKG-001-003 UMD build for CDN
   - Evidence:
-- [ ] PKG-001-004 declaration files
+    - packages/dom/src/cdn.ts
+    - packages/dom/vite.cdn.config.ts
+    - packages/dom/package.json (`build:cdn`, `unpkg`, `jsdelivr`)
+    - tests/e2e/packaging/package-csp.spec.ts
+  - Verified:
+    - pnpm --filter @onegrid/dom build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/packaging/package-csp.spec.ts --project=chromium
+- [x] PKG-001-004 declaration files
   - Evidence:
-- [ ] PKG-001-005 CSS build
+    - packages/*/package.json (`types`, `exports["."].types`)
+    - tests/packaging/package-metadata.test.ts
+  - Verified:
+    - pnpm build
+    - pnpm exec vitest run --config vitest.config.ts tests/packaging/package-metadata.test.ts
+- [x] PKG-001-005 CSS build
   - Evidence:
-- [ ] PKG-001-006 source maps
+    - packages/themes/package.json (`build:css`, CSS exports)
+    - tests/e2e/packaging/package-csp.spec.ts
+  - Verified:
+    - pnpm --filter @onegrid/themes build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/packaging/package-csp.spec.ts --project=chromium
+- [x] PKG-001-006 source maps
   - Evidence:
+    - packages/*/tsconfig.build.json
+    - packages/dom/vite.cdn.config.ts
+  - Verified:
+    - pnpm build
 
 ### PKG-002 Package Metadata
 
-- [ ] PKG-002-001 package exports field
+- [x] PKG-002-001 package exports field
   - Evidence:
-- [ ] PKG-002-002 sideEffects field
+    - packages/*/package.json
+    - tests/packaging/package-metadata.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/packaging/package-metadata.test.ts
+- [x] PKG-002-002 sideEffects field
   - Evidence:
-- [ ] PKG-002-003 peerDependencies React
+    - packages/*/package.json
+    - tests/packaging/package-metadata.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/packaging/package-metadata.test.ts
+- [x] PKG-002-003 peerDependencies React
   - Evidence:
-- [ ] PKG-002-004 peerDependencies Vue
+    - packages/react/package.json
+    - tests/packaging/package-metadata.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/packaging/package-metadata.test.ts
+- [x] PKG-002-004 peerDependencies Vue
   - Evidence:
-- [ ] PKG-002-005 files whitelist
+    - packages/vue/package.json
+    - tests/packaging/package-metadata.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/packaging/package-metadata.test.ts
+- [x] PKG-002-005 files whitelist
   - Evidence:
-- [ ] PKG-002-006 license metadata
+    - packages/*/package.json (`files`)
+    - tests/packaging/package-metadata.test.ts
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/packaging/package-metadata.test.ts
+- [x] PKG-002-006 license metadata
   - Evidence:
+    - packages/*/package.json (`license: UNLICENSED`)
+    - tests/packaging/package-metadata.test.ts
+  - Notes:
+    - 외부 배포 라이선스가 확정될 때까지 accidental open-source publish를 막기 위해 publishable packages는 `UNLICENSED`로 고정한다.
+  - Verified:
+    - pnpm exec vitest run --config vitest.config.ts tests/packaging/package-metadata.test.ts
 
 ### PKG-003 CDN
 
-- [ ] PKG-003-001 CDN UMD smoke page
+- [x] PKG-003-001 CDN UMD smoke page
   - Evidence:
-- [ ] PKG-003-002 CDN CSS smoke page
+    - tests/e2e/packaging/package-csp.spec.ts
+    - packages/dom/vite.cdn.config.ts
+    - packages/dom/package.json (`unpkg`, `jsdelivr`)
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/packaging/package-csp.spec.ts --project=chromium
+- [x] PKG-003-002 CDN CSS smoke page
   - Evidence:
-- [ ] PKG-003-003 CDN SRI guide
+    - tests/e2e/packaging/package-csp.spec.ts
+    - packages/themes/package.json
+  - Verified:
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/packaging/package-csp.spec.ts --project=chromium
+- [x] PKG-003-003 CDN SRI guide
   - Evidence:
-- [ ] PKG-003-004 CDN CSP guide
+    - apps/docs/docs/getting-started/installation.mdx
+    - tests/e2e/packaging/package-csp.spec.ts
+  - Verified:
+    - pnpm docs:build
+    - pnpm exec playwright test --config playwright.config.ts tests/e2e/packaging/package-csp.spec.ts --project=chromium
+- [x] PKG-003-004 CDN CSP guide
   - Evidence:
+    - apps/docs/docs/security/csp.mdx
+    - tests/e2e/packaging/package-csp.spec.ts
+    - package.json (`test:e2e:package-csp`)
+  - Verified:
+    - pnpm test:e2e:package-csp
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm docs:build
+    - git diff --check
 
 ---
 
@@ -4512,6 +5369,116 @@ EX-005 shared verification:
 
 작업 중 방향이 흔들릴 수 있는 결정은 여기에 기록한다.
 
+#### D-20260514-001 실제 성능 지표 리포트 계약
+
+- Date: 2026-05-14
+- Status: accepted
+- Context: 기존 `test:perf:smoke`는 대용량 계약이 깨지지 않는지만 검증했고, 실제 소요 시간/처리량/ms per operation이 남지 않아 상용 그리드 성능 기준을 추적하기 어려웠다.
+- Decision: benchmark 앱을 재사용 가능한 측정 하네스로 승격한다. `bench:metrics`는 core build 후 100M viewport, 10M segmented scroll, 50K column virtualization, 20K variable row height, merge window, frozen+virtual+merge 조합을 실행하고 duration/ops/s/ms-op/checksum/DOM bound 지표를 출력한다.
+- Risk: 장기 10,000 scroll operation memory drift와 browser long-task 수집은 아직 별도 장기 perf pass로 남아 있다.
+- Mitigation: `tests/perf/benchmark-report.test.ts`가 리포트 스키마와 기본 threshold를 보호하고, `tests/e2e/features/examples-quality-security-performance.spec.ts`가 100M viewport route의 실제 브라우저 DOM bound, frame interval, heap smoke metric을 기록한다.
+- Evidence:
+  - apps/benchmark/src/perfMarker.ts
+  - apps/benchmark/src/benchmarkData.ts
+  - apps/benchmark/src/scenarios.ts
+  - apps/benchmark/src/report.ts
+  - tests/perf/benchmark-report.test.ts
+  - tests/e2e/features/examples-quality-security-performance.spec.ts
+  - package.json (`bench:metrics`)
+- Verified:
+  - pnpm --filter @onegrid/benchmark typecheck
+  - pnpm --filter @onegrid/benchmark build
+  - pnpm test:perf:smoke
+  - pnpm bench:metrics
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=webkit
+
+#### D-20260512-001 Phase 5 ScrollCoordinator / LayoutState 단일화
+
+- Date: 2026-05-12
+- Status: accepted
+- Context: Phase 5 layout/virtualization hardening 검토에서 row scroll, viewport logical scroll, horizontal column sync, custom scrollbar가 같은 body viewport를 쓰면서도 각 파일에서 직접 `scrollTop`, `scrollLeft`, logical scroll dataset을 갱신하는 구조가 확인됐다. 이 상태는 Safari scrollbar, 100M viewport seek, pinned/header/footer sync 회귀를 만들기 쉽다.
+- Decision: `packages/dom/src/grid/scrollCoordinator.ts`를 추가해 body viewport의 `GridScrollLayoutState`를 단일 읽기/쓰기 지점으로 둔다. Root grid에는 `data-layout-scroll-top`, `data-layout-scroll-left`, max/viewport/scroll size dataset을 발행하고, row/viewport/column virtual scroll 및 custom scrollbar는 같은 coordinator를 통해 state를 갱신한다.
+- Risk: 장기 브라우저 스크롤 검증은 후속 hardening 범위로 남아 있다.
+- Mitigation: 2026-05-14에 editor/menu/focus overlay positioning을 coordinator state 구독 방식으로 전환했고, Playwright browser matrix에 Chromium/WebKit/Edge 실행 경로를 명시했다. Server-side variable row height는 1.0 fixed-height segmented contract로 정리해 지원 범위 과대 표기를 제거했다.
+- Evidence:
+  - packages/dom/src/grid/scrollCoordinator.ts
+  - packages/dom/src/grid/renderGridShell.ts
+  - packages/dom/src/grid/gridScrollbarMetrics.ts
+  - packages/dom/src/grid/gridScrollbars.ts
+  - playwright.config.ts
+  - package.json (`test:e2e:webkit`, `test:e2e:edge`, `test:e2e:browser-matrix`)
+  - packages/dom/src/grid/editorScrollSync.ts
+  - packages/dom/src/grid/editCellReveal.ts
+  - packages/dom/src/grid/gridFocus.ts
+  - packages/dom/src/grid/gridFocusNavigation.ts
+  - packages/dom/src/grid/overlayScrollSync.ts
+  - packages/dom/src/grid/columnMenu.ts
+  - packages/dom/src/grid/filterPanel.ts
+  - packages/dom/src/grid/contextMenuRuntime.ts
+  - packages/dom/src/grid/virtualBodyWindow.ts
+  - packages/dom/src/grid/viewportVirtualBodyWindow.ts
+  - packages/dom/src/grid/virtualColumnWindow.ts
+  - packages/dom/test/scroll-coordinator.test.ts
+  - tests/e2e/features/row-virtualization.spec.ts
+  - tests/e2e/features/column-virtualization.spec.ts
+  - tests/e2e/features/examples-quality-security-performance.spec.ts
+- Verified:
+  - pnpm lint
+  - pnpm typecheck
+  - pnpm test:unit
+  - pnpm --filter @onegrid/dom typecheck
+  - pnpm build
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/row-virtualization.spec.ts tests/e2e/features/column-virtualization.spec.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/virtual-scroll-scrollbars.spec.ts --project=webkit
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/layout-composition-matrix.spec.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/layout-composition-matrix.spec.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=webkit
+  - Not tested locally: `pnpm test:e2e:edge` (Microsoft Edge app is not installed on this machine)
+- Follow-up checklist items:
+  - [x] Phase 5 100M Segmented Virtual Scroll 계약 강화
+  - [x] Phase 5 overlay/focus/editor scroll consumer coordinator 구독화
+  - [x] Phase 5 Chromium/WebKit/Edge browser matrix 실행 경로 명시
+
+#### D-20260512-002 Phase 5 100M Segmented Virtual Scroll 계약 강화
+
+- Date: 2026-05-12
+- Status: accepted
+- Context: 100M viewport 예제에서 custom scrollbar track/end click과 `Jump near 100M`이 논리 row 위치, 물리 scrollbar 위치, viewport load target을 각각 다른 함수로 계산하면서 하단 극단값에서 blank body 또는 마지막 row clipping이 발생했다.
+- Decision: `resolveSegmentedVirtualRowWindow`와 `getSegmentedScrollTopForRow`를 core public virtualization contract로 승격하고, 10M~100M segmented viewport는 고정 numeric `rowHeight`만 허용한다. DOM viewport renderer/remote loader/skeleton rows/scrollToRow가 같은 계약을 사용한다. Root grid에는 logical max/height를 계속 발행해 custom scrollbar와 E2E가 실제 논리 scroll state를 검증한다.
+- Risk: 10M~100M rows에서 variable/auto row height를 client가 계산하려면 모든 선행 row offset을 알아야 하므로 전체 height map 또는 서버 offset index가 필요하다. 이는 브라우저 메모리/성능 목표와 충돌한다.
+- Mitigation: `rowModel: "viewport"` + `virtualization.segmented` 조합은 `rowHeight: "auto"` 또는 row별 height callback을 거부한다. 1.0 public contract는 fixed numeric rowHeight로 고정하고, remote variable-height scrollbar는 서버 offset-index protocol이 설계될 때까지 지원 범위로 주장하지 않는다.
+- Evidence:
+  - API_CHANGELOG.md
+  - packages/core/src/virtualization/segmentedVirtualScroll.ts
+  - packages/core/src/virtualization/index.ts
+  - packages/core/src/row/rowModelCapabilities.ts
+  - packages/dom/src/grid/viewportVirtualBodyWindow.ts
+  - packages/dom/src/grid/scrollPosition.ts
+  - packages/dom/src/grid/oneGridRemoteRows.ts
+  - packages/dom/src/grid/viewportLoadTarget.ts
+  - packages/dom/src/grid/viewportSkeletonRows.ts
+  - packages/dom/src/grid/rowModelOptions.ts
+  - packages/core/test/row-virtualization.test.ts
+  - packages/core/test/row-model-capabilities.test.ts
+  - packages/core/test/viewport-row-model.test.ts
+  - packages/dom/test/onegrid-shell.test.ts
+  - apps/docs/docs/features/row-model-capabilities.mdx
+  - apps/docs/docs/features/row-virtualization.mdx
+  - apps/docs/docs/features/viewport-row-model.mdx
+  - tests/e2e/features/examples-quality-security-performance.spec.ts
+- Verified:
+  - pnpm lint
+  - pnpm typecheck
+  - pnpm test:unit
+  - pnpm test:perf:smoke
+  - pnpm test:e2e
+  - pnpm test:a11y
+  - pnpm build
+  - pnpm docs:build
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=chromium
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/examples-quality-security-performance.spec.ts --project=webkit
+  - pnpm exec vitest run packages/core/test/row-model-capabilities.test.ts packages/dom/test/onegrid-shell.test.ts
+
 #### D-20260507-001 Full row editing 제외 및 cell+Tab editing flow 유지
 
 - Date: 2026-05-07
@@ -4520,6 +5487,7 @@ EX-005 shared verification:
 - Decision: Full row editing을 OneGrid 1.0 public API와 예제에서 제외한다. 편집 기본 전략은 cell editing, column별 `editTrigger`, keyboard policy, batch edit session API, read-only external state integration으로 유지한다.
 - Risk: 일부 업무 화면에서 한 행 전체를 form처럼 동시에 띄우는 요구가 생길 수 있다.
 - Mitigation: 해당 요구는 grid 기본 editing API가 아니라 외부 row detail/form panel 또는 custom editor workflow로 처리한다. OneGrid core/wrapper는 row-level pending edits 조회와 batch commit/cancel API를 제공하므로 외부 form 연동은 가능하다.
+- Follow-up: 2026-05-15 기준 결정 유지. Pivot/Grouping UX 성숙도 보강 중에도 full row editing API는 재도입하지 않았다.
 - Evidence:
   - packages/core/src/types/grid-api.ts
   - packages/core/src/types/events.ts
@@ -4549,21 +5517,34 @@ EX-005 shared verification:
 - Status: accepted
 - Context: F-EXPORT는 dependency-free core 안에서 CSV/JSON, OneGrid 생성 OpenXML XLSX, lightweight PDF, print HTML의 상용 기본 산출물 품질을 제공한다. 다만 CJK/custom font embedded PDF와 임의 외부 XLSX의 deflate 압축/복잡한 workbook 호환성은 font embedding, compression inflate, workbook compatibility engine이 필요한 영역이다.
 - Decision: OneGrid core는 내장 exporter/importer를 dependency-free 기본 경로로 유지하고, CJK/custom font PDF와 arbitrary compressed XLSX full compatibility는 명시적인 export/import adapter 또는 plugin으로 제공한다.
-- Risk: 한국어/CJK 글꼴을 PDF에 반드시 embed해야 하는 SI 산출물이나 Excel/LibreOffice 등 외부 도구가 생성한 복잡한 XLSX를 그대로 수입해야 하는 프로젝트는 adapter/plugin 완료 전까지 별도 구현이 필요하다.
-- Mitigation: `GridApi.exportData()` / `GridApi.importData()`의 public contract는 유지하고, adapter가 core export matrix와 import parser를 교체하거나 확장할 수 있게 후속 hardening 항목으로 추적한다. 기본 core는 bundle weight, CSP/security review scope, dependency risk를 키우지 않는다.
+- Risk: 한국어/CJK 글꼴을 PDF에 반드시 embed해야 하는 SI 산출물이나 Excel/LibreOffice 등 외부 도구가 생성한 복잡한 XLSX를 그대로 수입해야 하는 프로젝트는 검증된 document engine adapter 또는 server renderer가 필요하다.
+- Mitigation: 2026-05-15에 `export.adapter` / `import.adapter` public payload와 `@onegrid/adapters` plugin factory를 hardening했고, `@onegrid/adapter-xlsx-exceljs`, `@onegrid/adapter-pdf-pdfkit`, `createServerDocumentExportAdapter()`를 공식 경로로 추가했다. 기본 core는 bundle weight, CSP/security review scope, dependency risk를 키우지 않고, SI 프로젝트는 승인된 PDF/XLSX 엔진과 폰트를 adapter로 주입한다.
 - Follow-up checklist items:
   - F-EXPORT Export / Import hardening
   - packages/adapters export/import adapters
   - REL-004 Final Gates
 
+#### D-20260515-002 Spreadsheet formula injection은 text handoff 경계에서 차단
+
+- Date: 2026-05-15
+- Status: accepted
+- Context: Export/Clipboard는 renderer HTML을 사용하지 않고 raw value/formatter 결과를 CSV 또는 TSV text payload로 직렬화한다. 그러나 CSV/TSV는 Excel, Google Sheets 같은 spreadsheet 도구에서 열거나 붙여넣을 때 `=`, `+`, `-`, `@`로 시작하는 문자열을 formula로 해석할 수 있다.
+- Decision: OneGrid source data와 import 결과는 변경하지 않고, CSV export 및 Clipboard `text/plain` copy 경계에서만 formula-like string에 apostrophe prefix를 추가한다. XLSX export는 string 값을 formula cell이 아니라 inline string cell로 유지한다.
+- Risk: 업무적으로 실행 가능한 spreadsheet formula export가 필요한 앱은 기본 CSV/TSV 경로와 충돌한다.
+- Mitigation: 실행 formula가 필요한 프로젝트는 보안 검토된 custom export adapter를 명시적으로 등록해야 한다. 기본 OneGrid 경로는 데이터 유출/명령 실행 가능성을 줄이는 안전한 handoff를 우선한다.
+- Follow-up checklist items:
+  - F-CLIP Clipboard
+  - F-EXPORT Export / Import
+  - SEC-003 Sanitizer Adapter Hardening
+
 #### D-20260504-001 Markup-preserving sanitizer는 앱 주입 정책으로 유지
 
 - Date: 2026-05-04
-- Status: accepted
+- Status: resolved
 - Context: SEC-002에서 기본 renderer와 `strictTextOnlySanitizer`는 HTML을 텍스트로 축소해 안전한 기본값을 제공한다. 다만 `<strong>`, `<a>` 같은 마크업을 보존하는 sanitizer는 allowlist, URL policy, Trusted Types, 조직별 보안 정책이 함께 묶이는 영역이다.
 - Decision: OneGrid 기본값은 text-only sanitizer로 유지하고, 마크업 보존이 필요한 앱은 외부 보안 검토를 거친 sanitizer를 `security.html.sanitizer`로 명시 주입한다.
 - Risk: 보존형 sanitizer를 아무 구현이나 주입하면 XSS 방어 품질이 앱 책임으로 이동한다.
-- Mitigation: docs/security/xss에 정책을 명시하고, 기본 API는 `allowHtmlRenderer: true`와 sanitizer opt-in 없이는 HTML sink를 열지 않는다.
+- Mitigation: SEC-003에서 sanitizer metadata/context contract, `createAllowlistHtmlSanitizer()`, DOM post-sanitize boundary를 추가했다. 기본 API는 `allowHtmlRenderer: true`와 sanitizer opt-in 없이는 HTML sink를 열지 않으며, 외부 sanitizer 결과도 blocked tag, inline handler/style, unsafe URL protocol을 한 번 더 제거한다.
 - Follow-up checklist items:
   - SEC-002 XSS Defense
   - SEC-003 sanitizer adapter hardening
@@ -4640,6 +5621,8 @@ EX-005 shared verification:
 - Mitigation update: 2026-04-30 후속 LOC 정리 패스에서 `OneGrid.ts`를 public export entry로 축소하고 DOM lifecycle을 `oneGridBase`, `oneGridRows`, `oneGridSortingFiltering`, `oneGridSelection`, `oneGridEditStore`, `oneGridEditing`, `oneGridTypes`로 분리했다. renderer source 파일은 모두 400 LOC 이하로 내려갔고 public API 이름은 유지했다.
 - Mitigation update: 2026-05-04 SEC-001 이후 LOC 정리 패스에서 `oneGridBase.ts`의 render option 조립, pagination API/runtime, virtual scroll runtime을 `renderOptionsFactory.ts`, `oneGridPagination.ts`, `oneGridScrolling.ts`로 분리했다. `oneGridBase.ts`는 558 LOC에서 345 LOC로 내려갔고 public API 이름은 유지했다.
 - Mitigation update: 2026-05-04 row-model 전용 LOC 정리에서 infinite/server/viewport reset/load/update 책임을 `oneGridRemoteRows.ts`로 분리했다. `oneGridRows.ts`는 422 LOC에서 227 LOC로 내려갔고 renderer source 파일은 다시 모두 400 LOC 이하가 되었다.
+- Mitigation update: 2026-05-12 cleanup 패스에서 DOM shell 테스트를 plugin/state-column 전용 spec으로 분리하고 셀 선택 target/span 판독, custom scrollbar metric, shell root/runtime, column UI runtime, 초기 row model restore helper를 별도 모듈로 분리했다. 또한 examples catalog, server row model route cache spec, editing E2E helper, editing keyboard policy를 분리했다. `onegrid-shell.test.ts`는 664 LOC에서 214 LOC로, `selectionRuntime.ts`는 428 LOC에서 381 LOC로, `oneGridBase.ts`는 423 LOC에서 399 LOC로, `renderGridShell.ts`는 420 LOC에서 359 LOC로, `gridScrollbars.ts`는 414 LOC에서 302 LOC로, `catalog.ts`는 435 LOC에서 10 LOC로, `server-row-model.test.ts`는 503 LOC에서 390 LOC로, `editing.spec.ts`는 475 LOC에서 329 LOC로, `editorLifecycle.ts`는 363 LOC에서 336 LOC로 낮아졌고 public helper/API 이름은 유지했다.
+- Mitigation update: 2026-05-14 auto row height hardening 이후 `oneGridBase.ts`가 413 LOC로 재상승한 부분을 표현 정리만으로 397 LOC까지 낮춰 renderer source 권장 기준 안에 유지했다.
 - Evidence:
   - packages/dom/src/grid/OneGrid.ts
   - packages/dom/src/grid/oneGridBase.ts
@@ -4655,10 +5638,31 @@ EX-005 shared verification:
   - packages/dom/src/grid/oneGridTypes.ts
   - packages/dom/src/grid/gridFocus.ts
   - packages/dom/src/grid/gridFocusNavigation.ts
+  - packages/dom/src/grid/selectionRuntime.ts
+  - packages/dom/src/grid/selectionTarget.ts
+  - packages/dom/src/grid/gridScrollbars.ts
+  - packages/dom/src/grid/gridScrollbarMetrics.ts
+  - packages/dom/src/grid/oneGridBase.ts
+  - packages/dom/src/grid/oneGridColumnRuntime.ts
+  - packages/dom/src/grid/initialRowModelState.ts
   - packages/dom/src/grid/renderGridShell.ts
+  - packages/dom/src/grid/renderShellRoot.ts
   - packages/dom/src/grid/renderGridData.ts
   - packages/dom/src/grid/renderGridTypes.ts
   - packages/dom/src/grid/editBatchRuntime.ts
+  - packages/dom/test/onegrid-shell.test.ts
+  - packages/dom/test/onegrid-plugin-shell.test.ts
+  - packages/dom/test/onegrid-state-column.test.ts
+  - packages/core/src/editing/editorLifecycle.ts
+  - packages/core/src/editing/editKeyboardPolicy.ts
+  - packages/core/test/server-row-model.test.ts
+  - packages/core/test/server-row-model-route-cache.test.ts
+  - apps/examples/src/catalog.ts
+  - apps/examples/src/catalogTypes.ts
+  - apps/examples/src/catalogExamples.ts
+  - apps/examples/src/catalogRoadmap.ts
+  - tests/e2e/features/editing.spec.ts
+  - tests/e2e/features/editingHelpers.ts
   - apps/examples/src/features/basic/vanilla.ts
   - apps/examples/src/features/client-row-model/vanilla.ts
   - apps/examples/src/features/column-model/vanilla.ts
@@ -4668,6 +5672,13 @@ EX-005 shared verification:
   - apps/examples/src/features/infinite-row-model/vanilla.ts
   - apps/examples/src/features/sorting/vanilla.ts
 - Verified:
+  - pnpm exec vitest run packages/dom/test/onegrid-shell.test.ts packages/dom/test/onegrid-plugin-shell.test.ts packages/dom/test/onegrid-state-column.test.ts
+  - pnpm exec vitest run packages/dom/test/cell-merge-integration.test.ts packages/dom/test/onegrid-shell.test.ts packages/dom/test/onegrid-plugin-shell.test.ts packages/dom/test/onegrid-state-column.test.ts
+  - pnpm exec vitest run packages/core/test/editing.test.ts packages/core/test/server-row-model.test.ts packages/core/test/server-row-model-route-cache.test.ts
+  - pnpm exec playwright test --config playwright.config.ts tests/e2e/features/editing.spec.ts --project=chromium
+  - pnpm --filter @onegrid/examples typecheck
+  - pnpm --filter @onegrid/dom typecheck
+  - pnpm --filter @onegrid/core typecheck
   - pnpm typecheck
   - pnpm lint
   - pnpm test:unit

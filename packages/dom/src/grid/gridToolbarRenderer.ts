@@ -10,6 +10,7 @@ import type {
   PaginationRenderModel
 } from "./paginationRenderer.js";
 import { createPivotToolbar } from "./pivotPanel.js";
+import type { PivotBuilderRuntime } from "./pivotPanel.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
 import { createSelectionToolbar } from "./selectionToolbar.js";
 
@@ -22,6 +23,8 @@ export interface GridToolbarInput<TData> {
   readonly selectionRuntime?: GridSelectionRuntime;
   readonly filterRuntime?: HeaderFilterRuntime;
   readonly pivotMeta?: ClientPivotMeta;
+  readonly pivotOptions?: DomGridOptions<TData>;
+  readonly pivotRuntime?: PivotBuilderRuntime;
   readonly paginationRuntime?: GridPaginationRuntime;
   readonly paginationModel?: PaginationRenderModel;
 }
@@ -29,7 +32,11 @@ export interface GridToolbarInput<TData> {
 export function appendTopToolbars<TData>(input: GridToolbarInput<TData>): void {
   appendPagination(input.shell, input.paginationRuntime, input.paginationModel, "top");
 
-  const pivotToolbar = createPivotToolbar(input.options, input.pivotMeta);
+  const pivotToolbar = createPivotToolbar(
+    input.pivotOptions ?? input.options,
+    input.pivotMeta,
+    input.pivotRuntime
+  );
   if (pivotToolbar) {
     input.shell.append(pivotToolbar);
   }

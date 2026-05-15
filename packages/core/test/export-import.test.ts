@@ -34,6 +34,42 @@ describe("export/import model", () => {
     expect(exportCsv(matrix)).toContain("EXP-2,,860");
   });
 
+  it("neutralizes formula-like strings in CSV exports", () => {
+    const dangerous: GridExportMatrix = {
+      columns: [
+        { id: "id", field: "id", headerName: "ID" },
+        { id: "memo", field: "memo", headerName: "Memo" },
+        { id: "amount", field: "amount", headerName: "Amount" }
+      ],
+      headerRows: [[{ value: "ID" }, { value: "Memo" }, { value: "Amount" }]],
+      bodyRows: [
+        [{ value: "A" }, { value: "=HYPERLINK(\"https://example.test\")" }, { value: -42 }],
+        [{ value: "B" }, { value: " +SUM(1,2)" }, { value: "@risk" }],
+        [{ value: "C" }, { value: "-text" }, { value: 42 }]
+      ]
+    };
+
+    expect(exportCsv(dangerous)).toBe([
+      "ID,Memo,Amount",
+      "A,\"'=HYPERLINK(\"\"https://example.test\"\")\",-42",
+      "B,\"' +SUM(1,2)\",'@risk",
+      "C,'-text,42"
+    ].join("\r\n"));
+  });
+
+  it("writes formula-like XLSX values as strings, not formula cells", () => {
+    const xlsx = exportXlsx({
+      columns: [{ id: "memo", field: "memo", headerName: "Memo" }],
+      headerRows: [[{ value: "Memo" }]],
+      bodyRows: [[{ value: "=1+1" }], [{ value: "@lookup" }]]
+    });
+    const workbook = decodeAscii(xlsx);
+
+    expect(workbook).toContain("<t>=1+1</t>");
+    expect(workbook).toContain("<t>@lookup</t>");
+    expect(workbook).not.toContain("<f>");
+  });
+
   it("imports CSV rows with typed parser", () => {
     const result = createGridImport(
       "id,amount\r\nA,42",
@@ -121,6 +157,15 @@ describe("export/import model", () => {
     expect(pdfText).toContain(" re S");
     expect(xlsx.content).toBeInstanceOf(Uint8Array);
     expect(parsed.rows[1]).toEqual(["ID", "Region", "Amount"]);
+  });
+
+  it("rejects custom formats without an explicit adapter", () => {
+    expect(() => createGridExport(matrix, { format: "enterprise-pdf" })).toThrow(
+      "Register an export.adapter plugin"
+    );
+    expect(() => createGridImport("id\r\nA", { format: "enterprise-xlsx" })).toThrow(
+      "Register an import.adapter plugin"
+    );
   });
 
   it("keeps row-spanned PDF body blocks on the same page when possible", () => {

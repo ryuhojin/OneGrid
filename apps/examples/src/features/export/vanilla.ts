@@ -7,6 +7,7 @@ import {
   exportPagedGridOptions,
   exportPagedRows,
   exportRows,
+  sampleEnterpriseImport,
   exportWideColumns,
   exportWideGridOptions,
   exportWideRows
@@ -71,6 +72,18 @@ export function mountExportExample(el: HTMLElement): { destroy(): void } {
     }),
     createButton("Print layout", () => {
       void runExport(standardGrid, { format: "print" }, standardInspector);
+    }),
+    createButton("Export adapter JSON", () => {
+      void runExport(standardGrid, { format: "enterprise-json" }, standardInspector);
+    }),
+    createButton("Import adapter JSON", async () => {
+      const result = await standardGrid.importData(sampleEnterpriseImport, {
+        ...exportImportOptions,
+        format: "enterprise-json",
+        mode: "replace"
+      });
+      standardInspector.imported.textContent = String(result.rowCount);
+      standardInspector.preview.textContent = "Imported enterprise adapter JSON";
     }),
     createFileImport("Import CSV file", ".csv,text/csv", async (file) => {
       const result = await standardGrid.importData(await file.text(), {

@@ -71,6 +71,7 @@ test("column virtualization keeps header, body, and pinned panes aligned while s
     const cell = document.querySelector('[data-layout-section="body"] [data-column-id="metric32"]');
     const footer = document.querySelector('[data-layout-section="footer"]');
     const viewport = document.querySelector('[data-layout-viewport="body"]');
+    const grid = document.querySelector<HTMLElement>('[role="grid"]');
     const headerRect = header?.getBoundingClientRect();
     const cellRect = cell?.getBoundingClientRect();
     const footerRect = footer?.getBoundingClientRect();
@@ -79,12 +80,15 @@ test("column virtualization keeps header, body, and pinned panes aligned while s
     return {
       headerCellOffset: Math.abs((headerRect?.left ?? 0) - (cellRect?.left ?? 100)),
       footerOffset: Math.abs((footerRect?.left ?? 0) - (viewportRect?.left ?? 100)),
+      layoutScrollLeft: Number(grid?.dataset.layoutScrollLeft),
+      viewportScrollLeft: viewport?.scrollLeft ?? -1,
       gridScrollLeft: document.querySelector('[role="grid"]')?.scrollLeft ?? -1
     };
   });
 
   expect(alignment.headerCellOffset).toBeLessThanOrEqual(1);
   expect(alignment.footerOffset).toBeLessThanOrEqual(1);
+  expect(alignment.layoutScrollLeft).toBe(alignment.viewportScrollLeft);
   expect(alignment.gridScrollLeft).toBe(0);
 });
 

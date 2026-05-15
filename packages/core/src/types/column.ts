@@ -12,6 +12,7 @@ import type {
 import type { LocaleFormatterBridge } from "../i18n/localeTypes.js";
 
 export type ColumnDef<TData = unknown> = DataColumnDef<TData> | ColumnGroupDef<TData>;
+export type ColumnGroupShow = "always" | "open" | "closed";
 
 export type DataColumnDefaults<TData = unknown> = Partial<
   Omit<DataColumnDef<TData>, "columnId" | "id" | "field">
@@ -26,6 +27,7 @@ export interface DataColumnDef<TData = unknown> {
   readonly id?: ColumnId;
   readonly field?: string;
   readonly headerName?: string;
+  readonly columnGroupShow?: ColumnGroupShow;
   readonly headerTooltip?: string;
   readonly headerRenderer?: HeaderRendererDef<TData>;
   readonly type?: ColumnTypeReference;
@@ -37,6 +39,11 @@ export interface DataColumnDef<TData = unknown> {
   readonly hidden?: boolean;
   readonly resizable?: boolean;
   readonly movable?: boolean;
+  readonly hideable?: boolean;
+  readonly pinnable?: boolean;
+  readonly lockVisible?: boolean;
+  readonly lockPinned?: boolean;
+  readonly lockPosition?: boolean;
   readonly sortable?: boolean;
   readonly sort?: "asc" | "desc";
   readonly sortComparator?: SortComparator<TData>;
@@ -61,6 +68,7 @@ export interface ColumnGroupDef<TData = unknown> {
   readonly columnId?: ColumnId;
   readonly groupId?: ColumnId;
   readonly headerName: string;
+  readonly columnGroupShow?: ColumnGroupShow;
   readonly children: readonly ColumnDef<TData>[];
   readonly marryChildren?: boolean;
   readonly openByDefault?: boolean;

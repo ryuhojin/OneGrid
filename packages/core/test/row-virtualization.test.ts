@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   calculateFixedRowVirtualWindow,
   createMeasuredRowHeightCache,
+  createRowHeightIndex,
   createSegmentedVirtualScroll,
+  calculateVariableRowVirtualWindow,
+  getSegmentedScrollTopForRow,
+  getScrollTopForVariableRow,
   getScrollTopForRow,
+  resolveSegmentedVirtualRowWindow,
   toLogicalScrollTop,
   toPhysicalScrollTop
 } from "../src/index.js";
@@ -84,6 +89,50 @@ describe("row virtualization", () => {
     ]);
   });
 
+  it("calculates a variable row-height window with exact spacers", () => {
+    const rowHeightIndex = createRowHeightIndex({
+      rowCount: 6,
+      estimatedRowHeight: 40,
+      getRowHeight: (index) => [30, 60, 40, 80, 36, 44][index]
+    });
+    const window = calculateVariableRowVirtualWindow({
+      rowHeightIndex,
+      scrollTop: 70,
+      viewportHeight: 100,
+      overscan: { before: 1, after: 1 },
+      maxDomRows: 5
+    });
+
+    expect(window.visibleFirstRow).toBe(1);
+    expect(window.visibleLastRow).toBe(3);
+    expect(window.firstRow).toBe(0);
+    expect(window.lastRow).toBe(4);
+    expect(window.beforeHeight).toBe(0);
+    expect(window.afterHeight).toBe(44);
+    expect(window.totalHeight).toBe(290);
+    expect(window.renderedRowCount).toBe(5);
+  });
+
+  it("calculates scrollToRow for variable row heights", () => {
+    const rowHeightIndex = createRowHeightIndex({
+      rowCount: 4,
+      estimatedRowHeight: 40,
+      getRowHeight: (index) => [30, 60, 40, 80][index]
+    });
+
+    expect(getScrollTopForVariableRow({
+      rowHeightIndex,
+      rowIndex: 2,
+      viewportHeight: 100
+    })).toBe(90);
+    expect(getScrollTopForVariableRow({
+      rowHeightIndex,
+      rowIndex: 2,
+      viewportHeight: 100,
+      align: "end"
+    })).toBe(30);
+  });
+
   it("maps 10M rows into a bounded physical scroll range", () => {
     const state = createSegmentedVirtualScroll({
       rowCount: 10_000_000,
@@ -112,4 +161,46 @@ describe("row virtualization", () => {
     expect(physical).toBeLessThan(base.physicalScrollHeight);
     expect(Math.abs(roundTrip - logical)).toBeLessThan(1);
   });
+
+  it("resolves the final 100M segmented viewport window from physical bottom scroll", () => {
+    const base = {
+      rowCount: 100_000_000,
+      rowHeight: 30,
+      viewportHeight: 430,
+      maxScrollHeight: 24_000_000,
+      maxDomRows: 80
+    };
+    const top = resolveSegmentedVirtualRowWindow(base);
+    const bottom = resolveSegmentedVirtualRowWindow({
+      ...base,
+      physicalScrollTop: top.maxPhysicalScrollTop
+    });
+
+    expect(bottom.logicalScrollTop).toBe(bottom.maxLogicalScrollTop);
+    expect(bottom.lastVisibleRow).toBe(99_999_999);
+    expect(bottom.firstVisibleRow).toBeLessThan(bottom.lastVisibleRow);
+    expect(bottom.renderedRowCount).toBeLessThanOrEqual(80);
+  });
+
+  it("seeks to the final segmented row with end alignment", () => {
+    const logicalScrollTop = getSegmentedScrollTopForRow({
+      rowCount: 100_000_000,
+      rowHeight: 30,
+      viewportHeight: 430,
+      maxScrollHeight: 24_000_000,
+      rowIndex: 99_999_999,
+      align: "end"
+    });
+    const window = resolveSegmentedVirtualRowWindow({
+      rowCount: 100_000_000,
+      rowHeight: 30,
+      viewportHeight: 430,
+      maxScrollHeight: 24_000_000,
+      logicalScrollTop
+    });
+
+    expect(logicalScrollTop).toBe(window.maxLogicalScrollTop);
+    expect(window.lastVisibleRow).toBe(99_999_999);
+  });
+
 });

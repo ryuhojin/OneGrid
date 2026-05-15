@@ -3,6 +3,7 @@ import { createLocaleFormatter } from "../i18n/index.js";
 import type { CellContext } from "../types/column.js";
 import type { MergeOptions, MergeSpan } from "../types/grid-options.js";
 import type { MergeMeta } from "../types/shared.js";
+import { createCellKey, createCellSpanIndex, createEmptyCellSpanIndex } from "./cellSpanIndex.js";
 import type { CellSpan, CellSpanModel, CellSpanRow } from "./cellSpanTypes.js";
 
 export interface CellSpanModelInput<TData = unknown> {
@@ -36,14 +37,16 @@ export function createCellSpanModel<TData>(
 
   return Object.freeze({
     spans: Object.freeze([...index.spans]),
-    byCell: index.byCell
+    byCell: index.byCell,
+    index: createCellSpanIndex(index.spans, index.byCell)
   });
 }
 
 export function createEmptyCellSpanModel(): CellSpanModel {
   return Object.freeze({
     spans: Object.freeze([]),
-    byCell: new Map<string, CellSpan>()
+    byCell: new Map<string, CellSpan>(),
+    index: createEmptyCellSpanIndex()
   });
 }
 
@@ -337,6 +340,4 @@ function readField(row: unknown, field: string): unknown {
   return (row as Readonly<Record<string, unknown>>)[field];
 }
 
-export function createCellKey(rowIndex: number, columnIndex: number): string {
-  return `${rowIndex}:${columnIndex}`;
-}
+export { createCellKey } from "./cellSpanIndex.js";

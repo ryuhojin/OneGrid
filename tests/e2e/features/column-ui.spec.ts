@@ -80,6 +80,18 @@ test("column UI example exposes menu and tool panel surfaces", async ({ page }) 
   await expect(page.getByRole("checkbox", { name: "Audit Note" })).toBeVisible();
 });
 
+test("column UI example honors column policy flags", async ({ page }) => {
+  await page.goto("/#COL-003");
+
+  await page.getByLabel("Column menu ID").click();
+  await expect(page.getByRole("menuitem", { name: "Auto size ID" })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Hide ID" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Columns" }).click();
+  await expect(page.getByRole("checkbox", { name: "ID" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Pin Owner left" })).toBeDisabled();
+});
+
 async function getWidth(locator: Locator): Promise<number> {
   const box = await locator.boundingBox();
   return box?.width ?? 0;

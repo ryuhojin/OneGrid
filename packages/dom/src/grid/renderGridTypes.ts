@@ -1,5 +1,6 @@
 import type {
   AggregateResult,
+  DataSourceStatusSnapshot,
   InfiniteRowEntry,
   MergeMeta,
   ServerRowEntry,
@@ -17,6 +18,7 @@ export interface RowRenderState<TData = unknown> {
   readonly loading: boolean;
   readonly hasMore: boolean;
   readonly aggregate?: AggregateResult;
+  readonly dataSourceStatus?: DataSourceStatusSnapshot;
   readonly error?: unknown;
   readonly mergeMeta?: readonly MergeMeta[];
   onLoadMore(): void;

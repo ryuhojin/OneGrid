@@ -23,6 +23,7 @@ const model = new ServerRowModel({
 });
 
 await model.loadPage(0);
+await model.loadRoutePage(["region=Seoul"], 1);
 await model.expandGroup("region=Seoul");
 await model.collapseGroup("region=Seoul");
 await model.refresh();
@@ -36,8 +37,10 @@ new OneGrid({
   el,
   columns,
   rowKey: "id",
+  duplicateRowKeyPolicy: "error",
   rowModel: "server",
   dataSource,
+  dataSourceOptions: { retry: { attempts: 3, delayMs: 100, backoff: "exponential" } },
   server: { pageSize: 100 },
   sorting: { serverOnly: true, model: sortModel },
   filtering: { serverOnly: true, model: filterModel },
@@ -47,9 +50,54 @@ new OneGrid({
 });
 ```
 
+The same duplicate row id policy applies to server pages. A server response that repeats an explicit
+`rowKey` is rejected by default because remote selection, edit transactions, and route cache updates
+must target exactly one row. Use `duplicateRowKeyPolicy: "suffix"` only as a temporary compatibility
+mode for non-transactional legacy responses.
+
 The example route `ROW-003` renders server-owned region groups at the root level. Expanding a group
 keeps the root group list in place, sends that group's `groupKeys` back to the `DataSource`, and
 composes the returned child block under the matching group header. Multiple groups can remain expanded
 at the same time; cached child blocks are reused until `refresh()` purges the cache and reloads the
 root plus currently expanded groups. The page also exposes request model metadata, refreshes the server
 cache, and applies a transaction update through `DataSource.updateRows`.
+
+## Error And Retry
+
+Server row model requests use the shared DataSource execution contract. A failed `getRows` call is
+normalized to `DataSourceError`, retryable errors can be retried through `dataSourceOptions.retry`,
+and `model.status` exposes the last `DataSourceStatusSnapshot`.
+
+```ts
+const model = new ServerRowModel({
+  dataSource,
+  retryPolicy: { attempts: 3, delayMs: 100, backoff: "linear" }
+});
+
+try {
+  await model.loadPage(0);
+} catch (error) {
+  console.log(model.status?.status, error);
+}
+```
+
+The DOM grid emits `dataRequested`, `dataLoaded`, and `error` with the same request ids used by the
+core row model.
+
+## Route Cache
+
+Server routes are identified by their `groupKeys`. The root route uses `[]`, while an expanded
+group such as `["region=Seoul"]` has its own cache pages and cursor chain. This prevents a child
+route cursor from polluting the root page cursor, and it allows route state to be restored from
+`api.getState().rowModelState`.
+
+```ts
+const firstSeoulPage = await model.loadRoutePage(["region=Seoul"], 0);
+const secondSeoulPage = await model.loadRoutePage(["region=Seoul"], 1);
+
+const state = model.getState();
+// state.routes includes root and group route cursors.
+```
+
+`refresh()` clears all server route cache entries. Calling `loadRoutePage(groupKeys, page, true)`
+refreshes only that route before loading the requested page.

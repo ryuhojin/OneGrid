@@ -5,7 +5,7 @@ brand guide or public-sector design system. The bridge maps tenant tokens into O
 variables and returns a `theme` object that can be passed to every entry point.
 
 ```ts
-import { createSiTheme } from "@onegrid/themes";
+import { createSiTheme, validateSiTheme } from "@onegrid/themes";
 
 const theme = createSiTheme({
   name: "si-public-red",
@@ -20,6 +20,11 @@ const theme = createSiTheme({
     }
   }
 });
+
+const validation = validateSiTheme(theme);
+if (!validation.valid) {
+  throw new Error(validation.errors.map((issue) => issue.message).join("\n"));
+}
 
 api.applyTheme(theme);
 ```
@@ -55,6 +60,35 @@ red `R215 G25 B31`, dark red `R139 G3 B4`, dark gray `R101 G92 B79`, light gray
 | `shadows.popover` | `--og-shadow-popover` | Menus, filter panels, and editor overlays |
 
 `overrides` can still target any `--og-*` variable for project-specific exceptions.
+
+## Validation Gate
+
+`validateSiTheme()` checks tenant themes before rollout. It keeps OneGrid runtime rendering
+permissive, but gives SI projects a release gate for common brand-token mistakes:
+
+- foreground/background contrast for body, header, pinned panes, panels, summary, selected cells,
+  accent controls, and focus rings;
+- minimum row and header heights for enterprise hit targets;
+- `--og-*` variable namespace and unsafe CSS value diagnostics.
+
+```ts
+const result = validateSiTheme(theme, {
+  minimumTextContrastRatio: 4.5,
+  minimumUiContrastRatio: 3,
+  minRowHeightPx: 28,
+  minHeaderHeightPx: 32,
+  unsupportedColorSeverity: "error"
+});
+
+if (!result.valid) {
+  console.table(result.errors);
+}
+```
+
+The validator uses theme defaults for omitted variables, so a tenant can provide only the brand
+tokens it owns while still checking the final OneGrid contrast surface. Unsupported `--og-color-*`
+formats fail the gate by default; keep tenant palettes in hex, `rgb()`, or `rgba()` form unless the
+project has a separate browser-level color validation pass.
 
 ## CSS Override Recipe
 

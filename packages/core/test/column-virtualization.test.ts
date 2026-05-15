@@ -3,6 +3,7 @@ import {
   calculateFixedColumnVirtualWindow,
   clipHeaderRowsToColumns,
   createColumnModel,
+  createColumnVirtualizationIndex,
   createHeaderModel,
   getScrollLeftForColumn
 } from "../src/index.js";
@@ -66,6 +67,31 @@ describe("column virtualization", () => {
       currentScrollLeft: 180,
       align: "nearest"
     })).toBe(180);
+  });
+
+  it("resolves wide column windows from a reusable offset index", () => {
+    const columnWidths = Array.from({ length: 50_000 }, (_, index) => 80 + (index % 7));
+    const columnIndex = createColumnVirtualizationIndex({ columnWidths });
+    const scrollLeft = columnIndex.getColumnOffset(40_000);
+    const window = calculateFixedColumnVirtualWindow({
+      columnWidths,
+      columnVirtualizationIndex: columnIndex,
+      scrollLeft,
+      viewportWidth: 640,
+      overscan: { before: 2, after: 2 },
+      maxDomColumns: 12
+    });
+
+    expect(window.visibleFirstColumn).toBe(40_000);
+    expect(window.firstColumn).toBe(39_998);
+    expect(window.renderedColumnCount).toBeLessThanOrEqual(12);
+    expect(columnIndex.sumColumns(0, columnWidths.length - 1)).toBe(columnIndex.totalWidth);
+    expect(getScrollLeftForColumn({
+      columnWidths,
+      columnVirtualizationIndex: columnIndex,
+      columnIndex: 40_000,
+      viewportWidth: 640
+    })).toBe(scrollLeft);
   });
 
   it("clips group headers to a virtualized center column range", () => {

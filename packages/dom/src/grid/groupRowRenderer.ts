@@ -114,9 +114,14 @@ function appendGroupLabel(
 
   const label = document.createElement("span");
   label.className = "og-grid__group-label";
-  label.textContent = formatGroupLabel(entry);
-  cell.title = label.textContent;
+  label.textContent = formatGroupSummary(entry);
+  cell.title = formatGroupTitle(entry);
   cell.append(label);
+
+  const aggregates = createGroupAggregateList(entry);
+  if (aggregates) {
+    cell.append(aggregates);
+  }
 }
 
 function createGroupToggle(
@@ -193,13 +198,35 @@ function getAggregateKeys<TData>(
   ];
 }
 
-function formatGroupLabel(entry: ClientGroupRowEntry): string {
+function createGroupAggregateList(entry: ClientGroupRowEntry): HTMLElement | undefined {
   const aggregates = Object.entries(entry.aggregateValues);
-  const suffix = aggregates.length === 0
-    ? ""
-    : ` | ${aggregates.map(([key, value]) => `${formatAggregateLabel(key)} ${formatCellValue(value)}`).join(" | ")}`;
+  if (aggregates.length === 0) {
+    return undefined;
+  }
 
-  return `${entry.field}: ${formatCellValue(entry.value)} (${entry.childCount} rows)${suffix}`;
+  const list = document.createElement("span");
+  list.className = "og-grid__group-aggregate-list";
+
+  for (const [key, value] of aggregates) {
+    const chip = document.createElement("span");
+    chip.className = "og-grid__group-aggregate-chip";
+    chip.dataset.groupSummaryKey = key;
+    chip.dataset.groupSummaryValue = formatCellValue(value);
+    chip.textContent = `${formatAggregateLabel(key)} ${formatCellValue(value)}`;
+    list.append(chip);
+  }
+
+  return list;
+}
+
+function formatGroupSummary(entry: ClientGroupRowEntry): string {
+  return `${entry.field}: ${formatCellValue(entry.value)} (${entry.childCount} rows)`;
+}
+
+function formatGroupTitle(entry: ClientGroupRowEntry): string {
+  const aggregateText = Object.entries(entry.aggregateValues)
+    .map(([key, value]) => `${formatAggregateLabel(key)} ${formatCellValue(value)}`);
+  return [formatGroupSummary(entry), ...aggregateText].join(" | ");
 }
 
 function formatAggregateLabel(key: string): string {

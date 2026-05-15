@@ -3,6 +3,7 @@ import {
   createLocaleFormatter,
   createSelectionState,
   freezeGridStateSnapshot,
+  isRowModelStateFor,
   normalizeFilterModel,
   normalizeSortModel
 } from "@onegrid/core";
@@ -13,6 +14,7 @@ import type {
   GridSelectionState,
   GridStateSnapshot,
   GroupModel,
+  RowModelStateSnapshot,
   SortModel
 } from "@onegrid/core";
 import { applyFrozenColumnState } from "./frozenColumns.js";
@@ -23,6 +25,7 @@ export interface DomGridRuntimeState {
   readonly sortModel: readonly SortModel[];
   readonly filterModel: FilterModel;
   readonly groupModel: GroupModel;
+  readonly rowModelState: RowModelStateSnapshot | undefined;
   readonly selectionState: GridSelectionState;
   readonly locale: string;
   readonly paginationPage: number;
@@ -36,6 +39,7 @@ export interface DomGridStateSnapshotInput {
   readonly sortModel: readonly SortModel[];
   readonly filterModel: FilterModel;
   readonly groupModel: GroupModel;
+  readonly rowModelState?: RowModelStateSnapshot | undefined;
   readonly selectionState: GridSelectionState;
   readonly locale: string;
   readonly paginationPage: number;
@@ -48,6 +52,7 @@ export function createInitialDomGridState<TData>(
   options: DomGridOptions<TData>
 ): DomGridRuntimeState {
   const snapshot = freezeGridStateSnapshot(options.initialState ?? {});
+  const rowModel = options.rowModel ?? "client";
   return {
     columnState: applyFrozenColumnState(snapshot.columnState ?? options.columnState ?? {}, options.frozenColumns),
     sortModel: options.sorting?.enabled === false
@@ -57,6 +62,9 @@ export function createInitialDomGridState<TData>(
       ? Object.freeze({})
       : normalizeFilterModel(snapshot.filterModel ?? options.filtering?.model),
     groupModel: snapshot.groupModel ?? options.grouping?.model ?? Object.freeze({}),
+    rowModelState: isRowModelStateFor(snapshot.rowModelState, rowModel)
+      ? snapshot.rowModelState
+      : undefined,
     selectionState: snapshot.selection ?? createSelectionState(options.selection),
     locale: createLocaleFormatter(snapshot.locale ?? options.locale).locale,
     paginationPage: getInitialPage(options, snapshot),
@@ -74,6 +82,7 @@ export function createDomGridStateSnapshot(
     sortModel: input.sortModel,
     filterModel: input.filterModel,
     groupModel: input.groupModel,
+    ...(input.rowModelState === undefined ? {} : { rowModelState: input.rowModelState }),
     selection: input.selectionState,
     pagination: {
       page: input.paginationPage,

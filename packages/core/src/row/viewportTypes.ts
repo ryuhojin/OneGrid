@@ -1,5 +1,10 @@
-import type { RowKeyInput } from "./rowIdentity.js";
-import type { GetRowsRequest, GetRowsResult } from "../types/data.js";
+import type { DuplicateRowKeyPolicy, RowKeyInput } from "./rowIdentity.js";
+import type {
+  DataSourceRetryPolicy,
+  DataSourceStatusSnapshot,
+  GetRowsRequest,
+  GetRowsResult
+} from "../types/data.js";
 import type {
   AggregateModel,
   FilterModel,
@@ -15,6 +20,7 @@ export interface ViewportRowModelOptions<TData = unknown> {
     getRows(request: GetRowsRequest): Promise<GetRowsResult<TData>>;
   };
   readonly rowKey?: RowKeyInput<TData>;
+  readonly duplicateRowKeyPolicy?: DuplicateRowKeyPolicy;
   readonly rowHeight?: number;
   readonly viewportSize?: number;
   readonly overscan?: number;
@@ -28,6 +34,7 @@ export interface ViewportRowModelOptions<TData = unknown> {
   readonly aggregateModel?: AggregateModel;
   readonly pivotModel?: PivotModel;
   readonly snapshotVersion?: string;
+  readonly retryPolicy?: DataSourceRetryPolicy;
 }
 
 export interface ViewportLoadInput {
@@ -69,6 +76,7 @@ export interface ViewportLoadResult<TData = unknown> {
   readonly cached: boolean;
   readonly stale: boolean;
   readonly prefetched: boolean;
+  readonly status: DataSourceStatusSnapshot;
 }
 
 export interface ViewportLiveUpdate<TData = unknown> {

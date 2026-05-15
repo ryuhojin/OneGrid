@@ -9,6 +9,7 @@
     "typecheck": "tsc -b tsconfig.json --pretty false"
   },
   "dependencies": {
+    "@onegrid/adapters": "workspace:*",
     "@onegrid/core": "workspace:*",
     "@onegrid/dom": "workspace:*",
     "@onegrid/pagination": "workspace:*",

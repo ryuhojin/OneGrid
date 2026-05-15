@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ColumnDef } from "@onegrid/core";
-import { OneGrid } from "../src/index.js";
+import { createAllowlistHtmlSanitizer, OneGrid, strictTextOnlySanitizer } from "../src/index.js";
 import { renderSanitizedHtml } from "../src/grid/htmlSecurity.js";
 
 interface XssRow {
@@ -137,7 +137,7 @@ describe("XSS renderer defenses", () => {
       });
 
       expect(createdPolicies).toEqual(["onegrid-test-policy"]);
-      expect(trustedInputs).toEqual(["<strong>Ready</strong>"]);
+      expect(trustedInputs).toEqual(["<strong>Ready</strong>", "<strong>Ready</strong>"]);
       expect(cell.dataset.trustedTypesPolicy).toBe("onegrid-test-policy");
       expect(cell.querySelector("strong")?.textContent).toBe("Ready");
     } finally {
@@ -147,6 +147,72 @@ describe("XSS renderer defenses", () => {
         delete (window as { trustedTypes?: unknown }).trustedTypes;
       }
     }
+  });
+
+  it("post-sanitizes external sanitizer output before using the html sink", () => {
+    const cell = document.createElement("div");
+    renderSanitizedHtml(
+      cell,
+      "<strong onclick=\"alert(1)\">Ready</strong>"
+        + "<a href=\"javascript:alert(1)\" data-safe=\"yes\">Open</a>"
+        + "<script>alert(1)</script>"
+        + "<img src=\"https://example.com/x.png\" onerror=\"alert(1)\">"
+        + "<span style=\"color:red\">Styled</span>",
+      {
+        html: {
+          allowHtmlRenderer: true,
+          sanitizer: {
+            name: "misconfigured-external",
+            mode: "external",
+            sanitize: (html) => html
+          }
+        },
+        url: { allowedProtocols: ["https:"] }
+      }
+    );
+
+    expect(cell.querySelector("strong")?.textContent).toBe("Ready");
+    expect(cell.querySelector("strong")?.getAttribute("onclick")).toBeNull();
+    expect(cell.querySelector("a")?.getAttribute("href")).toBeNull();
+    expect(cell.querySelector("a")?.getAttribute("data-safe")).toBe("yes");
+    expect(cell.querySelector("script")).toBeNull();
+    expect(cell.querySelector("img")).toBeNull();
+    expect(cell.querySelector("span")?.getAttribute("style")).toBeNull();
+  });
+
+  it("keeps text-only sanitizer output out of the html sink", () => {
+    const cell = document.createElement("div");
+    renderSanitizedHtml(cell, "&lt;strong onclick=\"alert(1)\"&gt;Ready&lt;/strong&gt;", {
+      html: {
+        allowHtmlRenderer: true,
+        sanitizer: strictTextOnlySanitizer
+      }
+    });
+
+    expect(cell.dataset.htmlSanitizerMode).toBe("text");
+    expect(cell.querySelector("strong")).toBeNull();
+    expect(cell.textContent).toBe("<strong onclick=\"alert(1)\">Ready</strong>");
+  });
+
+  it("provides an allowlist sanitizer adapter for markup-preserving deployments", () => {
+    const sanitizer = createAllowlistHtmlSanitizer();
+    const sanitized = sanitizer.sanitize(
+      "<p class=\"status\" onclick=\"alert(1)\">"
+        + "<strong>Ready</strong>"
+        + "<a href=\"https://example.com/review\">Open</a>"
+        + "<a href=\"javascript:alert(1)\">Bad</a>"
+        + "</p>",
+      { allowedProtocols: ["https:"] }
+    );
+    const template = document.createElement("template");
+    template.innerHTML = sanitized;
+
+    expect(template.content.querySelector("p")?.className).toBe("status");
+    expect(template.content.querySelector("p")?.getAttribute("onclick")).toBeNull();
+    expect(template.content.querySelector("strong")?.textContent).toBe("Ready");
+    expect(template.content.querySelectorAll("a")[0]?.getAttribute("href"))
+      .toBe("https://example.com/review");
+    expect(template.content.querySelectorAll("a")[1]?.getAttribute("href")).toBeNull();
   });
 });
 

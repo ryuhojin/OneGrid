@@ -106,6 +106,9 @@ function getClientRowModelOptions<TData>(
 
   return {
     ...(options.rowKey === undefined ? {} : { rowKey: options.rowKey }),
+    ...(options.duplicateRowKeyPolicy === undefined
+      ? {}
+      : { duplicateRowKeyPolicy: options.duplicateRowKeyPolicy }),
     columns: options.columns,
     ...(filterModel === undefined ? {} : { filterModel }),
     ...(sortModel === undefined ? {} : { sortModel }),

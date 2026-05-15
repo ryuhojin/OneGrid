@@ -1,0 +1,34 @@
+{
+  "name": "@onegrid/adapter-pdf-pdfkit",
+  "version": "0.0.0",
+  "description": "Official PDFKit export adapter for OneGrid.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -b tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@onegrid/adapters": "workspace:*",
+    "@onegrid/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "pdfkit": ">=0.15.0"
+  },
+  "peerDependenciesMeta": {
+    "pdfkit": {
+      "optional": true
+    }
+  }
+}

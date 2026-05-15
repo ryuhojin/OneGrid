@@ -77,7 +77,9 @@ context.registerExtension({
 ```
 
 `export.adapter` lets a plugin provide a custom export format after the DOM grid has built the
-visual export matrix:
+visual export matrix. A plugin may also override a built-in format such as `pdf` or `xlsx` when a
+deployment needs CJK font embedding, tenant-specific workbook styling, or a licensed document
+engine:
 
 ```ts
 context.registerExtension({
@@ -93,6 +95,52 @@ context.registerExtension({
   }
 });
 ```
+
+`import.adapter` is the matching import boundary. It receives the original file payload, the shared
+`ImportOptions`, and fallback column metadata. Use it for arbitrary external XLSX workbooks,
+compressed workbook readers, or tenant-specific document packages:
+
+```ts
+context.registerExtension({
+  point: "import.adapter",
+  id: "enterprise-xlsx",
+  payload: {
+    format: "enterprise-xlsx",
+    capabilities: { compressedXlsx: true, externalWorkbook: true },
+    import: async ({ content, options }) => {
+      const rows = await parseEnterpriseWorkbook(content, options);
+      return { rows, rowCount: rows.length, rejected: [] };
+    }
+  }
+});
+```
+
+`@onegrid/adapters` provides `createGridIoAdapterPlugin()`,
+`createExportAdapterPlugin()`, and `createImportAdapterPlugin()` helpers so these adapter
+contributions can be packaged without touching DOM internals.
+
+For server-rendered enterprise documents, `@onegrid/adapters` also provides
+`createServerDocumentExportAdapter()` and `createServerDocumentExportAdapterPlugin()`. The adapter
+posts the visual export matrix to a reviewed backend renderer or delegates to an application
+handler:
+
+```ts
+import { createServerDocumentExportAdapterPlugin } from "@onegrid/adapters";
+
+const serverExport = createServerDocumentExportAdapterPlugin("server-export", {
+  format: "server-xlsx",
+  endpoint: "/api/exports/xlsx",
+  filename: "audit.xlsx"
+});
+```
+
+Official engine-specific packages are intentionally peer/injection based:
+
+- `@onegrid/adapter-xlsx-exceljs` for ExcelJS-backed XLSX export/import.
+- `@onegrid/adapter-pdf-pdfkit` for PDFKit-backed PDF export with app-supplied fonts.
+
+These packages register the same `export.adapter` and `import.adapter` extension records. Core does
+not import `exceljs`, `pdfkit`, or tenant fonts directly.
 
 `theme` extensions are merged into the active theme before the CSP-aware runtime style is applied:
 

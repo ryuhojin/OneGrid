@@ -1,21 +1,30 @@
 import {
   freezeGridStateSnapshot,
   freezeColumnUiState,
+  applyColumnUiState,
+  createColumnStateSnapshot,
   createLocaleFormatter,
+  setColumnGroupOpen,
+  toggleColumnGroupOpen,
   normalizeFilterModel,
   normalizeSortModel
 } from "@onegrid/core";
 import { normalizePage, normalizePageSize } from "@onegrid/pagination";
+import { createDomColumnModel } from "./domColumnModel.js";
 import { applyFrozenColumnState } from "./frozenColumns.js";
 import { createDomGridStateSnapshot, getSnapshotRowIndex } from "./gridStateRuntime.js";
 import { invalidate } from "./renderInvalidation.js";
 import { OneGridBase } from "./oneGridBase.js";
 import type {
   ColumnDef,
+  ApplyColumnStateParams,
+  ColumnStateApplyResult,
   ColumnUiState,
+  GetColumnStateOptions,
   GridSelectionChangedEvent,
   GridSelectionState,
   GridStateSnapshot,
+  RowModelStateSnapshot,
   SetColumnStateOptions,
   SetGridStateOptions,
   ValidationResult
@@ -33,7 +42,8 @@ export abstract class OneGridApiBase<TData = unknown> extends OneGridBase<TData>
       paginationPage: this.paginationPage,
       paginationPageSize: this.paginationPageSize,
       virtualScrollTop: this.virtualScrollTop,
-      columnScrollLeft: this.columnScrollLeft
+      columnScrollLeft: this.columnScrollLeft,
+      rowModelState: this.createRowModelStateSnapshot()
     });
   }
 
@@ -46,10 +56,16 @@ export abstract class OneGridApiBase<TData = unknown> extends OneGridBase<TData>
     const reason = options?.reason ?? "state-api";
     const remoteModelChanged = this.applyStateSnapshot(snapshot, reason);
     if (options?.render === false) {
+      if (snapshot.rowModelState !== undefined) {
+        this.applyRowModelStateSnapshot(snapshot.rowModelState);
+      }
       return;
     }
 
-    if (remoteModelChanged && this.resetRemoteRowModel(reason)) {
+    if (remoteModelChanged && this.resetRemoteRowModel(reason, snapshot.rowModelState)) {
+      return;
+    }
+    if (snapshot.rowModelState !== undefined && this.restoreRowModelStateSnapshot(snapshot.rowModelState, reason)) {
       return;
     }
     if (this.viewportRowModel && snapshot.scroll?.top !== undefined) {
@@ -58,6 +74,85 @@ export abstract class OneGridApiBase<TData = unknown> extends OneGridBase<TData>
     }
 
     void this.render(invalidate(["columns", "rows", "layout", "overlay"], reason));
+  }
+
+  private createRowModelStateSnapshot(): RowModelStateSnapshot {
+    if (this.infiniteRowModel) {
+      return this.infiniteRowModel.getState();
+    }
+    if (this.serverRowModel) {
+      return this.serverRowModel.getState();
+    }
+    if (this.viewportRowModel) {
+      return this.viewportRowModel.getState();
+    }
+    if (this.treeRowModel) {
+      return this.treeRowModel.getState();
+    }
+    return Object.freeze({
+      rowModel: "client",
+      rowCount: this.dataRows?.length ?? this.options.data?.length ?? 0
+    });
+  }
+
+  private restoreRowModelStateSnapshot(state: RowModelStateSnapshot, reason: string): boolean {
+    if (!this.applyRowModelStateSnapshot(state)) {
+      return false;
+    }
+
+    switch (state.rowModel) {
+      case "infinite":
+        void this.render(invalidate(["rows", "overlay"], reason));
+        void this.loadNextInfiniteBlock();
+        return true;
+      case "server":
+        void this.loadServerRows(true);
+        return true;
+      case "viewport":
+        void this.scrollViewportTo(state.range?.firstRow ?? 0);
+        return true;
+      case "tree":
+        void this.render(invalidate(["rows", "overlay"], reason));
+        return true;
+      case "client":
+        return false;
+    }
+  }
+
+  private applyRowModelStateSnapshot(state: RowModelStateSnapshot): boolean {
+    switch (state.rowModel) {
+      case "infinite":
+        if (!this.infiniteRowModel) {
+          return false;
+        }
+        this.infiniteRowModel.restoreState(state);
+        this.infiniteEntries = this.infiniteRowModel.getAppendRows();
+        return true;
+      case "server":
+        if (!this.serverRowModel) {
+          return false;
+        }
+        this.serverRowModel.restoreState(state);
+        if (state.page !== undefined) {
+          this.paginationPage = state.page + 1;
+        }
+        return true;
+      case "viewport":
+        if (!this.viewportRowModel) {
+          return false;
+        }
+        this.viewportRowModel.restoreState(state);
+        return true;
+      case "tree":
+        if (!this.treeRowModel) {
+          return false;
+        }
+        this.treeRowModel.restoreState(state);
+        this.treeEntries = this.treeRowModel.visibleRows;
+        return true;
+      case "client":
+        return false;
+    }
   }
 
   setColumns(columns: readonly ColumnDef<TData>[]): void {
@@ -71,8 +166,9 @@ export abstract class OneGridApiBase<TData = unknown> extends OneGridBase<TData>
     void this.render(invalidate(["columns", "rows", "layout", "overlay"], "columns-api"));
   }
 
-  getColumnState(): ColumnUiState {
-    return freezeColumnUiState(this.columnState);
+  getColumnState(options?: GetColumnStateOptions): ColumnUiState {
+    const model = createDomColumnModel({ ...this.options, columnState: this.columnState });
+    return createColumnStateSnapshot(model, this.columnState, options);
   }
 
   setColumnState(state: ColumnUiState, options?: SetColumnStateOptions): void {
@@ -80,7 +176,7 @@ export abstract class OneGridApiBase<TData = unknown> extends OneGridBase<TData>
       return;
     }
 
-    this.applyColumnState(
+    this.commitColumnState(
       applyFrozenColumnState(freezeColumnUiState(state), this.options.frozenColumns),
       options?.reason ?? "column-state-api",
       ["columns", "rows", "layout", "overlay"],
@@ -88,14 +184,78 @@ export abstract class OneGridApiBase<TData = unknown> extends OneGridBase<TData>
     );
   }
 
+  applyColumnState(
+    params: ApplyColumnStateParams,
+    options?: SetColumnStateOptions
+  ): ColumnStateApplyResult {
+    if (this.destroyed) {
+      return Object.freeze({
+        applied: false,
+        state: freezeColumnUiState(this.columnState),
+        appliedColumnIds: Object.freeze([]),
+        appliedGroupIds: Object.freeze([]),
+        missingColumnIds: Object.freeze([]),
+        missingGroupIds: Object.freeze([])
+      });
+    }
+
+    const model = createDomColumnModel({ ...this.options, columnState: this.columnState });
+    const result = applyColumnUiState(model, this.columnState, params);
+    if (!result.applied) {
+      return result;
+    }
+
+    const nextState = applyFrozenColumnState(result.state, this.options.frozenColumns);
+    const committed = this.commitColumnState(
+      nextState,
+      options?.reason ?? "column-state-apply",
+      ["columns", "rows", "layout", "overlay"],
+      options?.render !== false
+    );
+
+    return Object.freeze({
+      ...result,
+      applied: committed,
+      state: committed ? freezeColumnUiState(nextState) : freezeColumnUiState(this.columnState)
+    });
+  }
+
   resetColumnState(options?: SetColumnStateOptions): void {
     if (this.destroyed) {
       return;
     }
 
-    this.applyColumnState(
+    this.commitColumnState(
       applyFrozenColumnState(this.options.columnState ?? {}, this.options.frozenColumns),
       options?.reason ?? "column-state-reset",
+      ["columns", "rows", "layout", "overlay"],
+      options?.render !== false
+    );
+  }
+
+  setColumnGroupOpen(groupId: string, open: boolean, options?: SetColumnStateOptions): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    const model = createDomColumnModel({ ...this.options, columnState: this.columnState });
+    this.commitColumnState(
+      setColumnGroupOpen(model, this.columnState, groupId, open),
+      options?.reason ?? "column-group-state-api",
+      ["columns", "rows", "layout", "overlay"],
+      options?.render !== false
+    );
+  }
+
+  toggleColumnGroup(groupId: string, options?: SetColumnStateOptions): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    const model = createDomColumnModel({ ...this.options, columnState: this.columnState });
+    this.commitColumnState(
+      toggleColumnGroupOpen(model, this.columnState, groupId),
+      options?.reason ?? "column-group-toggle-api",
       ["columns", "rows", "layout", "overlay"],
       options?.render !== false
     );
@@ -124,7 +284,9 @@ export abstract class OneGridApiBase<TData = unknown> extends OneGridBase<TData>
   private applyStateSnapshot(snapshot: GridStateSnapshot, reason: string): boolean {
     let remoteModelChanged = false;
     if (snapshot.columnState !== undefined) {
-      const nextState = applyFrozenColumnState(snapshot.columnState, this.options.frozenColumns);
+      const nextState = this.constrainColumnState(
+        applyFrozenColumnState(snapshot.columnState, this.options.frozenColumns)
+      );
       const before = this.emitGridBeforeEvent("beforeColumnStateChange", {
         type: "beforeColumnStateChange",
         previousColumnState: freezeColumnUiState(this.columnState),

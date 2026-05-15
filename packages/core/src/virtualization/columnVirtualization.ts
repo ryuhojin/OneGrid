@@ -1,16 +1,20 @@
 import { resolveOverscan } from "./rowVirtualization.js";
+import {
+  createColumnVirtualizationIndex
+} from "./columnVirtualizationIndex.js";
 import type {
   FixedColumnVirtualWindow,
   OverscanOptions,
   ScrollToColumnAlign
 } from "./types.js";
+import type { ColumnVirtualizationIndex } from "./columnVirtualizationIndex.js";
 
-const DEFAULT_COLUMN_WIDTH = 120;
 const DEFAULT_VIEWPORT_WIDTH = 800;
 const DEFAULT_MAX_DOM_COLUMNS = 80;
 
 export interface FixedColumnVirtualWindowInput {
   readonly columnWidths: readonly number[];
+  readonly columnVirtualizationIndex?: ColumnVirtualizationIndex | undefined;
   readonly scrollLeft?: number | undefined;
   readonly viewportWidth?: number | undefined;
   readonly overscan?: number | OverscanOptions | undefined;
@@ -20,12 +24,16 @@ export interface FixedColumnVirtualWindowInput {
 export function calculateFixedColumnVirtualWindow(
   input: FixedColumnVirtualWindowInput
 ): FixedColumnVirtualWindow {
-  const widths = normalizeWidths(input.columnWidths);
-  const columnCount = widths.length;
+  const index = input.columnVirtualizationIndex
+    ?? createColumnVirtualizationIndex({ columnWidths: input.columnWidths });
+  const columnCount = index.columnCount;
   const viewportWidth = normalizePositive(input.viewportWidth, DEFAULT_VIEWPORT_WIDTH);
-  const scrollLeft = normalizeNonNegative(input.scrollLeft);
-  const offsets = calculateOffsets(widths);
-  const totalWidth = offsets[columnCount] ?? 0;
+  const totalWidth = index.totalWidth;
+  const scrollLeft = clamp(
+    normalizeNonNegative(input.scrollLeft),
+    0,
+    Math.max(0, totalWidth - viewportWidth)
+  );
   const overscan = resolveOverscan(input.overscan);
 
   if (columnCount === 0) {
@@ -48,8 +56,9 @@ export function calculateFixedColumnVirtualWindow(
     });
   }
 
-  const visibleFirstColumn = findVisibleFirstColumn(widths, offsets, scrollLeft);
-  const visibleLastColumn = findVisibleLastColumn(widths, offsets, visibleFirstColumn, scrollLeft + viewportWidth);
+  const viewportEnd = Math.min(totalWidth, scrollLeft + viewportWidth);
+  const visibleFirstColumn = index.findColumnAtOffset(scrollLeft);
+  const visibleLastColumn = index.findColumnAtOffset(Math.max(scrollLeft, viewportEnd - 0.0001));
   const visibleColumnCount = visibleLastColumn - visibleFirstColumn + 1;
   const maxRenderedColumns = normalizeMaxRendered(input.maxDomColumns, visibleColumnCount);
   const windowRange = resolveRenderedColumnRange({
@@ -60,16 +69,17 @@ export function calculateFixedColumnVirtualWindow(
     overscanAfter: overscan.after,
     maxRenderedColumns
   });
-  const renderedWidth = sumWidths(widths, windowRange.firstColumn, windowRange.lastColumn);
-  const afterStart = offsets[windowRange.lastColumn + 1] ?? totalWidth;
+  const renderedWidth = index.sumColumns(windowRange.firstColumn, windowRange.lastColumn);
+  const offsetLeft = index.getColumnOffset(windowRange.firstColumn);
+  const afterStart = index.getColumnOffset(windowRange.lastColumn + 1);
 
   return freezeColumnWindow({
     firstColumn: windowRange.firstColumn,
     lastColumn: windowRange.lastColumn,
     visibleFirstColumn,
     visibleLastColumn,
-    offsetLeft: offsets[windowRange.firstColumn] ?? 0,
-    beforeWidth: offsets[windowRange.firstColumn] ?? 0,
+    offsetLeft,
+    beforeWidth: offsetLeft,
     afterWidth: Math.max(0, totalWidth - afterStart),
     totalWidth,
     renderedWidth,
@@ -84,22 +94,23 @@ export function calculateFixedColumnVirtualWindow(
 
 export function getScrollLeftForColumn(input: {
   readonly columnWidths: readonly number[];
+  readonly columnVirtualizationIndex?: ColumnVirtualizationIndex;
   readonly columnIndex: number;
   readonly viewportWidth?: number;
   readonly currentScrollLeft?: number;
   readonly align?: ScrollToColumnAlign;
 }): number {
-  const widths = normalizeWidths(input.columnWidths);
-  if (widths.length === 0) {
+  const index = input.columnVirtualizationIndex
+    ?? createColumnVirtualizationIndex({ columnWidths: input.columnWidths });
+  if (index.columnCount === 0) {
     return 0;
   }
 
-  const columnIndex = clamp(Math.trunc(input.columnIndex), 0, widths.length - 1);
+  const columnIndex = clamp(Math.trunc(input.columnIndex), 0, index.columnCount - 1);
   const viewportWidth = normalizePositive(input.viewportWidth, DEFAULT_VIEWPORT_WIDTH);
-  const offsets = calculateOffsets(widths);
-  const totalWidth = offsets[offsets.length - 1] ?? 0;
-  const columnLeft = offsets[columnIndex] ?? 0;
-  const columnRight = columnLeft + (widths[columnIndex] ?? DEFAULT_COLUMN_WIDTH);
+  const totalWidth = index.totalWidth;
+  const columnLeft = index.getColumnOffset(columnIndex);
+  const columnRight = columnLeft + index.getColumnWidth(columnIndex);
   const currentScrollLeft = normalizeNonNegative(input.currentScrollLeft);
   const maxScrollLeft = Math.max(0, totalWidth - viewportWidth);
 
@@ -144,55 +155,6 @@ function resolveRenderedColumnRange(input: {
   }
 
   return { firstColumn, lastColumn };
-}
-
-function findVisibleFirstColumn(
-  widths: readonly number[],
-  offsets: readonly number[],
-  scrollLeft: number
-): number {
-  for (let index = 0; index < widths.length; index += 1) {
-    if ((offsets[index] ?? 0) + (widths[index] ?? DEFAULT_COLUMN_WIDTH) > scrollLeft) {
-      return index;
-    }
-  }
-  return Math.max(0, widths.length - 1);
-}
-
-function findVisibleLastColumn(
-  widths: readonly number[],
-  offsets: readonly number[],
-  firstColumn: number,
-  viewportEnd: number
-): number {
-  let lastColumn = firstColumn;
-  for (let index = firstColumn; index < widths.length; index += 1) {
-    if ((offsets[index] ?? 0) < viewportEnd) {
-      lastColumn = index;
-    } else {
-      break;
-    }
-  }
-  return lastColumn;
-}
-
-function normalizeWidths(widths: readonly number[]): readonly number[] {
-  return Object.freeze(widths.map((width) => normalizePositive(width, DEFAULT_COLUMN_WIDTH)));
-}
-
-function calculateOffsets(widths: readonly number[]): readonly number[] {
-  const offsets: number[] = [];
-  let total = 0;
-  for (const width of widths) {
-    offsets.push(total);
-    total += width;
-  }
-  offsets.push(total);
-  return Object.freeze(offsets);
-}
-
-function sumWidths(widths: readonly number[], first: number, last: number): number {
-  return widths.slice(first, last + 1).reduce((total, width) => total + width, 0);
 }
 
 function normalizeMaxRendered(value: number | undefined, visibleColumnCount: number): number {

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  DuplicateRowKeyError,
   serializeServerFilterModel,
   serializeServerSortModel,
   ServerRowModel
 } from "../src/index.js";
-import type { GetRowsRequest, RowUpdate } from "../src/index.js";
+import type { ColumnDef, GetRowsRequest, RowUpdate } from "../src/index.js";
 
 interface ServerOrderRow {
   readonly id: string;
@@ -25,6 +26,10 @@ function createRows(start: number, end: number): readonly ServerOrderRow[] {
 describe("server row model", () => {
   it("builds server requests with sort, filter, group, aggregate, and pivot models", async () => {
     let capturedRequest: GetRowsRequest | undefined;
+    const resultColumns: readonly ColumnDef<ServerOrderRow>[] = [
+      { field: "region", headerName: "Region" },
+      { field: "amount", headerName: "Amount" }
+    ];
     const model = new ServerRowModel<ServerOrderRow>({
       pageSize: 25,
       sortModel: [{ field: "amount", direction: "desc" }],
@@ -38,7 +43,11 @@ describe("server row model", () => {
       dataSource: {
         async getRows(request) {
           capturedRequest = request;
-          return { rows: createRows(request.startRow, request.endRow), rowCount: 100 };
+          return {
+            rows: createRows(request.startRow, request.endRow),
+            columns: resultColumns,
+            rowCount: 100
+          };
         }
       }
     });
@@ -54,6 +63,7 @@ describe("server row model", () => {
     expect(capturedRequest?.groupKeys).toEqual(["region=Seoul"]);
     expect(capturedRequest?.aggregateModel?.fields[0]?.alias).toBe("amountTotal");
     expect(capturedRequest?.pivotModel?.values).toEqual(["amount"]);
+    expect(result.columns).toBe(resultColumns);
     expect(result.entries).toHaveLength(25);
   });
 
@@ -96,6 +106,49 @@ describe("server row model", () => {
     expect(first.cached).toBe(false);
     expect(second.cached).toBe(true);
     expect(refreshed.cached).toBe(false);
+  });
+
+  it("rejects duplicate explicit row ids returned by a server page", async () => {
+    const duplicateRows = [createRows(0, 1)[0], createRows(0, 1)[0]] as readonly ServerOrderRow[];
+    const model = new ServerRowModel<ServerOrderRow>({
+      rowKey: "id",
+      pageSize: 2,
+      dataSource: {
+        async getRows() {
+          return { rows: duplicateRows, rowCount: duplicateRows.length };
+        }
+      }
+    });
+
+    await expect(model.loadPage(0)).rejects.toBeInstanceOf(DuplicateRowKeyError);
+  });
+
+  it("retries retryable server data source failures with standardized status", async () => {
+    let requestCount = 0;
+    const model = new ServerRowModel<ServerOrderRow>({
+      pageSize: 5,
+      retryPolicy: { attempts: 2, delayMs: 0 },
+      dataSource: {
+        async getRows(request) {
+          requestCount += 1;
+          if (requestCount === 1) {
+            throw Object.assign(new Error("Temporary outage"), { statusCode: 503 });
+          }
+          return { rows: createRows(request.startRow, request.endRow), rowCount: 50 };
+        }
+      }
+    });
+
+    const result = await model.loadPage(0);
+
+    expect(requestCount).toBe(2);
+    expect(result.status).toMatchObject({
+      status: "success",
+      requestKind: "getRows",
+      attempt: 2,
+      maxAttempts: 2
+    });
+    expect(model.status).toMatchObject({ status: "success", attempt: 2 });
   });
 
   it("dedupes concurrent server page requests", async () => {
@@ -291,6 +344,40 @@ describe("server row model", () => {
     if (firstEntry?.kind === "data") {
       expect(firstEntry.data.status).toBe("Rejected");
     }
+  });
+
+  it("retries server transaction updates with standardized status", async () => {
+    let updateCount = 0;
+    const model = new ServerRowModel<ServerOrderRow>({
+      pageSize: 2,
+      rowKey: "id",
+      retryPolicy: { attempts: 2, delayMs: 0 },
+      dataSource: {
+        async getRows(request) {
+          return { rows: createRows(request.startRow, request.endRow), rowCount: 10 };
+        },
+        async updateRows() {
+          updateCount += 1;
+          if (updateCount === 1) {
+            throw Object.assign(new Error("Write conflict"), { statusCode: 409 });
+          }
+          return {
+            rows: [{ id: "ORD-0", region: "Seoul", amount: 1000, status: "Approved" }]
+          };
+        }
+      }
+    });
+
+    await model.loadPage(0);
+    await model.applyTransaction([{ rowKey: "ORD-0", row: { status: "Approved" } }]);
+
+    expect(updateCount).toBe(2);
+    expect(model.status).toMatchObject({
+      requestKind: "updateRows",
+      status: "success",
+      attempt: 2,
+      maxAttempts: 2
+    });
   });
 });
 

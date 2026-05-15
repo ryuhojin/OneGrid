@@ -43,9 +43,44 @@ The foundation supports:
 
 - stable row identity from `rowKey`
 - `setClientRows`, `appendClientRows`, `updateClientRows`, and `removeClientRows`
+- transaction result variants (`setClientRowsWithResult`, `appendClientRowsWithResult`,
+  `updateClientRowsWithResult`, `removeClientRowsWithResult`)
 - client filter conditions and quick text
 - multi-column sort model
 - expanded grouped row entries
 - aggregate values for the filtered set and each group
+
+When `rowKey` is explicit, duplicate row ids throw by default. This keeps row selection, pending
+edits, clipboard ranges, and state restore unambiguous. Legacy data can opt in to synthetic suffixes:
+
+```ts
+const model = createClientRowModel(rows, {
+  rowKey: "id",
+  duplicateRowKeyPolicy: "suffix"
+});
+```
+
+In suffix mode, later duplicates become ids such as `ORD-5101__2`. Prefer fixing source data for
+transactional grids.
+
+Client row transaction result objects expose the accepted/rejected contract used by the Grid API:
+
+```ts
+const result = api.updateRows([
+  { rowKey: "ORD-5102", row: { amount: 990 } },
+  { rowKey: "ORD-MISSING", row: { amount: 1000 } }
+]);
+
+if (result) {
+  console.log(result.acceptedRowCount);
+  console.log(result.rejected);
+}
+```
+
+For client-backed data, `setData()`, `appendRows()`, `updateRows()`, and `removeRows()` return a
+`ClientRowTransactionResult`. The result includes `rowCountBefore`, `rowCountAfter`, `added`,
+`updated`, `removed`, and `rejected` entries. Missing row keys and duplicate transaction requests
+are reported instead of being silently swallowed. Remote/server row models may return `undefined`
+because those mutations are asynchronous DataSource requests.
 
 The executable example is available as `ROW-001` in the examples app.

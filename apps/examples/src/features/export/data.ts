@@ -7,6 +7,7 @@ import type {
   ImportOptions,
   SelectionOptions
 } from "@onegrid/core";
+import { createGridIoAdapterPlugin } from "@onegrid/adapters";
 
 export interface ExportRow {
   readonly id: string;
@@ -144,7 +145,7 @@ export const exportImportOptions: ImportOptions<ExportRow> = {
 
 export const exportGridOptions: Pick<
   GridOptions<ExportRow>,
-  "rowKey" | "rowModel" | "selection" | "merge" | "layout" | "headerMerge" | "export" | "import"
+  "rowKey" | "rowModel" | "selection" | "merge" | "layout" | "headerMerge" | "export" | "import" | "plugins"
 > = {
   rowKey: "id",
   rowModel: "client",
@@ -153,6 +154,33 @@ export const exportGridOptions: Pick<
   headerMerge: exportHeaderMerge,
   export: exportOptions,
   import: exportImportOptions,
+  plugins: [
+    createGridIoAdapterPlugin<ExportRow>({
+      id: "enterprise-document-io",
+      exports: [{
+        format: "enterprise-json",
+        capabilities: { cjkFonts: true, customFonts: true, externalWorkbook: true, mergedLayout: true },
+        export({ matrix, options }) {
+          return {
+            content: JSON.stringify(createEnterprisePayload(matrix), null, 2),
+            mediaType: "application/vnd.onegrid.enterprise+json",
+            filename: options.filename ?? "onegrid-enterprise-export.json"
+          };
+        }
+      }],
+      imports: [{
+        format: "enterprise-json",
+        capabilities: { compressedXlsx: true, externalWorkbook: true, mergedLayout: true },
+        import({ content, options }) {
+          const payload = parseEnterprisePayload(content);
+          const rows = payload.rows.map((row, index) =>
+            options.parseRow ? options.parseRow(row, index) : row as unknown as ExportRow
+          );
+          return { rows, rowCount: rows.length, rejected: [] };
+        }
+      }]
+    })
+  ],
   layout: { width: "100%", height: 360, bodyHeight: 360 }
 };
 
@@ -220,6 +248,32 @@ export const sampleXlsxImportMatrix: GridExportMatrix = {
   ]
 };
 
+export const sampleEnterpriseImport = JSON.stringify({
+  version: 1,
+  rows: [
+    createRow(
+      "ENT-3001",
+      "Adapter",
+      "Document Office",
+      "Enterprise import",
+      2110,
+      "Adapter supplied row",
+      "Moon",
+      "Review"
+    ),
+    createRow(
+      "ENT-3002",
+      "Adapter",
+      "Document Office",
+      "Font package handoff",
+      2240,
+      "Adapter supplied row",
+      "Moon",
+      "Approved"
+    )
+  ]
+});
+
 function createRow(
   id: string,
   region: string,
@@ -239,4 +293,33 @@ function createImportCells(row: ExportRow) {
 
 function parseStatus(value: unknown): ExportRow["status"] {
   return value === "Approved" || value === "Review" || value === "Hold" ? value : "Review";
+}
+
+function createEnterprisePayload(matrix: GridExportMatrix) {
+  return {
+    version: 1,
+    capabilities: {
+      cjkFonts: true,
+      customFonts: true,
+      externalWorkbook: true,
+      mergedLayout: true
+    },
+    columns: matrix.columns.map((column) => ({
+      id: column.id,
+      field: column.field,
+      headerName: column.headerName
+    })),
+    rows: matrix.bodyRows.map((row) => Object.fromEntries(matrix.columns.map((column, index) => [
+      column.field,
+      row[index]?.covered === true ? "" : row[index]?.value ?? ""
+    ])))
+  };
+}
+
+function parseEnterprisePayload(content: string | Uint8Array): { readonly rows: readonly Readonly<Record<string, unknown>>[] } {
+  const text = typeof content === "string"
+    ? content
+    : new TextDecoder().decode(content);
+  const parsed = JSON.parse(text) as { readonly rows?: readonly Readonly<Record<string, unknown>>[] };
+  return { rows: Array.isArray(parsed.rows) ? parsed.rows : [] };
 }

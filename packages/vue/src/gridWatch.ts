@@ -16,6 +16,7 @@ export function watchGridProps(
       props.data,
       props.dataSource,
       props.rowKey,
+      props.duplicateRowKeyPolicy,
       props.rowModel,
       props.rowHeight,
       props.width,

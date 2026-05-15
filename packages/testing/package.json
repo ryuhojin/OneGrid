@@ -2,6 +2,7 @@
   "name": "@onegrid/testing",
   "version": "0.0.0",
   "description": "Testing helpers for OneGrid examples, E2E, a11y, and performance.",
+  "license": "UNLICENSED",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",

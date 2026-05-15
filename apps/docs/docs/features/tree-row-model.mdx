@@ -34,6 +34,7 @@ new OneGrid({
   data,
   dataSource,
   rowKey: "id",
+  duplicateRowKeyPolicy: "error",
   rowModel: "tree",
   tree: {
     childrenField: "children",
@@ -43,6 +44,9 @@ new OneGrid({
   }
 });
 ```
+
+Tree roots and lazy children share the same row id namespace. Duplicate explicit ids throw by
+default, including a lazy child that repeats an already loaded root or sibling key.
 
 The example route `ROW-005` verifies nested rows, lazy children, indentation, and descendants
 selection through visible grid controls.

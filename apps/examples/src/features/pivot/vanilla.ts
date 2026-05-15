@@ -5,6 +5,7 @@ import {
   pivotFilterModel,
   pivotRows,
   pivotSourceColumns,
+  pivotUxSummary,
   serverPivotColumns,
   serverPivotOptions
 } from "./data.js";
@@ -13,12 +14,18 @@ import type { PivotResultRow, PivotServerStats, PivotSourceRow } from "./data.js
 export function mountPivotExample(el: HTMLElement): { destroy(): void } {
   const actions = document.createElement("div");
   actions.className = "example-actions";
+  const clientHeading = createHeading("Client pivot");
   const clientHost = document.createElement("div");
+  const serverHeading = createHeading("Server pivot");
   const serverHost = document.createElement("div");
   const inspector = document.createElement("dl");
   inspector.className = "example-inspector";
   inspector.setAttribute("aria-label", "Pivot summary");
 
+  appendValue(inspector, "Pivot row fields", pivotUxSummary.rows);
+  appendValue(inspector, "Pivot column fields", pivotUxSummary.columns);
+  appendValue(inspector, "Pivot value fields", pivotUxSummary.values);
+  appendValue(inspector, "Pivot totals", pivotUxSummary.totals);
   const filteredRows = appendValue(inspector, "Client filtered source rows", "6");
   appendValue(inspector, "Client pivot data rows", "4");
   const serverRequests = appendValue(inspector, "Server pivot requests", "0");
@@ -54,13 +61,20 @@ export function mountPivotExample(el: HTMLElement): { destroy(): void } {
     })
   );
 
-  el.replaceChildren(actions, clientHost, serverHost, inspector);
+  el.replaceChildren(actions, clientHeading, clientHost, serverHeading, serverHost, inspector);
   return {
     destroy() {
       clientGrid.destroy();
       serverGrid.destroy();
     }
   };
+}
+
+function createHeading(label: string): HTMLHeadingElement {
+  const heading = document.createElement("h3");
+  heading.className = "example-subheading";
+  heading.textContent = label;
+  return heading;
 }
 
 function createAction(label: string, onClick: () => void): HTMLButtonElement {

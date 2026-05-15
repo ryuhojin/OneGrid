@@ -1,9 +1,63 @@
 # Installation
 
-The package names are reserved by the monorepo baseline:
+## npm
 
 ```bash
 pnpm add @onegrid/core @onegrid/dom @onegrid/themes
 ```
 
-Published npm and CDN install instructions will be completed during packaging hardening.
+Import the DOM renderer and theme CSS from the package exports:
+
+```ts
+import { OneGrid } from "@onegrid/dom";
+import "@onegrid/themes/default.css";
+```
+
+React and Vue wrappers keep the same core option contract:
+
+```bash
+pnpm add @onegrid/react react react-dom
+pnpm add @onegrid/vue vue
+```
+
+## CDN
+
+CDN deployments use immutable versioned package URLs. The DOM package exposes a browser global
+bundle through `unpkg`/`jsdelivr` metadata, and theme CSS is exported from built `dist` artifacts:
+
+```html
+<link
+  rel="stylesheet"
+  href="https://cdn.example.com/@onegrid/themes@0.0.0/dist/default.css"
+  integrity="sha384-..."
+  crossorigin="anonymous"
+>
+<script
+  src="https://cdn.example.com/@onegrid/dom@0.0.0/dist/onegrid.umd.js"
+  integrity="sha384-..."
+  crossorigin="anonymous"
+></script>
+```
+
+The global namespace is `window.OneGrid`:
+
+```html
+<script>
+  const { OneGrid } = window.OneGrid;
+  new OneGrid({ el, columns, data });
+</script>
+```
+
+## SRI
+
+Generate Subresource Integrity hashes from the exact release artifacts after `pnpm build`.
+Do not reuse hashes across versions or rebuilds.
+
+```bash
+openssl dgst -sha384 -binary packages/dom/dist/onegrid.umd.js | openssl base64 -A
+openssl dgst -sha384 -binary packages/themes/dist/default.css | openssl base64 -A
+```
+
+Prefix the output with `sha384-` and attach it to the matching `<script>` or `<link>` tag.
+OneGrid's packaging E2E validates that the UMD bundle and CSS artifact can load with SRI and a
+strict CSP.

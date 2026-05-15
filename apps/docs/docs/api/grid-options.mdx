@@ -57,8 +57,11 @@ Merge order is `defaultColumnDef`, then any type defaults, then the explicit col
 Column types can inherit from built-in or named types by setting their own `type`.
 
 `columnState` can be supplied by renderers or persisted application state when column width,
-visibility, order, or pinning should be restored. The runtime API uses the same shape through
-`api.getColumnState()`, `api.setColumnState()`, and `api.resetColumnState()`.
+visibility, order, pinning, or column group open state should be restored. The runtime API uses the
+same shape through `api.getColumnState()`, `api.setColumnState()`, `api.applyColumnState()`,
+`api.setColumnGroupOpen()`, `api.toggleColumnGroup()`, and `api.resetColumnState()`. Prefer
+`applyColumnState()` for user preference restore because it validates missing column and group ids
+and can apply partial state without replacing unrelated column state.
 
 `initialState` restores mutable grid state without mixing it into static options. It is the preferred
 contract for saved user views, route restore, and wrapper parity:
@@ -68,10 +71,18 @@ const options: GridOptions<OrderRow> = {
   columns,
   data,
   initialState: {
-    columnState: { columns: { amount: { width: 160, hidden: false } } },
+    columnState: {
+      columns: { amount: { width: 160, hidden: false } },
+      groups: { workflow: { open: true } }
+    },
     sortModel: [{ columnId: "amount", field: "amount", direction: "desc" }],
     filterModel: { quickText: "approved" },
     groupModel: { fields: ["region"], expandedKeys: ["group:region=Capital"] },
+    rowModelState: {
+      rowModel: "server",
+      page: 1,
+      expandedGroupKeys: ["group:region=Capital"]
+    },
     selection: { mode: "row", rowKeys: ["ORD-001"], cells: [], ranges: [] },
     pagination: { page: 2, pageSize: 50 },
     scroll: { top: 360, left: 120 },
@@ -82,6 +93,48 @@ const options: GridOptions<OrderRow> = {
 
 `initialState` is intentionally limited to runtime UI state. It does not replace `columns`, `data`,
 `dataSource`, renderer definitions, or security options. Missing fields are left at normal defaults.
+`rowModelState` restores remote/tree row-model cursors and expansion metadata, but it does not
+embed row data or cache contents.
+
+`rowKey` must resolve to a stable row id for selection, editing, clipboard, merge layout, and state
+restore. When `rowKey` is configured, duplicate ids are treated as configuration/data errors by
+default:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  data,
+  rowKey: "id",
+  duplicateRowKeyPolicy: "error"
+};
+```
+
+Use `duplicateRowKeyPolicy: "suffix"` only for legacy datasets that cannot be cleaned immediately.
+Suffix mode keeps the first row id unchanged and assigns later duplicates synthetic ids such as
+`ORD-1__2`; it should not be used for audited transaction paths.
+
+`dataSourceOptions` standardizes remote request retry and status behavior for infinite, server,
+viewport, and lazy tree row models:
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  rowModel: "server",
+  dataSource,
+  dataSourceOptions: {
+    retry: {
+      attempts: 3,
+      delayMs: 100,
+      maxDelayMs: 1000,
+      backoff: "exponential",
+      retry: ({ error }) => error.statusCode !== 400
+    }
+  }
+};
+```
+
+Failures are normalized to `DataSourceError`. Row models expose a `DataSourceStatusSnapshot`, and
+DOM/React/Vue receive the shared `dataRequested`, `dataLoaded`, and `error` events.
 
 `beforeEvents` provides cancellable hooks before grid mutations. Use it for business rules that
 must block a user action before the grid changes visible state:
@@ -327,6 +380,11 @@ before parsing body records, which is required when importing a OneGrid XLSX exp
 multi-row headers. XLSX import reads shared strings, inline strings, cached formula values, formula
 text without a cached value, and date-formatted numeric cells before `parseRow` receives the record.
 
+Header merge rules are validated before rendering. A rule must reference leaf data column ids, row
+presentation rules must be contiguous and non-overlapping, label presentation rules must map to one
+existing header cell, and rule ids must be unique. Invalid rules throw during grid creation so saved
+views and wrapper examples fail early instead of rendering a broken header.
+
 Localization options select the active locale for renderer chrome and formatter context helpers:
 
 ```ts
@@ -378,6 +436,8 @@ the same `theme.variables` shape.
 `security.html` controls the only code path that may write sanitized HTML:
 
 ```ts
+import { createAllowlistHtmlSanitizer } from "@onegrid/dom";
+
 const options: GridOptions<OrderRow> = {
   columns,
   data,
@@ -385,9 +445,7 @@ const options: GridOptions<OrderRow> = {
     html: {
       allowHtmlRenderer: true,
       trustedTypesPolicyName: "onegrid-orders",
-      sanitizer: {
-        sanitize: (html) => DOMPurify.sanitize(html)
-      }
+      sanitizer: createAllowlistHtmlSanitizer()
     },
     url: {
       allowedProtocols: ["https:", "mailto:", "tel:"]
@@ -397,7 +455,10 @@ const options: GridOptions<OrderRow> = {
 ```
 
 Without both `allowHtmlRenderer: true` and a sanitizer, `kind: "html"` renderer output is displayed
-as text. Element renderer URL attributes are filtered through `security.url.allowedProtocols`.
+as text. External sanitizer output is post-sanitized by OneGrid before it reaches the `innerHTML`
+sink, so blocked tags, inline event attributes, inline styles, and unsafe URL protocols are still
+removed if the adapter is misconfigured. Element renderer URL attributes are filtered through
+`security.url.allowedProtocols`.
 
 Menu options control row and cell context menu items while header menu availability remains under
 `columnUi.menu`:
@@ -422,6 +483,11 @@ const options: GridOptions<OrderRow> = {
 
 Context menus open from body cells through right click, `Shift+F10`, or the Context Menu key.
 Custom items receive `ContextMenuContext<TData>` with row, row key, field, column, and value data.
+
+Row model capabilities are intentionally explicit. Use the
+[Row Model Capability Matrix](../features/row-model-capabilities) before choosing a model for
+large data, server grouping, pivot, transactions, or lazy hierarchy. The same information is exported
+from `@onegrid/core` as `rowModelCapabilityMatrix` and `getRowModelCapabilityProfile()`.
 
 Infinite row model options are configured separately from `data` because rows are requested through
 `DataSource.getRows` blocks:
@@ -652,6 +718,11 @@ const options: GridOptions<OrderRow> = {
   }
 };
 ```
+
+Segmented viewport mode for 10M to 100M logical rows uses a fixed numeric row height. Do not combine
+that mode with `rowHeight: "auto"` or per-row height callbacks. Variable-height rows belong to local
+or smaller virtualized datasets where measuring rendered rows does not require a full logical height
+index.
 
 Column virtualization is nested under `virtualization.columns` and applies to the center pane.
 Pinned left and right columns remain outside the horizontal virtual window:

@@ -50,13 +50,13 @@ export function createColumnUiRuntime<TData>(
       );
     },
     hideColumn: (columnId) => {
-      input.setColumnState(setColumnHidden(input.columnState, columnId, true));
+      input.updateColumnState((model) => setColumnHidden(model, input.columnState, columnId, true));
     },
     showColumn: (columnId) => {
-      input.setColumnState(setColumnHidden(input.columnState, columnId, false));
+      input.updateColumnState((model) => setColumnHidden(model, input.columnState, columnId, false));
     },
     pinColumn: (columnId, pinned) => {
-      input.setColumnState(pinColumn(input.columnState, columnId, pinned));
+      input.updateColumnState((model) => pinColumn(model, input.columnState, columnId, pinned));
     },
     moveColumnBefore: (columnId, targetColumnId) => {
       input.updateColumnState((model) =>

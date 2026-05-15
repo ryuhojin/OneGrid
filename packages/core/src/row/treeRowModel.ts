@@ -1,16 +1,20 @@
 import { isFilterModelEmpty } from "../filtering/index.js";
+import { createDataSourceSuccessStatus, executeDataSourceRequest } from "../dataSource/index.js";
 import { filterClientRows } from "./clientFilter.js";
 import { sortClientRows } from "./clientSort.js";
-import { normalizeTreeChildren, normalizeTreeRows } from "./treeNormalize.js";
+import { createTreeUsedRowKeyMap, normalizeTreeChildren, normalizeTreeRows } from "./treeNormalize.js";
 import { applyTreeSelection, collectDescendantKeys } from "./treeSelection.js";
+import type { RowModelStateSnapshot, TreeRowModelStateSnapshot } from "./rowModelState.js";
 import type {
   TreeNode,
+  TreeLoadChildrenResult,
   TreeRowEntry,
   TreeRowModelOptions,
   TreeRowStore,
   TreeSelectionState
 } from "./treeTypes.js";
 import type { ClientRowNode } from "./rowIdentity.js";
+import type { DataSourceStatusSnapshot } from "../types/data.js";
 import type { FilterModel, RowKey, SortModel } from "../types/shared.js";
 
 const DEFAULT_INDENT_SIZE = 18;
@@ -24,6 +28,7 @@ export class TreeRowModel<TData = unknown> {
   private sortModel: readonly SortModel[] | undefined;
   private selectedKeys: ReadonlySet<RowKey>;
   private requestSequence = 0;
+  private dataSourceStatus: DataSourceStatusSnapshot | undefined;
 
   constructor(rows: readonly TData[], options: TreeRowModelOptions<TData> = {}) {
     this.options = options;
@@ -48,6 +53,29 @@ export class TreeRowModel<TData = unknown> {
 
   get selected(): readonly RowKey[] {
     return Object.freeze([...this.selectedKeys]);
+  }
+
+  get status(): DataSourceStatusSnapshot | undefined {
+    return this.dataSourceStatus;
+  }
+
+  getState(): TreeRowModelStateSnapshot {
+    return Object.freeze({
+      rowModel: "tree",
+      rowCount: this.rowCount,
+      expandedKeys: Object.freeze([...this.expandedKeys]),
+      selectedKeys: Object.freeze([...this.selectedKeys])
+    });
+  }
+
+  restoreState(state: RowModelStateSnapshot): void {
+    if (state.rowModel !== "tree") {
+      return;
+    }
+
+    this.expandedKeys.clear();
+    state.expandedKeys?.forEach((key) => this.expandedKeys.add(key));
+    this.selectedKeys = new Set(state.selectedKeys ?? []);
   }
 
   isExpanded(key: RowKey): boolean {
@@ -87,25 +115,46 @@ export class TreeRowModel<TData = unknown> {
     await this.expand(key);
   }
 
-  async loadChildren(key: RowKey): Promise<readonly TreeNode<TData>[]> {
+  async loadChildren(key: RowKey): Promise<TreeLoadChildrenResult<TData>> {
     const parent = this.store.nodes.get(key);
     const loader = this.options.dataSource?.getChildren;
     if (!parent || parent.childrenLoaded || !loader) {
-      return [];
+      return this.createNoopLoadChildrenResult(key);
     }
 
     this.loadingKeys.add(key);
-    const result = await loader({
+    const requestId = `tree:${++this.requestSequence}:${String(key)}`;
+    try {
+      const result = await executeDataSourceRequest(() => loader({
         parentKey: key,
         depth: parent.depth + 1,
         ...(this.sortModel === undefined ? {} : { sortModel: this.sortModel }),
         ...(this.filterModel === undefined ? {} : { filterModel: this.filterModel }),
-        requestId: `tree:${++this.requestSequence}:${String(key)}`
+        requestId
+      }), {
+        requestKind: "getChildren",
+        requestId,
+        ...(this.options.retryPolicy === undefined ? {} : { retryPolicy: this.options.retryPolicy }),
+        status: (status) => {
+          this.dataSourceStatus = status;
+        }
       });
-    const childStore = normalizeTreeChildren(result.rows, parent, this.options);
-    this.mergeChildren(parent, childStore);
-    this.loadingKeys.delete(key);
-    return Object.freeze([...childStore.nodes.values()]);
+      const childStore = normalizeTreeChildren(
+        result.rows,
+        parent,
+        this.options,
+        createTreeUsedRowKeyMap(this.store.nodes)
+      );
+      this.mergeChildren(parent, childStore);
+      return Object.freeze({
+        parentKey: key,
+        requestId,
+        rows: Object.freeze([...childStore.nodes.values()]),
+        status: this.dataSourceStatus ?? createDataSourceSuccessStatus("getChildren", requestId)
+      });
+    } finally {
+      this.loadingKeys.delete(key);
+    }
   }
 
   select(key: RowKey, selected: boolean): void {
@@ -236,6 +285,16 @@ export class TreeRowModel<TData = unknown> {
     return value === undefined || !Number.isFinite(value) || value < 0
       ? DEFAULT_INDENT_SIZE
       : Math.trunc(value);
+  }
+
+  private createNoopLoadChildrenResult(key: RowKey): TreeLoadChildrenResult<TData> {
+    const requestId = `tree:noop:${String(key)}`;
+    return Object.freeze({
+      parentKey: key,
+      requestId,
+      rows: Object.freeze([]),
+      status: createDataSourceSuccessStatus("getChildren", requestId)
+    });
   }
 }
 

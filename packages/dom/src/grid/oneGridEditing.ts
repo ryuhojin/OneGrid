@@ -18,6 +18,8 @@ import { readCellEditTarget, type CellEditTarget, type EditTrigger, type GridEdi
 import { openCellEditor } from "./editorOverlay.js";
 import { OneGridEditCommitBase } from "./oneGridEditCommitBase.js";
 import { invalidate } from "./renderInvalidation.js";
+import type { GridScrollLayoutState } from "./scrollCoordinator.js";
+import { getGridScrollCoordinator } from "./scrollCoordinator.js";
 
 export class OneGridEditing<TData = unknown> extends OneGridEditCommitBase<TData> {
   startEdit(position: CellPosition): void {
@@ -50,7 +52,7 @@ export class OneGridEditing<TData = unknown> extends OneGridEditCommitBase<TData
     return {
       startEditFromCell: (cell, trigger, initialValue) => this.startEditFromCell(cell, trigger, initialValue),
       toggleCheckboxCell: (cell, trigger) => this.toggleCheckboxCell(cell, trigger),
-      syncActiveEditOnScroll: (viewport) => this.syncActiveEditOnScroll(viewport),
+      syncActiveEditOnScroll: (viewport, state) => this.syncActiveEditOnScroll(viewport, state),
       stopEdit: (options) => this.stopEdit(options),
       isEditingCell: (cell) => {
         const target = readCellEditTarget(cell);
@@ -186,7 +188,11 @@ export class OneGridEditing<TData = unknown> extends OneGridEditCommitBase<TData
     return true;
   }
 
-  private syncActiveEditOnScroll(viewport: HTMLElement): void {
+  private syncActiveEditOnScroll(
+    viewport: HTMLElement,
+    _scrollState?: GridScrollLayoutState
+  ): void {
+    void _scrollState;
     const active = this.activeEdit;
     if (!active) {
       return;
@@ -209,12 +215,14 @@ export class OneGridEditing<TData = unknown> extends OneGridEditCommitBase<TData
   }
 
   private createEditRevealRuntime() {
+    const scrollCoordinator = getGridScrollCoordinator(this.root);
     return {
       root: this.root,
       findCellElement: (position: CellPosition) => this.findCellElement(position),
       getColumnScrollLeft: () => this.columnScrollLeft,
       setColumnScrollToField: (field: string, align: ScrollAlign) => this.setColumnScrollToField(field, align),
-      setColumnViewportWidth: (width: number) => { this.columnViewportWidth = width || this.columnViewportWidth; }
+      setColumnViewportWidth: (width: number) => { this.columnViewportWidth = width || this.columnViewportWidth; },
+      ...(scrollCoordinator === undefined ? {} : { scrollCoordinator })
     };
   }
 

@@ -1,4 +1,4 @@
-import type { GridOptions } from "@onegrid/core";
+import type { GridOptions, MeasuredRowHeightCache } from "@onegrid/core";
 
 const DEFAULT_ROW_HEIGHT = 36;
 const DEFAULT_VIEWPORT_HEIGHT = 360;
@@ -7,8 +7,16 @@ export interface VirtualScrollRuntime {
   readonly enabled: boolean;
   readonly scrollTop: number;
   readonly viewportHeight: number;
+  readonly autoRowHeightCache?: MeasuredRowHeightCache;
   onScroll(scrollTop: number, viewportHeight: number): void;
+  onAutoRowHeightsMeasured?(result: AutoRowHeightMeasurementResult): void;
   onLogicalRowScroll?(rowIndex: number, scrollTop?: number): void;
+}
+
+export interface AutoRowHeightMeasurementResult {
+  readonly changed: boolean;
+  readonly scrollTopAdjustment: number;
+  readonly viewportHeight: number;
 }
 
 export function resolveVirtualRowHeight<TData>(options: GridOptions<TData>): number {

@@ -4,6 +4,7 @@ import {
   clientGroupingOptions,
   createGroupingDataSource,
   groupingColumns,
+  groupingFieldSummary,
   groupingRows,
   serverGroupingOptions
 } from "./data";
@@ -12,12 +13,14 @@ const serverDataSource = createGroupingDataSource();
 </script>
 
 <template>
+  <h3 class="example-subheading">Client grouping</h3>
   <OneGrid
     :columns="groupingColumns"
     :data="groupingRows"
     :accessibility="{ label: 'Client grouping grid' }"
     v-bind="clientGroupingOptions"
   />
+  <h3 class="example-subheading">Server grouping</h3>
   <OneGrid
     :columns="groupingColumns"
     :data-source="serverDataSource"
@@ -25,9 +28,13 @@ const serverDataSource = createGroupingDataSource();
     v-bind="serverGroupingOptions"
   />
   <dl class="example-inspector" aria-label="Grouping summary">
-    <dt>Grouping modes</dt>
-    <dd>client groups, expandable group rows, group footers, and server group requests</dd>
-    <dt>Wrapper behavior</dt>
-    <dd>Vue forwards grouping and aggregation contracts to @onegrid/dom</dd>
+    <dt>Grouping fields</dt>
+    <dd>{{ groupingFieldSummary.fields }}</dd>
+    <dt>Grouping aggregates</dt>
+    <dd>{{ groupingFieldSummary.aggregates }}</dd>
+    <dt>Client UX</dt>
+    <dd>expandable rows, aggregate chips, and bottom group footers</dd>
+    <dt>Server UX</dt>
+    <dd>root groups, child route expansion, and server-supplied aggregate metadata</dd>
   </dl>
 </template>

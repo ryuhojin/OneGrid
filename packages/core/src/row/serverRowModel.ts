@@ -1,26 +1,17 @@
-import {
-  clearServerRowCache,
-  createServerRowCache,
-  getServerCacheEntry,
-  listServerCacheEntries,
-  setServerCacheEntry
-} from "./serverCache.js";
+import { clearServerRowCache, clearServerRowRouteCache, createServerRowCache, getServerCacheEntry, listServerCacheEntries, setServerCacheEntry } from "./serverCache.js";
 import { createServerEntries } from "./serverEntries.js";
 import { createServerRowsRequest } from "./serverRequest.js";
-import { resolveRowKey } from "./rowIdentity.js";
+import { createRowNodes, resolveRowKey } from "./rowIdentity.js";
+import { createDataSourceSuccessStatus, executeDataSourceRequest } from "../dataSource/index.js";
+import { createServerRequestId, getServerGroupRequestPath, normalizeServerPage, normalizeServerPageSize, reindexServerVisibleEntries, toServerLoadResult, withServerGroupExpanded } from "./serverRowUtils.js";
+import { createServerRouteCursorStore, createServerRouteKey, createServerRoutePath, getServerRouteCursor, resetServerRouteCursor, restoreServerRouteCursors, setServerRouteCursor, snapshotRootServerCursors, snapshotServerRouteCursors } from "./serverRouteCache.js";
+import type { RowModelStateSnapshot, ServerRowModelStateSnapshot } from "./rowModelState.js";
 import type { ServerRowCache } from "./serverCache.js";
-import type {
-  ServerLoadResult,
-  ServerGroupRowEntry,
-  ServerRowCacheEntry,
-  ServerRowEntry,
-  ServerRowModelOptions,
-  ServerUpdateRowsResult
-} from "./serverTypes.js";
+import type { ServerRouteCursorStore } from "./serverRouteCache.js";
+import type { DataSourceStatusSnapshot } from "../types/data.js";
+import type { ServerLoadResult, ServerRowCacheEntry, ServerRowEntry, ServerRowModelOptions, ServerUpdateRowsResult } from "./serverTypes.js";
 import type { RowUpdate } from "../types/data.js";
 import type { RowKey } from "../types/shared.js";
-
-const DEFAULT_PAGE_SIZE = 50;
 
 export class ServerRowModel<TData = unknown> {
   private readonly options: ServerRowModelOptions<TData>;
@@ -31,15 +22,16 @@ export class ServerRowModel<TData = unknown> {
   private currentPage: number;
   private currentResult: ServerLoadResult<TData> | undefined;
   private currentBaseCacheKey: string | undefined;
-  private readonly cursors = new Map<number, string | undefined>();
+  private readonly routeCursors: ServerRouteCursorStore;
+  private dataSourceStatus: DataSourceStatusSnapshot | undefined;
   private readonly expandedGroupKeys = new Set<string>();
   private readonly collapsedGroupKeys = new Set<string>();
 
   constructor(options: ServerRowModelOptions<TData>) {
     this.options = options;
     this.cache = createServerRowCache<TData>();
-    this.currentPage = normalizePage(options.initialPage);
-    this.cursors.set(0, options.initialCursor);
+    this.currentPage = normalizeServerPage(options.initialPage);
+    this.routeCursors = createServerRouteCursorStore(options.initialCursor);
     for (const groupKey of options.groupModel?.expandedKeys ?? []) {
       this.expandedGroupKeys.add(groupKey);
     }
@@ -50,7 +42,7 @@ export class ServerRowModel<TData = unknown> {
   }
 
   get pageSize(): number {
-    return normalizePageSize(this.options.pageSize);
+    return normalizeServerPageSize(this.options.pageSize);
   }
 
   get rowCount(): number {
@@ -69,15 +61,51 @@ export class ServerRowModel<TData = unknown> {
     return listServerCacheEntries(this.cache);
   }
 
+  get status(): DataSourceStatusSnapshot | undefined {
+    return this.dataSourceStatus;
+  }
+
   get expandedGroups(): readonly string[] {
     return Object.freeze([...this.expandedGroupKeys]);
   }
 
+  getState(): ServerRowModelStateSnapshot {
+    return Object.freeze({
+      rowModel: "server",
+      page: this.currentPage,
+      pageSize: this.pageSize,
+      rowCount: this.rowCount,
+      hasMore: this.hasMore,
+      expandedGroupKeys: Object.freeze([...this.expandedGroupKeys]),
+      collapsedGroupKeys: Object.freeze([...this.collapsedGroupKeys]),
+      cursors: snapshotRootServerCursors(this.routeCursors),
+      routes: snapshotServerRouteCursors(this.routeCursors),
+      ...(this.currentResult?.snapshotVersion === undefined && this.options.snapshotVersion === undefined
+        ? {}
+        : { snapshotVersion: this.currentResult?.snapshotVersion ?? this.options.snapshotVersion })
+    });
+  }
+
+  restoreState(state: RowModelStateSnapshot): void {
+    if (state.rowModel !== "server") {
+      return;
+    }
+
+    this.currentPage = normalizeServerPage(state.page);
+    this.expandedGroupKeys.clear();
+    state.expandedGroupKeys?.forEach((key) => this.expandedGroupKeys.add(key));
+    this.collapsedGroupKeys.clear();
+    state.collapsedGroupKeys?.forEach((key) => this.collapsedGroupKeys.add(key));
+    restoreServerRouteCursors(this.routeCursors, state.routes, state.cursors);
+    clearServerRowCache(this.cache);
+    this.currentResult = undefined;
+    this.currentBaseCacheKey = undefined;
+  }
+
   async loadPage(page = this.currentPage, refresh = false): Promise<ServerLoadResult<TData>> {
-    this.currentPage = normalizePage(page);
+    this.currentPage = normalizeServerPage(page);
     if (refresh) {
       clearServerRowCache(this.cache);
-      this.resetCursors();
     }
 
     const baseResult = await this.loadRequest(this.currentPage, refresh);
@@ -89,6 +117,10 @@ export class ServerRowModel<TData = unknown> {
 
   refresh(): Promise<ServerLoadResult<TData>> {
     return this.loadPage(this.currentPage, true);
+  }
+
+  loadRoutePage(groupKeys: readonly string[], page = 0, refresh = false): Promise<ServerLoadResult<TData>> {
+    return this.loadRequest(page, refresh, groupKeys);
   }
 
   expandGroup(groupKey: string): Promise<ServerLoadResult<TData>> {
@@ -111,17 +143,24 @@ export class ServerRowModel<TData = unknown> {
     return this.expandedGroupKeys.has(groupKey) && !this.collapsedGroupKeys.has(groupKey);
   }
 
-  async applyTransaction(
-    updates: readonly RowUpdate<TData>[]
-  ): Promise<ServerUpdateRowsResult<TData>> {
+  async applyTransaction(updates: readonly RowUpdate<TData>[]): Promise<ServerUpdateRowsResult<TData>> {
     if (!this.options.dataSource.updateRows) {
       throw new Error("ServerRowModel requires DataSource.updateRows for transactions.");
     }
 
-    const result = await this.options.dataSource.updateRows({
-      updates,
-      requestId: `server:update:${++this.requestSequence}`
-    });
+    const requestId = `server:update:${++this.requestSequence}`;
+    const result = await executeDataSourceRequest(
+      () => this.options.dataSource.updateRows?.({ updates, requestId })
+        ?? Promise.resolve({ rows: [] }),
+      {
+        requestKind: "updateRows",
+        requestId,
+        ...(this.options.retryPolicy === undefined ? {} : { retryPolicy: this.options.retryPolicy }),
+        status: (status) => {
+          this.dataSourceStatus = status;
+        }
+      }
+    );
     this.patchCachedRows(result.rows);
     await this.refreshCurrentResultFromCache();
     return result;
@@ -132,9 +171,16 @@ export class ServerRowModel<TData = unknown> {
     refresh: boolean,
     groupKeys?: readonly string[]
   ): Promise<ServerLoadResult<TData>> {
-    const normalizedPage = normalizePage(page);
-    const requestId = createRequestId(++this.requestSequence, normalizedPage, groupKeys);
-    const cursor = groupKeys === undefined ? this.getCursorForPage(normalizedPage) : undefined;
+    const normalizedPage = normalizeServerPage(page);
+    const routePath = createServerRoutePath(groupKeys, this.options.groupKeys);
+    const routeKey = createServerRouteKey(routePath);
+    const cursor = getServerRouteCursor(this.routeCursors, routePath, normalizedPage);
+    if (refresh) {
+      clearServerRowRouteCache(this.cache, routeKey);
+      resetServerRouteCursor(this.routeCursors, routePath);
+      setServerRouteCursor(this.routeCursors, routePath, normalizedPage, cursor);
+    }
+    const requestId = createServerRequestId(++this.requestSequence, normalizedPage, groupKeys);
     const requestBundle = createServerRowsRequest(this.options, {
       page: normalizedPage,
       pageSize: this.pageSize,
@@ -145,7 +191,7 @@ export class ServerRowModel<TData = unknown> {
 
     const cached = getServerCacheEntry(this.cache, requestBundle.cacheKey);
     if (cached && !refresh) {
-      return Promise.resolve(this.toLoadResult(cached, true));
+      return Promise.resolve(toServerLoadResult(cached, true));
     }
 
     const pending = this.pending.get(requestBundle.cacheKey);
@@ -153,24 +199,37 @@ export class ServerRowModel<TData = unknown> {
       return pending;
     }
 
-    const promise = this.options.dataSource.getRows(requestBundle.request).then((result) => {
-      if (groupKeys === undefined) {
-        this.rememberNextCursor(result.nextCursor);
+    const promise = executeDataSourceRequest(
+      () => this.options.dataSource.getRows(requestBundle.request),
+      {
+        requestKind: "getRows",
+        requestId,
+        ...(this.options.retryPolicy === undefined ? {} : { retryPolicy: this.options.retryPolicy }),
+        status: (status) => {
+          this.dataSourceStatus = status;
+        }
       }
+    ).then((result) => {
+      this.rememberNextCursor(routePath, normalizedPage, result.nextCursor);
       const entry = Object.freeze({
         cacheKey: requestBundle.cacheKey,
+        routeKey,
+        routePath,
+        page: normalizedPage,
         request: requestBundle.request,
+        dataSourceStatus: this.dataSourceStatus ?? createDataSourceSuccessStatus("getRows", requestId),
         result,
         entries: createServerEntries(
           result.rows,
           requestBundle.request.startRow,
           this.options.rowKey,
-          result.groupMeta
+          result.groupMeta,
+          this.options.duplicateRowKeyPolicy
         ),
         lastAccess: ++this.accessSequence
       });
       setServerCacheEntry(this.cache, entry);
-      return this.toLoadResult(entry, false);
+      return toServerLoadResult(entry, false);
     }).finally(() => {
       this.pending.delete(requestBundle.cacheKey);
     });
@@ -179,16 +238,13 @@ export class ServerRowModel<TData = unknown> {
     return promise;
   }
 
-  private async expandLoadResult(
-    result: ServerLoadResult<TData>,
-    refresh: boolean
-  ): Promise<ServerLoadResult<TData>> {
+  private async expandLoadResult(result: ServerLoadResult<TData>, refresh: boolean): Promise<ServerLoadResult<TData>> {
     if (result.entries.every((entry) => entry.kind !== "group")) {
       return result;
     }
 
     const entries = await this.expandEntries(result.entries, refresh);
-    const visibleEntries = reindexVisibleEntries(entries);
+    const visibleEntries = reindexServerVisibleEntries(entries);
     return Object.freeze({
       ...result,
       entries: visibleEntries,
@@ -213,7 +269,7 @@ export class ServerRowModel<TData = unknown> {
 
       const clientExpanded = this.expandedGroupKeys.has(entry.key) && !this.collapsedGroupKeys.has(entry.key);
       const expanded = !this.collapsedGroupKeys.has(entry.key) && (clientExpanded || entry.expanded);
-      output.push(withGroupExpanded(entry, expanded));
+      output.push(withServerGroupExpanded(entry, expanded));
       if (clientExpanded) {
         const childEntries = await this.loadExpandedGroupEntries(entry.key, refresh);
         output.push(...await this.expandEntries(childEntries, refresh, entry.key));
@@ -222,11 +278,8 @@ export class ServerRowModel<TData = unknown> {
     return Object.freeze(output);
   }
 
-  private async loadExpandedGroupEntries(
-    groupKey: string,
-    refresh: boolean
-  ): Promise<readonly ServerRowEntry<TData>[]> {
-    const result = await this.loadRequest(0, refresh, getGroupRequestPath(groupKey));
+  private async loadExpandedGroupEntries(groupKey: string, refresh: boolean): Promise<readonly ServerRowEntry<TData>[]> {
+    const result = await this.loadRequest(0, refresh, getServerGroupRequestPath(groupKey));
     return result.entries;
   }
 
@@ -240,7 +293,7 @@ export class ServerRowModel<TData = unknown> {
       return;
     }
 
-    const baseResult = this.toLoadResult(cacheEntry, true);
+    const baseResult = toServerLoadResult(cacheEntry, true);
     this.currentResult = await this.expandLoadResult(baseResult, false);
   }
 
@@ -250,7 +303,12 @@ export class ServerRowModel<TData = unknown> {
     }
 
     const rowsByKey = new Map<RowKey, TData>(
-      rows.map((row, index) => [resolveRowKey(row, index, this.options.rowKey), row] as const)
+      createRowNodes(rows, {
+        ...(this.options.rowKey === undefined ? {} : { rowKey: this.options.rowKey }),
+        ...(this.options.duplicateRowKeyPolicy === undefined
+          ? {}
+          : { duplicateRowKeyPolicy: this.options.duplicateRowKeyPolicy })
+      }).map((node) => [node.key, node.data] as const)
     );
 
     for (const cacheEntry of listServerCacheEntries(this.cache)) {
@@ -265,84 +323,23 @@ export class ServerRowModel<TData = unknown> {
           nextRows,
           cacheEntry.request.startRow,
           this.options.rowKey,
-          cacheEntry.result.groupMeta
+          cacheEntry.result.groupMeta,
+          this.options.duplicateRowKeyPolicy
         ),
         lastAccess: ++this.accessSequence
       });
       setServerCacheEntry(this.cache, nextEntry);
       if (this.currentResult?.cacheKey === nextEntry.cacheKey) {
-        this.currentResult = this.toLoadResult(nextEntry, true);
+        this.currentResult = toServerLoadResult(nextEntry, true);
       }
     }
   }
 
-  private toLoadResult(
-    entry: ServerRowCacheEntry<TData>,
-    cached: boolean
-  ): ServerLoadResult<TData> {
-    return Object.freeze({
-      cacheKey: entry.cacheKey,
-      request: entry.request,
-      rows: entry.result.rows,
-      entries: entry.entries,
-      rowCount: entry.result.rowCount ?? entry.entries.length,
-      cached,
-      ...(entry.result.aggregate === undefined ? {} : { aggregate: entry.result.aggregate }),
-      ...(entry.result.groupMeta === undefined ? {} : { groupMeta: entry.result.groupMeta }),
-      ...(entry.result.mergeMeta === undefined ? {} : { mergeMeta: entry.result.mergeMeta }),
-      ...(entry.result.nextCursor === undefined ? {} : { nextCursor: entry.result.nextCursor }),
-      ...(entry.result.hasMore === undefined ? {} : { hasMore: entry.result.hasMore }),
-      ...(entry.result.snapshotVersion === undefined
-        ? {}
-        : { snapshotVersion: entry.result.snapshotVersion })
-    });
+  private rememberNextCursor(
+    routePath: readonly string[],
+    page: number,
+    cursor: string | undefined
+  ): void {
+    setServerRouteCursor(this.routeCursors, routePath, normalizeServerPage(page) + 1, cursor);
   }
-
-  private getCursorForPage(page: number): string | undefined {
-    return this.cursors.get(page);
-  }
-
-  private rememberNextCursor(cursor: string | undefined): void {
-    if (cursor !== undefined) {
-      this.cursors.set(this.currentPage + 1, cursor);
-    }
-  }
-
-  private resetCursors(): void {
-    this.cursors.clear();
-    this.cursors.set(0, this.options.initialCursor);
-  }
-}
-
-function normalizePage(value: number | undefined): number {
-  return value === undefined || !Number.isFinite(value) || value < 0 ? 0 : Math.trunc(value);
-}
-
-function normalizePageSize(value: number | undefined): number {
-  return value === undefined || !Number.isFinite(value) || value <= 0
-    ? DEFAULT_PAGE_SIZE
-    : Math.trunc(value);
-}
-
-function createRequestId(sequence: number, page: number, groupKeys: readonly string[] | undefined): string {
-  return groupKeys === undefined || groupKeys.length === 0
-    ? `server:${sequence}:${page}`
-    : `server:${sequence}:group:${groupKeys.join("/")}:${page}`;
-}
-
-function getGroupRequestPath(groupKey: string): readonly string[] {
-  const normalized = groupKey.startsWith("group:") ? groupKey.slice("group:".length) : groupKey;
-  return Object.freeze(normalized.split("/").filter(Boolean));
-}
-
-function withGroupExpanded(entry: ServerGroupRowEntry, expanded: boolean): ServerGroupRowEntry {
-  return entry.expanded === expanded ? entry : Object.freeze({ ...entry, expanded });
-}
-
-function reindexVisibleEntries<TData>(
-  entries: readonly ServerRowEntry<TData>[]
-): readonly ServerRowEntry<TData>[] {
-  return Object.freeze(entries.map((entry, rowIndex) =>
-    entry.kind === "data" ? Object.freeze({ ...entry, rowIndex }) : entry
-  ));
 }

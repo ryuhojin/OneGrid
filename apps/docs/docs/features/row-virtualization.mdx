@@ -34,6 +34,64 @@ The public DOM instance exposes `scrollToRow(rowIndex, align)` for controlled na
 await grid.scrollToRow(2_499, "start");
 ```
 
+For local/client rows, `rowHeight(row, index)` can be combined with virtualization. OneGrid builds
+an exact prefix height index for the current client row model, so top and bottom spacers use the
+real row heights instead of a fixed-row estimate:
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  rowHeight: (row) => row.height,
+  virtualization: {
+    enabled: true,
+    estimatedRowHeight: 56,
+    overscan: { before: 2, after: 3 },
+    maxDomRows: 32
+  }
+});
+```
+
+`rowHeight: "auto"` is also supported for local/client row virtualization. The DOM renderer starts
+from `virtualization.estimatedRowHeight`, measures rendered center-pane rows with `ResizeObserver`,
+caches the measured heights by visible row index, and re-renders the virtual spacers so pinned panes
+stay aligned with wrapped body content:
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  data,
+  rowKey: "id",
+  rowModel: "client",
+  rowHeight: "auto",
+  virtualization: {
+    enabled: true,
+    estimatedRowHeight: 56,
+    overscan: { before: 2, after: 3 },
+    maxDomRows: 32
+  }
+});
+```
+
 The segmented scroll helpers in `@onegrid/core` are designed for 10M to 100M logical row ranges
 without creating equivalent client arrays or DOM nodes. Server, infinite, and viewport row models
 still own data loading and cache eviction; virtualization only decides the visible window.
+Segmented 10M to 100M viewport mode intentionally requires fixed numeric row heights; variable
+row heights and auto measured heights are local/client virtualization features unless a future
+server offset-index contract is supplied.
+
+## Server Scale Row Height Contract
+
+For OneGrid 1.0, 10M to 100M segmented viewport scrolling is a fixed-height contract. This is the
+commercial default because the browser can map scrollbar position to logical row index in constant
+time without storing or requesting a height entry for every preceding row.
+
+Do not configure `rowHeight: "auto"` or a row-height callback with `rowModel: "viewport"` and
+`virtualization.segmented: true`; the DOM package rejects that combination at construction time.
+If an application needs variable visual detail for remote rows, use fixed-height grid rows plus a
+detail panel, expandable row content, or a server-owned paged layout. A true remote variable-height
+scrollbar would require a dedicated server offset index API and is not part of the 1.0 baseline.

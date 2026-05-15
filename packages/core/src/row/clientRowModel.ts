@@ -5,7 +5,7 @@ import { setClientRows } from "./clientTransactions.js";
 import { sortClientRows } from "./clientSort.js";
 import type { ClientAggregateValues } from "./clientAggregate.js";
 import type { ClientRowModelEntry } from "./clientGroup.js";
-import type { ClientRowNode, RowKeyInput } from "./rowIdentity.js";
+import type { ClientRowNode, DuplicateRowKeyPolicy, RowKeyInput } from "./rowIdentity.js";
 import type { ColumnDef } from "../types/column.js";
 import type {
   AggregateModel,
@@ -18,6 +18,7 @@ import type {
 
 export interface ClientRowModelOptions<TData = unknown> {
   readonly rowKey?: RowKeyInput<TData>;
+  readonly duplicateRowKeyPolicy?: DuplicateRowKeyPolicy;
   readonly columns?: readonly ColumnDef<TData>[];
   readonly filterModel?: FilterModel;
   readonly sortModel?: readonly SortModel[];
@@ -41,7 +42,12 @@ export function createClientRowModel<TData>(
   rows: readonly TData[],
   options: ClientRowModelOptions<TData> = {}
 ): ClientRowModel<TData> {
-  const store = setClientRows(rows, options.rowKey);
+  const store = setClientRows(rows, {
+    ...(options.rowKey === undefined ? {} : { rowKey: options.rowKey }),
+    ...(options.duplicateRowKeyPolicy === undefined
+      ? {}
+      : { duplicateRowKeyPolicy: options.duplicateRowKeyPolicy })
+  });
   const filteredRows = filterClientRows(store.rows, options.filterModel, {
     ...(options.columns === undefined ? {} : { columns: options.columns })
   });

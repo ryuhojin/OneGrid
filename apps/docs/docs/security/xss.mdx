@@ -21,9 +21,13 @@ const columns = [
 
 The two columns above render text only. HTML is not interpreted.
 
-For HTML rendering, use `kind: "html"`, `sanitize: true`, and enable HTML rendering with a sanitizer:
+For HTML rendering, use `kind: "html"`, `sanitize: true`, and enable HTML rendering with a
+sanitizer. The dependency-free default for preserving simple markup is
+`createAllowlistHtmlSanitizer()` from `@onegrid/dom`:
 
 ```ts
+import { createAllowlistHtmlSanitizer, OneGrid } from "@onegrid/dom";
+
 new OneGrid({
   el,
   columns: [
@@ -41,9 +45,7 @@ new OneGrid({
     html: {
       allowHtmlRenderer: true,
       trustedTypesPolicyName: "onegrid-orders",
-      sanitizer: {
-        sanitize: (html) => DOMPurify.sanitize(html)
-      }
+      sanitizer: createAllowlistHtmlSanitizer()
     }
   }
 });
@@ -54,6 +56,30 @@ returned string as text.
 
 For deployments that want an HTML renderer hook but no markup, `@onegrid/dom` also exports
 `strictTextOnlySanitizer`, which reduces HTML input to text before it reaches the sink.
+
+## Sanitizer adapter hardening
+
+`security.html.sanitizer` can point to an organization-approved sanitizer adapter. OneGrid still
+post-sanitizes the adapter output at the DOM boundary before writing to `innerHTML`. This second pass
+removes blocked tags, inline event attributes, inline style attributes, `srcdoc`, `srcset`, unsafe
+URL protocols, and unsupported tags. It is not a replacement for an audited sanitizer in high-risk
+applications; it is a guardrail that prevents a misconfigured adapter from opening a raw HTML sink.
+
+```ts
+const sanitizer = {
+  name: "company-reviewed-html-sanitizer",
+  mode: "external",
+  sanitize(html, context) {
+    return companySanitizer.sanitize(html, {
+      allowedProtocols: context?.allowedProtocols
+    });
+  }
+};
+```
+
+For SI deployments, keep the sanitizer adapter owned by the application security team and pass it
+through `security.html.sanitizer`. Use `strictTextOnlySanitizer` unless preserving markup is a stated
+requirement.
 
 ## Element renderer URL policy
 
@@ -77,14 +103,41 @@ new OneGrid({
 Relative URLs, fragments, and `https:`, `http:`, `mailto:`, and `tel:` are allowed by default.
 Add protocols only when the surrounding application has reviewed them.
 
+## React and Vue custom renderers
+
+React `reactRenderers` and Vue `cell-*` / `header-*` slots are mounted inside
+OneGrid-owned placeholder elements. The placeholder is created through the safe
+`kind: "element"` path, but the framework subtree is application code. React
+text bindings and Vue mustache bindings are safe defaults; React
+`dangerouslySetInnerHTML`, Vue `v-html`, direct DOM writes, and third-party
+components that emit raw HTML are outside OneGrid's sanitizer boundary.
+
+Use a shared core `kind: "html"` renderer with `security.html.sanitizer` when
+OneGrid must own markup sanitization, or sanitize in application code before
+using a framework HTML sink. See
+[Wrapper Renderer Security Boundary](./wrapper-renderers) for the full
+wrapper-specific review checklist.
+
 ## Trusted Types
 
 When the browser exposes Trusted Types, OneGrid creates a policy for sanitized HTML sinks. The
 default policy name is `onegrid-html-renderer`; pass `security.html.trustedTypesPolicyName` to use an
 application-specific policy name.
 
+OneGrid also uses the configured policy when it parses sanitizer output for its internal allowlist
+post-sanitize pass. This keeps both the intermediate parsing step and the final HTML sink compatible
+with a real browser policy such as:
+
+```http
+Content-Security-Policy:
+  require-trusted-types-for 'script';
+  trusted-types onegrid-orders;
+```
+
 ## Verification
 
 The SEC-002 example is available at `/#SEC-002`. Playwright verifies malicious text payloads remain
 inert, HTML renderer output is sanitized, unsafe element URLs are removed, and no injected handler
-sets the example XSS sentinel.
+sets the example XSS sentinel. The Trusted Types E2E test injects
+`require-trusted-types-for 'script'` into the response header in Chromium and verifies the sanitized
+HTML renderer uses the configured policy without security policy violations.

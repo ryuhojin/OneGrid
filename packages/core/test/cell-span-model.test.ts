@@ -3,6 +3,9 @@ import {
   createCellSpanModel,
   createColumnModel,
   expandCellSpanRange,
+  getCellSpansForColumn,
+  getCellSpansForRange,
+  getCellSpansForRow,
   getCellSpanState,
   resolveCellSpanAnchor
 } from "../src/index.js";
@@ -149,6 +152,83 @@ describe("cell span model", () => {
       firstColumn: 3,
       lastColumn: 4
     });
+  });
+
+  it("indexes spans by anchor, row, column, and queried range", () => {
+    const columnModel = createColumnModel(columns);
+    const model = createCellSpanModel({
+      rows,
+      columns: columnModel.visibleLeafColumns,
+      options: { enabled: true }
+    });
+
+    const region = model.index.byAnchorCell.get("0:1");
+    const rowZeroIds = getCellSpansForRow(model.index, 0).map((span) => span.id);
+    const ownerColumnIds = getCellSpansForColumn(model.index, 4).map((span) => span.id);
+    const memoRangeIds = getCellSpansForRange(model.index, {
+      firstRow: 0,
+      lastRow: 0,
+      firstColumn: 4,
+      lastColumn: 4
+    }).map((span) => span.id);
+
+    expect(region).toMatchObject({ kind: "value", rowSpan: 2 });
+    expect(rowZeroIds).toEqual(expect.arrayContaining([
+      "value:0:region",
+      "value:0:agency",
+      "custom:0:memo"
+    ]));
+    expect(ownerColumnIds).toEqual(["custom:0:memo", "custom:1:memo"]);
+    expect(memoRangeIds).toEqual(["custom:0:memo"]);
+  });
+
+  it("uses indexed range expansion without pulling unrelated spans", () => {
+    const columnModel = createColumnModel(columns);
+    const model = createCellSpanModel({
+      rows,
+      columns: columnModel.visibleLeafColumns,
+      options: { enabled: true }
+    });
+
+    const expanded = expandCellSpanRange(model, {
+      firstRow: 2,
+      lastRow: 2,
+      firstColumn: 0,
+      lastColumn: 0
+    });
+
+    expect(expanded).toEqual({
+      firstRow: 2,
+      lastRow: 2,
+      firstColumn: 0,
+      lastColumn: 0
+    });
+  });
+
+  it("indexes large server spans only for loaded covered cells", () => {
+    const columnModel = createColumnModel(columns);
+    const model = createCellSpanModel({
+      rows,
+      columns: columnModel.visibleLeafColumns,
+      options: { enabled: true, strategy: "server" },
+      serverMeta: [
+        {
+          anchor: { rowIndex: 1, field: "status", rowKey: "B" },
+          rowSpan: 1_000_000,
+          colSpan: 1,
+          value: "Long server span"
+        }
+      ]
+    });
+
+    expect(model.index.byRow.size).toBeLessThanOrEqual(rows.length);
+    expect(getCellSpansForRow(model.index, 999_999)).toEqual([]);
+    expect(getCellSpansForRange(model.index, {
+      firstRow: 999_998,
+      lastRow: 999_999,
+      firstColumn: 5,
+      lastColumn: 5
+    })).toEqual([]);
   });
 });
 

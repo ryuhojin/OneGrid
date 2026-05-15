@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -b tsconfig.build.json --pretty false",
+    "report": "node dist/index.js",
     "typecheck": "tsc -b tsconfig.json --pretty false"
   },
   "dependencies": {
+    "@onegrid/core": "workspace:*",
     "@onegrid/testing": "workspace:*"
   }
 }

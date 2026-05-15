@@ -16,7 +16,29 @@ export {
   resizeColumn,
   setColumnHidden
 } from "./columnUi.js";
+export {
+  applyColumnUiState,
+  constrainColumnUiState,
+  createColumnStateSnapshot
+} from "./columnStateApi.js";
+export {
+  createColumnGroupStateSnapshot,
+  setColumnGroupOpen,
+  shouldShowInColumnGroup,
+  toggleColumnGroupOpen
+} from "./columnGroupState.js";
 export { splitPinnedLeafColumns } from "./columnOrder.js";
+export {
+  enforceMarriedColumnOrder,
+  getMarriedColumnBlock
+} from "./columnOrder.js";
+export {
+  canChangeColumnPinning,
+  canChangeColumnVisibility,
+  canMoveColumn,
+  canResizeColumn,
+  enforceColumnPositionPolicy
+} from "./columnPolicy.js";
 export {
   allocateColumnId,
   resolveDataColumnId,
@@ -46,6 +68,12 @@ export type {
   ColumnsToolPanelColumn,
   ColumnsToolPanelModel,
   ColumnUiColumnState,
+  ColumnUiGroupState,
   ColumnUiState,
   SetColumnStateOptions
 } from "./columnUi.js";
+export type {
+  ApplyColumnStateParams,
+  ColumnStateApplyResult,
+  GetColumnStateOptions
+} from "./columnStateApi.js";

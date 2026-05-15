@@ -2,6 +2,7 @@
   "name": "@onegrid/themes",
   "version": "0.0.0",
   "description": "Theme tokens and CSS for OneGrid.",
+  "license": "UNLICENSED",
   "type": "module",
   "sideEffects": ["./dist/*.css", "./src/*.css"],
   "main": "./dist/index.js",
@@ -13,34 +14,34 @@
       "import": "./dist/index.js"
     },
     "./tokens.css": {
-      "style": "./src/tokens.css",
-      "default": "./src/tokens.css"
+      "style": "./dist/tokens.css",
+      "default": "./dist/tokens.css"
     },
     "./default.css": {
-      "style": "./src/default.css",
-      "default": "./src/default.css"
+      "style": "./dist/default.css",
+      "default": "./dist/default.css"
     },
     "./clean.css": {
-      "style": "./src/clean.css",
-      "default": "./src/clean.css"
+      "style": "./dist/clean.css",
+      "default": "./dist/clean.css"
     },
     "./compact.css": {
-      "style": "./src/compact.css",
-      "default": "./src/compact.css"
+      "style": "./dist/compact.css",
+      "default": "./dist/compact.css"
     },
     "./dark.css": {
-      "style": "./src/dark.css",
-      "default": "./src/dark.css"
+      "style": "./dist/dark.css",
+      "default": "./dist/dark.css"
     },
     "./high-contrast.css": {
-      "style": "./src/high-contrast.css",
-      "default": "./src/high-contrast.css"
+      "style": "./dist/high-contrast.css",
+      "default": "./dist/high-contrast.css"
     }
   },
   "files": ["dist", "src/*.css"],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && pnpm run build:css",
-    "build:css": "mkdir -p dist && cp src/*.css dist/",
+    "build:css": "mkdir -p dist && cp src/*.css dist/ && perl -pi -e 's#\\@onegrid/themes/#./#g' dist/*.css",
     "typecheck": "tsc -b tsconfig.json --pretty false"
   }
 }

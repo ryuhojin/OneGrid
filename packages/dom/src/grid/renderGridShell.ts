@@ -1,13 +1,4 @@
-import {
-  createCellSpanModel,
-  createFrozenRowSlices,
-  createGridLayoutModel,
-  createHeaderModel,
-  createLocaleFormatter,
-  resolveEditKeyboardPolicy,
-  createSummaryRow
-} from "@onegrid/core";
-import type { CellSpanModel, LocaleFormatterBridge } from "@onegrid/core";
+import { createCellSpanModel, createFrozenRowSlices, createGridLayoutModel, createHeaderModel, createLocaleFormatter, resolveEditKeyboardPolicy, createSummaryRow } from "@onegrid/core";
 import { createBodyPane } from "./bodyPaneRenderer.js";
 import type { ColumnVirtualScrollRuntime } from "./columnVirtualScrollRuntime.js";
 import { resolveColumnUiOptions } from "./columnControls.js";
@@ -28,18 +19,19 @@ import { attachInfiniteScroll } from "./infiniteScrollTrigger.js";
 import type { GridEditRuntime } from "./editRuntime.js";
 import type { DomGridOptions } from "./OneGrid.js";
 import { createPivotRenderData } from "./pivotRenderData.js";
-import {
-  createPaginationRenderModel,
-} from "./paginationRenderer.js";
+import type { PivotBuilderRuntime } from "./pivotPanel.js";
+import { createPaginationRenderModel } from "./paginationRenderer.js";
 import type { GridPaginationRuntime } from "./paginationRenderer.js";
 import type { RenderInvalidation } from "./renderInvalidation.js";
-import {
-  createCellSpanRows,
-  getGridRowData,
-  getSummaryRows
-} from "./renderGridData.js";
+import { createCellSpanRows, getGridRowData, getSummaryRows } from "./renderGridData.js";
+import { attachAutoRowHeightMeasurement, disposeAutoRowHeightMeasurement } from "./autoRowHeightMeasurement.js";
 import type { RowRenderState } from "./renderGridTypes.js";
-import { createBodyRowHeightResolver } from "./rowHeightRuntime.js";
+import { createBodyPaneRuntime, createGridRoot } from "./renderShellRoot.js";
+import {
+  createGridScrollCoordinator,
+  disposeGridScrollCoordinator,
+  registerGridScrollCoordinator
+} from "./scrollCoordinator.js";
 import { attachGridSelectionForHost, disposeGridSelection } from "./selectionRuntime.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
 import type { HeaderSortRuntime } from "./sortRuntime.js";
@@ -68,10 +60,12 @@ import { attachWheelBoundaryGuard } from "./wheelScroll.js";
 export type { RowRenderState } from "./renderGridTypes.js";
 
 export function disposeGridShell(host: HTMLElement): void {
+  disposeAutoRowHeightMeasurement(host);
   disposeGridScrollbars(host);
   disposeGridFocus(host);
   disposeGridSelection(host);
   disposeEditorScrollSync(host);
+  disposeGridScrollCoordinator(host);
 }
 
 export function renderGridShell<TData>(
@@ -87,11 +81,14 @@ export function renderGridShell<TData>(
   editRuntime?: GridEditRuntime,
   selectionRuntime?: GridSelectionRuntime,
   paginationRuntime?: GridPaginationRuntime,
+  pivotRuntime?: PivotBuilderRuntime,
+  sourceOptions?: DomGridOptions<TData>,
   invalidation?: RenderInvalidation
 ): void {
   disposeGridShell(host);
   host.replaceChildren();
 
+  const pivotOptions = sourceOptions ?? options;
   const pivotRenderData = createPivotRenderData(options, rowRenderState !== undefined);
   const renderOptions = pivotRenderData.options;
   const columnModel = createDomColumnModel(renderOptions);
@@ -116,7 +113,9 @@ export function renderGridShell<TData>(
     renderOptions,
     frozenRows.scrollableRowCount,
     rowRenderState,
-    virtualScrollRuntime
+    virtualScrollRuntime,
+    frozenRows.bodyRows,
+    frozenRows.bodyOffset
   );
   const viewportVirtualWindow = createViewportVirtualWindow(renderOptions, rowRenderState, virtualScrollRuntime);
   const activeRowWindow = virtualWindow ?? viewportVirtualWindow;
@@ -166,6 +165,8 @@ export function renderGridShell<TData>(
     ...(selectionRuntime === undefined ? {} : { selectionRuntime }),
     ...(filterRuntime === undefined ? {} : { filterRuntime }),
     ...(pivotRenderData.meta === undefined ? {} : { pivotMeta: pivotRenderData.meta }),
+    pivotOptions,
+    ...(pivotRuntime === undefined ? {} : { pivotRuntime }),
     ...(paginationRuntime === undefined ? {} : { paginationRuntime }),
     ...(paginationModel === undefined ? {} : { paginationModel })
   });
@@ -183,7 +184,17 @@ export function renderGridShell<TData>(
   }, i18n);
   const bodyViewport = createBodyViewport();
   const bodyShell = createBodyShell(bodyViewport);
-  const bodyRuntime = createBodyPaneRuntime(renderOptions, rowRenderState, cellSpanModel, groupRuntime, i18n);
+  const scrollCoordinator = createGridScrollCoordinator({ root: grid, viewport: bodyViewport });
+  registerGridScrollCoordinator(host, scrollCoordinator);
+  registerGridScrollCoordinator(grid, scrollCoordinator);
+  const bodyRuntime = createBodyPaneRuntime(
+    renderOptions,
+    rowRenderState,
+    cellSpanModel,
+    groupRuntime,
+    i18n,
+    virtualScrollRuntime
+  );
   const centerOwnsTreeControls = paneState.panes.left.columns.length === 0;
   attachWheelBoundaryGuard(bodyViewport);
   attachInfiniteScroll(bodyViewport, rowRenderState);
@@ -199,6 +210,7 @@ export function renderGridShell<TData>(
     centerOwnsTreeControls,
     virtualScrollRuntime,
     virtualWindow,
+    scrollCoordinator,
     getPanes: () => paneState.panes,
     onWindowChange: (nextWindow) => {
       rowWindowState.window = nextWindow;
@@ -216,6 +228,7 @@ export function renderGridShell<TData>(
     centerOwnsTreeControls,
     virtualScrollRuntime,
     virtualWindow: viewportVirtualWindow,
+    scrollCoordinator,
     getPanes: () => paneState.panes,
     onWindowChange: (nextWindow) => {
       rowWindowState.window = nextWindow;
@@ -327,9 +340,10 @@ export function renderGridShell<TData>(
     ...(selectionRuntime === undefined ? {} : { selectionRuntime }),
     columnVirtualScrollRuntime,
     columnWindow,
+    scrollCoordinator,
     ...(renderOptions.security === undefined ? {} : { security: renderOptions.security })
   });
-  attachEditorScrollSyncForHost(host, bodyViewport, editRuntime);
+  attachEditorScrollSyncForHost(host, bodyViewport, editRuntime, scrollCoordinator);
   shell.append(grid);
   appendBottomPagination({
     shell,
@@ -340,16 +354,38 @@ export function renderGridShell<TData>(
     ...(selectionRuntime === undefined ? {} : { selectionRuntime }),
     ...(filterRuntime === undefined ? {} : { filterRuntime }),
     ...(pivotRenderData.meta === undefined ? {} : { pivotMeta: pivotRenderData.meta }),
+    pivotOptions,
+    ...(pivotRuntime === undefined ? {} : { pivotRuntime }),
     ...(paginationRuntime === undefined ? {} : { paginationRuntime }),
     ...(paginationModel === undefined ? {} : { paginationModel })
   });
   host.append(shell);
   restoreVirtualScroll(bodyViewport, grid, virtualScrollRuntime, activeRowWindow);
   restoreColumnVirtualScroll(bodyViewport, grid, columnVirtualScrollRuntime, columnWindow);
-  attachGridScrollbarsForHost(host, { grid: bodyShell, viewport: bodyViewport, panes: layout.panes });
+  if (renderOptions.rowHeight === "auto") {
+    const onAutoRowHeightsMeasured = virtualScrollRuntime?.["onAutoRowHeightsMeasured"];
+    attachAutoRowHeightMeasurement({
+      host,
+      viewport: bodyViewport,
+      virtualWindow: activeRowWindow,
+      cache: virtualScrollRuntime?.autoRowHeightCache,
+      ...(onAutoRowHeightsMeasured === undefined
+        ? {}
+        : { onMeasured: onAutoRowHeightsMeasured })
+    });
+  }
+  scrollCoordinator.sync();
+  attachGridScrollbarsForHost(host, {
+    grid: bodyShell,
+    layerHost: shell,
+    viewport: bodyViewport,
+    panes: layout.panes,
+    scrollCoordinator
+  });
   attachGridFocusForHost(host, {
     grid,
     viewport: bodyViewport,
+    scrollCoordinator,
     ...(editRuntime === undefined ? {} : { editRuntime }),
     editKeyboardPolicy: resolveEditKeyboardPolicy(renderOptions.editing),
     ...(selectionRuntime === undefined ? {} : { selectionRuntime })
@@ -357,64 +393,4 @@ export function renderGridShell<TData>(
   if (selectionRuntime) {
     attachGridSelectionForHost(host, { grid, runtime: selectionRuntime });
   }
-}
-
-function createGridRoot<TData>(
-  totalColumnWidth: number,
-  columnCount: number,
-  rowCount: number,
-  options: DomGridOptions<TData>
-): HTMLElement {
-  const grid = document.createElement("div");
-  grid.className = "og-grid";
-  grid.setAttribute("role", options.rowModel === "tree" ? "treegrid" : "grid");
-  grid.setAttribute("aria-colcount", String(columnCount));
-  grid.setAttribute("aria-rowcount", String(rowCount));
-  grid.style.setProperty("--og-layout-width", `${totalColumnWidth}px`);
-  setGridRowHeight(grid, options);
-  setSize(grid, "inlineSize", options.layout?.width ?? options.width);
-  setSize(grid, "blockSize", options.layout?.height ?? options.height);
-  setSize(grid, "maxBlockSize", options.layout?.bodyHeight ?? options.bodyHeight);
-  return grid;
-}
-
-function createBodyPaneRuntime<TData>(
-  options: DomGridOptions<TData>,
-  rowRenderState: RowRenderState<TData> | undefined,
-  cellSpanModel: CellSpanModel,
-  groupRuntime: GroupRowRuntime | undefined,
-  i18n: LocaleFormatterBridge
-) {
-  const rowHeight = createBodyRowHeightResolver(options);
-  return {
-    ...(rowRenderState?.treeRuntime === undefined ? {} : { treeRuntime: rowRenderState.treeRuntime }),
-    ...(groupRuntime === undefined ? {} : { groupRuntime }),
-    ...(options.tree?.treeColumnField === undefined ? {} : { treeColumnField: options.tree.treeColumnField }),
-    cellSpanModel,
-    i18n,
-    ...(rowHeight === undefined ? {} : { rowHeight }),
-    ...(options.editing === undefined ? {} : { editing: options.editing }),
-    ...(options.security === undefined ? {} : { security: options.security })
-  };
-}
-
-function setGridRowHeight<TData>(grid: HTMLElement, options: DomGridOptions<TData>): void {
-  const rowHeight = typeof options.rowHeight === "number"
-    ? options.rowHeight
-    : options.virtualization?.rowHeight;
-  if (rowHeight !== undefined && Number.isFinite(rowHeight) && rowHeight > 0) {
-    grid.style.setProperty("--og-row-height", `${rowHeight}px`);
-  }
-}
-
-function setSize(
-  element: HTMLElement,
-  property: "inlineSize" | "blockSize" | "maxBlockSize",
-  value: number | string | undefined
-): void {
-  if (value === undefined) {
-    return;
-  }
-
-  element.style[property] = typeof value === "number" ? `${value}px` : value;
 }

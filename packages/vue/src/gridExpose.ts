@@ -27,16 +27,16 @@ export function createGridExpose(
       getGrid()?.setState(state, options);
     },
     setData(rows) {
-      getGrid()?.setData(rows);
+      return getGrid()?.setData(rows);
     },
     appendRows(rows) {
-      getGrid()?.appendRows(rows);
+      return getGrid()?.appendRows(rows);
     },
     updateRows(rows) {
-      getGrid()?.updateRows(rows);
+      return getGrid()?.updateRows(rows);
     },
     removeRows(rowKeys) {
-      getGrid()?.removeRows(rowKeys);
+      return getGrid()?.removeRows(rowKeys);
     },
     getRow(rowKey) {
       return getGrid()?.getRow(rowKey);
@@ -107,14 +107,31 @@ export function createGridExpose(
     setColumns(columns) {
       getGrid()?.setColumns(columns);
     },
-    getColumnState() {
-      return getGrid()?.getColumnState() ?? freezeColumnUiState({});
+    getColumnState(options) {
+      return getGrid()?.getColumnState(options) ?? freezeColumnUiState({});
     },
     setColumnState(state, options) {
       getGrid()?.setColumnState(state, options);
     },
+    applyColumnState(params, options) {
+      return getGrid()?.applyColumnState(params, options)
+        ?? Object.freeze({
+          applied: false,
+          state: freezeColumnUiState({}),
+          appliedColumnIds: Object.freeze([]),
+          appliedGroupIds: Object.freeze([]),
+          missingColumnIds: Object.freeze([]),
+          missingGroupIds: Object.freeze([])
+        });
+    },
     resetColumnState(options) {
       getGrid()?.resetColumnState(options);
+    },
+    setColumnGroupOpen(groupId, open, options) {
+      getGrid()?.setColumnGroupOpen(groupId, open, options);
+    },
+    toggleColumnGroup(groupId, options) {
+      getGrid()?.toggleColumnGroup(groupId, options);
     },
     showColumn(field) {
       getGrid()?.showColumn(field);
@@ -145,6 +162,12 @@ export function createGridExpose(
     },
     getGroupModel() {
       return getGrid()?.getGroupModel() ?? Object.freeze({});
+    },
+    setPivotModel(model) {
+      getGrid()?.setPivotModel(model);
+    },
+    getPivotModel() {
+      return getGrid()?.getPivotModel();
     },
     expandGroup(groupKey) {
       getGrid()?.expandGroup(groupKey);

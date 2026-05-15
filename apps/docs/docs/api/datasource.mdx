@@ -1,7 +1,8 @@
 # DataSource
 
-`DataSource<TData>` provides `getRows(request)` for server, infinite, and viewport row models.
-Requests carry sort, filter, group, pivot, aggregate, viewport, and cancellation metadata.
+`DataSource<TData>` provides `getRows(request)` for server, infinite, and viewport row models,
+and optional `getChildren(request)` for lazy tree rows. Requests carry sort, filter, group,
+pivot, aggregate, viewport, tree parent, and cancellation metadata.
 Pagination requests also carry `page`, `pageSize`, and optionally `cursor`.
 
 `getDistinctValues(request)` is optional and powers set filters for remote row models:
@@ -42,6 +43,47 @@ const dataSource: DataSource<OrderRow> = {
   }
 };
 ```
+
+Server-side projections such as pivot can return a result column schema with the rows:
+
+```ts
+const dataSource: DataSource<PivotResultRow> = {
+  async getRows(request) {
+    const result = await fetchPivot(request.pivotModel);
+    return {
+      rows: result.rows,
+      columns: result.columns,
+      rowCount: result.totalCount
+    };
+  }
+};
+```
+
+`columns` is optional. When present, DOM/React/Vue render that response schema for the current
+server result. The original `GridOptions.columns` remain the source-field contract used by pivot
+builder panels and external configuration UI.
+
+## Error, Retry, And Status
+
+Remote row models use the same DataSource execution contract. Configure
+`GridOptions.dataSourceOptions.retry` for transient failures; OneGrid normalizes thrown values to
+`DataSourceError` and exposes the latest `DataSourceStatusSnapshot` from the row model. Remote
+set-filter `getDistinctValues()` and server `updateRows()` requests use the same retry policy and
+standardized error event.
+
+```ts
+const options: GridOptions<OrderRow> = {
+  columns,
+  rowModel: "viewport",
+  dataSource,
+  dataSourceOptions: {
+    retry: { attempts: 3, delayMs: 100, backoff: "exponential" }
+  }
+};
+```
+
+DOM, React, and Vue receive `dataRequested`, `dataLoaded`, and standardized `error` events with the
+same request ids used by the core row model.
 
 Server responses can include `mergeMeta` when the backend owns merge calculation:
 

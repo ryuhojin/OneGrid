@@ -24,6 +24,7 @@ Column state methods persist and restore the same `ColumnUiState` shape used by
 
 ```ts
 const columnState = api.getColumnState();
+const completeColumnState = api.getColumnState({ includeDefaults: true });
 
 api.setColumnState({
   order: ["order-id", "customer", "amount", "status"],
@@ -31,15 +32,46 @@ api.setColumnState({
     amount: { width: 160 },
     status: { pinned: "right" },
     internalNotes: { hidden: true }
+  },
+  groups: {
+    workflow: { open: true }
   }
 });
 
+const result = api.applyColumnState({
+  state: {
+    order: ["amount", "order-id"],
+    columns: {
+      amount: { width: 180 },
+      internalNotes: { hidden: true }
+    }
+  },
+  defaultState: { pinned: null },
+  applyOrder: true
+});
+
+if (!result.applied) {
+  console.warn("Unknown column ids", result.missingColumnIds);
+  console.warn("Unknown column group ids", result.missingGroupIds);
+}
+
+api.setColumnGroupOpen("workflow", true);
+api.toggleColumnGroup("workflow");
 api.resetColumnState();
 ```
 
 `setColumnState()` replaces the current column UI state with the provided state and rerenders by
-default. `resetColumnState()` returns to `GridOptions.columnState` plus any configured
-`frozenColumns` defaults.
+default. `applyColumnState()` is the safer incremental API for saved views and user preferences:
+it applies only supplied column patches, can move only the supplied ordered columns, can apply a
+`defaultState` to unspecified leaf columns, and returns missing column ids instead of silently
+dropping them. Set `ignoreMissingColumns: true` only when restoring a state from an older schema.
+`getColumnState({ includeDefaults: true })` returns a full leaf-column snapshot including effective
+width, hidden, pinned values, and column group open states. `resetColumnState()` returns to
+`GridOptions.columnState` plus any configured `frozenColumns` defaults.
+
+Column state APIs honor `ColumnDef` policy flags. Locked visibility, pinned state, resize, and
+position settings are ignored rather than partially applied, so saved views cannot hide required
+columns, unpin locked columns, or move fixed-position columns out of their current slot.
 
 Before-event methods attach cancellable handlers after constructor options are created:
 
@@ -60,8 +92,10 @@ mutation. Normal `events.*` handlers still run only after the change succeeds.
 
 State methods capture and restore runtime UI state. `getState()` returns a `GridStateSnapshot`
 containing column UI state, sort/filter/group models, selection, pagination, scroll offsets, and
-locale. `setState()` applies only the fields provided, so applications can restore a saved view
-without remounting the grid:
+locale. It also includes `rowModelState`, which captures row-model runtime state such as infinite
+append position, server page/group/cursor state, viewport range metadata, and tree expansion or
+selection state. `setState()` applies only the fields provided, so applications can restore a saved
+view without remounting the grid:
 
 ```ts
 const saved = api.getState();
@@ -70,6 +104,7 @@ api.setState({
   columnState: saved.columnState,
   sortModel: saved.sortModel,
   filterModel: saved.filterModel,
+  rowModelState: saved.rowModelState,
   pagination: { page: 1, pageSize: 100 },
   scroll: { top: 0, left: 0 }
 });
@@ -77,7 +112,8 @@ api.setState({
 
 The same snapshot shape is accepted by `GridOptions.initialState` for first render. `setState()` is
 not a data-loading API; it does not replace `columns`, `data`, `dataSource`, or renderer/security
-configuration.
+configuration. Remote row model caches are not serialized; restored infinite, server, and viewport
+models re-request their data through the configured `DataSource`.
 
 Sorting methods update the shared `SortModel[]` used by header state, client row model sorting,
 and remote row model requests:
@@ -114,6 +150,21 @@ const groupModel = api.getGroupModel();
 
 For server row models, `expandGroup("Capital")` sets `groupKeys` to `["Capital"]` before the next
 `DataSource.getRows()` call. `collapseGroup("Capital")` returns to the root group list.
+
+Pivot methods update the shared `PivotModel` used by client pivot calculation and server pivot
+requests:
+
+```ts
+api.setPivotModel({
+  rows: ["region", "agency"],
+  columns: ["quarter"],
+  values: [{ field: "amount", function: "sum", alias: "amountTotal" }],
+  totals: "both",
+  subtotals: true
+});
+
+const pivotModel = api.getPivotModel();
+```
 
 Tree methods operate on the tree row model and reuse the configured lazy-loading and cascade
 selection policy:
@@ -182,7 +233,26 @@ api.clearEditHistory();
 
 `getEditHistoryState()` exposes `canUndo`, `canRedo`, and the current stack sizes for toolbar state.
 External data replacement through `setData()`, `appendRows()`, `updateRows()`, or `removeRows()`
-clears the edit stack because row identity and stored snapshots may no longer match.
+clears the edit stack because row identity and stored snapshots may no longer match. For
+client-backed data, these methods return a `ClientRowTransactionResult` so integrations can inspect
+what changed:
+
+```ts
+const result = api.updateRows([
+  { rowKey: "ED-0002", row: { budget: 430000 } },
+  { rowKey: "ED-MISSING", row: { budget: 0 } }
+]);
+
+if (result) {
+  console.log(result.updated);
+  console.log(result.rejected);
+}
+```
+
+The result includes `added`, `updated`, `removed`, `rejected`, `rowCountBefore`,
+`rowCountAfter`, `acceptedRowCount`, and `rejectedRowCount`. Missing row keys and duplicate
+transaction requests are reported through `rejected`. Server and remote row models may return
+`undefined` because the mutation is handled asynchronously by the configured `DataSource`.
 
 Selection methods expose the same core state used by pointer and keyboard interaction:
 

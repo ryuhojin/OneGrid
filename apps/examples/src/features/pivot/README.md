@@ -8,3 +8,7 @@
 - `totals: "both"` adds row and column totals.
 - `subtotals: true` adds subtotal rows for the first row field.
 - Server pivot forwards the same `pivotModel` through `DataSource.getRows`.
+
+The pivot panel is a draft/apply builder. It supports drag/drop and keyboard button movement across
+row, column, and value buckets, then applies changes through `GridApi.setPivotModel()` so client and
+server pivot stay on the same public contract.

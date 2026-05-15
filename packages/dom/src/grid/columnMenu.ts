@@ -18,6 +18,8 @@ import { attachOverlayFocusTrap } from "./focusTrap.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
 import type { FocusTrapHandle } from "./focusTrap.js";
 import { positionOverlay } from "./overlayPosition.js";
+import { attachOverlayScrollSync } from "./overlayScrollSync.js";
+import type { OverlayScrollSyncHandle } from "./overlayScrollSync.js";
 
 let nextColumnMenuId = 0;
 
@@ -73,9 +75,12 @@ function showColumnMenu<TData>(
   menu.tabIndex = -1;
   let removeGlobalListeners = (): void => undefined;
   let focusTrap: FocusTrapHandle | undefined;
+  let scrollSync: OverlayScrollSyncHandle | undefined;
   const closeCurrentMenu = (): void => {
     focusTrap?.destroy();
     focusTrap = undefined;
+    scrollSync?.destroy();
+    scrollSync = undefined;
     closeMenu(menu, anchor);
     removeGlobalListeners();
   };
@@ -117,7 +122,15 @@ function showColumnMenu<TData>(
     }
   };
   document.body.append(menu);
-  positionOverlay({ anchor, overlay: menu });
+  const reposition = (): void => {
+    positionOverlay({ anchor, overlay: menu });
+  };
+  reposition();
+  scrollSync = attachOverlayScrollSync({
+    anchor,
+    onUpdate: reposition,
+    onAnchorMissing: closeCurrentMenu
+  });
   anchor.setAttribute("aria-expanded", "true");
   menu.addEventListener("keydown", (event) => {
     handleMenuKeyDown(menu, event);

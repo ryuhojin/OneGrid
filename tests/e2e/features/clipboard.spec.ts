@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { BrowserContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 test("clipboard example copies selected merged range with covered blanks", async ({ page }) => {
   await page.goto("/#F-CLIP");
@@ -16,14 +16,14 @@ test("clipboard example copies selected merged range with covered blanks", async
   );
 });
 
-test("clipboard example copies selected rows with headers through public API", async ({ page, context }) => {
-  await grantClipboard(context);
+test("clipboard example copies selected rows with headers through public API", async ({ page }) => {
+  await installClipboardApiProbe(page);
   await page.goto("/#F-CLIP");
 
   await page.getByLabel("Select row CLIP-0003").check();
   await page.getByRole("button", { name: "Copy with headers" }).click();
 
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(
+  await expect.poll(() => readClipboardApiProbe(page)).toContain(
     "ID\tRegion\tAgency\tProgram\tAmount\tMemo\tOwner\tStatus\r\nCLIP-0003"
   );
 });
@@ -66,10 +66,26 @@ async function readCopyProbe(page: Page): Promise<string> {
   return page.evaluate(() => (window as unknown as { __onegridCopied?: string }).__onegridCopied ?? "");
 }
 
-async function grantClipboard(context: BrowserContext): Promise<void> {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
-    origin: "http://127.0.0.1:4174"
+async function installClipboardApiProbe(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    (window as unknown as { __onegridClipboardApiText?: string }).__onegridClipboardApiText = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        readText: async () =>
+          (window as unknown as { __onegridClipboardApiText?: string }).__onegridClipboardApiText ?? "",
+        writeText: async (text: string) => {
+          (window as unknown as { __onegridClipboardApiText?: string }).__onegridClipboardApiText = text;
+        }
+      }
+    });
   });
+}
+
+async function readClipboardApiProbe(page: Page): Promise<string> {
+  return page.evaluate(() =>
+    (window as unknown as { __onegridClipboardApiText?: string }).__onegridClipboardApiText ?? ""
+  );
 }
 
 function shortcut(key: string): string {

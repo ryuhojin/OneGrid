@@ -1,8 +1,10 @@
 import {
+  calculateVariableRowVirtualWindow,
   calculateFixedRowVirtualWindow,
   createLocaleFormatter
 } from "@onegrid/core";
 import { createBodyPane } from "./bodyPaneRenderer.js";
+import { measureAutoRowHeights } from "./autoRowHeightMeasurement.js";
 import {
   isRowVirtualizationEnabled,
   resolveVirtualRowHeight,
@@ -18,24 +20,49 @@ import type { CellSpanModel, FixedRowVirtualWindow, LayoutPane } from "@onegrid/
 import type { BodyRowEntry } from "./bodyRowRenderer.js";
 import type { DomGridOptions } from "./OneGrid.js";
 import type { RowRenderState } from "./renderGridTypes.js";
-import { createBodyRowHeightResolver } from "./rowHeightRuntime.js";
+import {
+  createBodyRowHeightIndex,
+  createBodyRowHeightResolver
+} from "./rowHeightRuntime.js";
 import type { BodyRowHeightResolver } from "./rowHeightRuntime.js";
+import type { GridScrollCoordinator } from "./scrollCoordinator.js";
+import { CONTROLLED_SCROLL_RESTORE } from "./scrollCoordinator.js";
+import { observeElementResize } from "./resizeObserver.js";
 import type { VirtualScrollRuntime } from "./virtualScrollRuntime.js";
 
 const restoredViewportScrolls = new WeakSet<HTMLElement>();
-const CONTROLLED_SCROLL_RESTORE = "true";
 
 export function createVirtualWindow<TData>(
   options: DomGridOptions<TData>,
   rowCount: number,
   rowRenderState: RowRenderState<TData> | undefined,
-  virtualScrollRuntime: VirtualScrollRuntime | undefined
+  virtualScrollRuntime: VirtualScrollRuntime | undefined,
+  allRows?: readonly BodyRowEntry<TData>[],
+  rowIndexOffset = 0
 ): FixedRowVirtualWindow | undefined {
   const eligible = rowRenderState === undefined
     && isRowVirtualizationEnabled(options)
     && virtualScrollRuntime?.enabled !== false;
   if (!eligible) {
     return undefined;
+  }
+
+  const rowHeightIndex = allRows
+    ? createBodyRowHeightIndex(
+        options,
+        allRows,
+        rowIndexOffset,
+        virtualScrollRuntime?.autoRowHeightCache
+      )
+    : undefined;
+  if (rowHeightIndex) {
+    return calculateVariableRowVirtualWindow({
+      rowHeightIndex,
+      scrollTop: virtualScrollRuntime?.scrollTop ?? 0,
+      viewportHeight: virtualScrollRuntime?.viewportHeight ?? resolveVirtualViewportHeight(options),
+      overscan: options.virtualization?.overscan,
+      maxDomRows: options.virtualization?.maxDomRows
+    });
   }
 
   return calculateFixedRowVirtualWindow({
@@ -67,6 +94,7 @@ export interface VirtualScrollAttachInput<TData> {
   readonly centerOwnsTreeControls: boolean;
   readonly virtualScrollRuntime: VirtualScrollRuntime | undefined;
   readonly virtualWindow: FixedRowVirtualWindow | undefined;
+  readonly scrollCoordinator?: GridScrollCoordinator;
   getPanes?(): Readonly<Record<"left" | "center" | "right", LayoutPane<TData>>>;
   onWindowChange?(window: FixedRowVirtualWindow): void;
 }
@@ -83,6 +111,7 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
     rowIndexOffset,
     virtualScrollRuntime,
     virtualWindow,
+    scrollCoordinator,
     getPanes,
     onWindowChange
   } = input;
@@ -91,6 +120,12 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
   }
 
   let currentWindow = virtualWindow;
+  const rowHeightIndex = createBodyRowHeightIndex(
+    options,
+    allRows,
+    rowIndexOffset ?? 0,
+    virtualScrollRuntime.autoRowHeightCache
+  );
   const updateRows = (nextWindow: FixedRowVirtualWindow): void => {
     virtualScrollRuntime.onScroll(nextWindow.scrollTop, nextWindow.viewportHeight);
     if (sameRenderedWindow(currentWindow, nextWindow)) {
@@ -99,7 +134,7 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
       return;
     }
 
-    const rowHeight = createBodyRowHeightResolver(options);
+    const rowHeight = createBodyRowHeightResolver(options, virtualScrollRuntime.autoRowHeightCache);
     replaceBodyRows({
       scrollElement,
       rows: getRenderedRows(allRows, nextWindow),
@@ -109,21 +144,31 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
       ...(options.locale === undefined ? {} : { locale: options.locale }),
       ...(rowIndexOffset === undefined ? {} : { rowIndexOffset }),
       ...(rowHeight === undefined ? {} : { rowHeight }),
+      ...(options.rowHeight === "auto" ? { autoRowHeight: true } : {}),
       centerOwnsTreeControls,
       virtualWindow: nextWindow
     });
+    measureRenderedAutoRows(scrollElement, virtualScrollRuntime, nextWindow);
     currentWindow = nextWindow;
     onWindowChange?.(nextWindow);
   };
   const getWindowForScrollTop = (scrollTop: number): FixedRowVirtualWindow =>
-    calculateFixedRowVirtualWindow({
-      rowCount,
-      rowHeight: resolveVirtualRowHeight(options),
-      scrollTop,
-      viewportHeight: scrollElement.clientHeight || virtualScrollRuntime.viewportHeight,
-      overscan: options.virtualization?.overscan,
-      maxDomRows: options.virtualization?.maxDomRows
-    });
+    rowHeightIndex
+      ? calculateVariableRowVirtualWindow({
+          rowHeightIndex,
+          scrollTop,
+          viewportHeight: scrollElement.clientHeight || virtualScrollRuntime.viewportHeight,
+          overscan: options.virtualization?.overscan,
+          maxDomRows: options.virtualization?.maxDomRows
+        })
+      : calculateFixedRowVirtualWindow({
+          rowCount,
+          rowHeight: resolveVirtualRowHeight(options),
+          scrollTop,
+          viewportHeight: scrollElement.clientHeight || virtualScrollRuntime.viewportHeight,
+          overscan: options.virtualization?.overscan,
+          maxDomRows: options.virtualization?.maxDomRows
+        });
 
   scrollElement.addEventListener("wheel", (event) => {
     const deltaY = normalizeWheelDelta(event.deltaY, event.deltaMode, scrollElement.clientHeight);
@@ -141,21 +186,43 @@ export function attachVirtualScroll<TData>(input: VirtualScrollAttachInput<TData
     }
 
     event.preventDefault();
-    scrollElement.scrollTop = nextScrollTop;
+    if (scrollCoordinator) {
+      scrollCoordinator.setScroll("vertical", nextScrollTop);
+    } else {
+      scrollElement.scrollTop = nextScrollTop;
+    }
     updateRows(getWindowForScrollTop(nextScrollTop));
   }, { passive: false });
 
   scrollElement.addEventListener("scroll", () => {
-    const nextWindow = calculateFixedRowVirtualWindow({
-      rowCount,
-      rowHeight: resolveVirtualRowHeight(options),
-      scrollTop: scrollElement.scrollTop,
-      viewportHeight: scrollElement.clientHeight || virtualScrollRuntime.viewportHeight,
-      overscan: options.virtualization?.overscan,
-      maxDomRows: options.virtualization?.maxDomRows
-    });
-    updateRows(nextWindow);
+    scrollCoordinator?.sync();
+    updateRows(getWindowForScrollTop(scrollElement.scrollTop));
   }, { passive: true });
+  observeElementResize(scrollElement, () => {
+    scrollCoordinator?.sync();
+    updateRows(getWindowForScrollTop(scrollElement.scrollTop));
+  });
+}
+
+function measureRenderedAutoRows(
+  scrollElement: HTMLElement,
+  virtualScrollRuntime: VirtualScrollRuntime,
+  virtualWindow: FixedRowVirtualWindow
+): void {
+  if (!virtualScrollRuntime.autoRowHeightCache || !virtualScrollRuntime.onAutoRowHeightsMeasured) {
+    return;
+  }
+
+  const cache = virtualScrollRuntime.autoRowHeightCache;
+  const onMeasured = virtualScrollRuntime.onAutoRowHeightsMeasured;
+  requestAnimationFrame(() => {
+    measureAutoRowHeights({
+      viewport: scrollElement,
+      virtualWindow,
+      cache,
+      onMeasured
+    });
+  });
 }
 
 export function restoreVirtualScroll(
@@ -170,7 +237,6 @@ export function restoreVirtualScroll(
 
   markerElement.dataset.virtualizedRows = "true";
   scrollElement.dataset.virtualizedRows = "true";
-  markerElement.style.setProperty("--og-row-height", `${virtualWindow.rowHeight}px`);
   setControlledViewportScroll(scrollElement, virtualWindow.scrollTop);
 }
 
@@ -193,6 +259,7 @@ export function replaceBodyRows<TData>(input: {
   readonly locale?: string;
   readonly rowIndexOffset?: number;
   readonly rowHeight?: BodyRowHeightResolver<TData>;
+  readonly autoRowHeight?: boolean;
   readonly centerOwnsTreeControls: boolean;
   readonly virtualWindow: FixedRowVirtualWindow;
 }): void {
@@ -220,6 +287,7 @@ export function replaceBodyRows<TData>(input: {
         cellSpanModel: input.cellSpanModel,
         i18n: createLocaleFormatter(input.locale),
         ...(input.rowHeight === undefined ? {} : { rowHeight: input.rowHeight }),
+        ...(input.autoRowHeight === true ? { autoRowHeight: true } : {}),
         ...(input.rowIndexOffset === undefined ? {} : { rowIndexOffset: input.rowIndexOffset })
       },
       input.centerOwnsTreeControls,

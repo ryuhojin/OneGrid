@@ -6,7 +6,14 @@ import type {
   CellSpanRange,
   CellSpanWindow
 } from "./cellSpanTypes.js";
-import { createCellKey } from "./cellSpanModel.js";
+import {
+  cellSpanRangesIntersect,
+  cellSpanToRange,
+  createCellKey,
+  getCellSpansForRange,
+  normalizeCellSpanRange,
+  unionCellSpanRanges
+} from "./cellSpanIndex.js";
 
 export interface CellSpanRangeEndpoint {
   readonly rowIndex: number;
@@ -66,17 +73,13 @@ export function expandCellSpanRange(
   model: CellSpanModel,
   range: CellSpanRange
 ): CellSpanRange {
-  let expanded = normalizeRange(range);
+  let expanded = normalizeCellSpanRange(range);
   let changed = true;
 
   while (changed) {
     changed = false;
-    for (const span of model.spans) {
-      if (!intersects(expanded, toRange(span))) {
-        continue;
-      }
-
-      const next = union(expanded, toRange(span));
+    for (const span of getCellSpansForRange(model.index, expanded)) {
+      const next = unionCellSpanRanges(expanded, cellSpanToRange(span));
       changed = changed || !sameRange(expanded, next);
       expanded = next;
     }
@@ -90,11 +93,11 @@ export function expandCellSpanRangeFromEndpoints(
   range: CellSpanRange,
   endpoints: readonly CellSpanRangeEndpoint[]
 ): CellSpanRange {
-  let expanded = normalizeRange(range);
+  let expanded = normalizeCellSpanRange(range);
   for (const endpoint of endpoints) {
     const span = model.byCell.get(createCellKey(endpoint.rowIndex, endpoint.columnIndex));
     if (span) {
-      expanded = union(expanded, toRange(span));
+      expanded = unionCellSpanRanges(expanded, cellSpanToRange(span));
     }
   }
   return expanded;
@@ -104,8 +107,8 @@ function clipSpanToWindow(
   span: CellSpan,
   window: CellSpanWindow
 ): CellSpanRange | undefined {
-  const range = toRange(span);
-  if (!intersects(range, window)) {
+  const range = cellSpanToRange(span);
+  if (!cellSpanRangesIntersect(range, window)) {
     return undefined;
   }
 
@@ -114,43 +117,6 @@ function clipSpanToWindow(
     lastRow: Math.min(range.lastRow, window.lastRow),
     firstColumn: Math.max(range.firstColumn, window.firstColumn),
     lastColumn: Math.min(range.lastColumn, window.lastColumn)
-  };
-}
-
-function toRange(span: CellSpan): CellSpanRange {
-  return {
-    firstRow: span.rowIndex,
-    lastRow: span.rowIndex + span.rowSpan - 1,
-    firstColumn: span.columnIndex,
-    lastColumn: span.columnIndex + span.colSpan - 1
-  };
-}
-
-function normalizeRange(range: CellSpanRange): CellSpanRange {
-  return {
-    firstRow: Math.min(range.firstRow, range.lastRow),
-    lastRow: Math.max(range.firstRow, range.lastRow),
-    firstColumn: Math.min(range.firstColumn, range.lastColumn),
-    lastColumn: Math.max(range.firstColumn, range.lastColumn)
-  };
-}
-
-function intersects(
-  left: CellSpanRange,
-  right: CellSpanRange | CellSpanWindow
-): boolean {
-  return left.firstRow <= right.lastRow
-    && left.lastRow >= right.firstRow
-    && left.firstColumn <= right.lastColumn
-    && left.lastColumn >= right.firstColumn;
-}
-
-function union(left: CellSpanRange, right: CellSpanRange): CellSpanRange {
-  return {
-    firstRow: Math.min(left.firstRow, right.firstRow),
-    lastRow: Math.max(left.lastRow, right.lastRow),
-    firstColumn: Math.min(left.firstColumn, right.firstColumn),
-    lastColumn: Math.max(left.lastColumn, right.lastColumn)
   };
 }
 

@@ -1,16 +1,30 @@
 import type { ColumnModel, NormalizedDataColumn } from "./columnModel.js";
+import { enforceMarriedColumnOrder, getMarriedColumnBlock } from "./columnOrder.js";
+import { measureColumnWidth } from "./columnMeasure.js";
+import {
+  canChangeColumnPinning,
+  canChangeColumnVisibility,
+  canMoveColumn,
+  canResizeColumn,
+  enforceColumnPositionPolicy
+} from "./columnPolicy.js";
 import type { DataColumnDef } from "../types/column.js";
 import type { ColumnId, PinnedSide } from "../types/shared.js";
 
 export interface ColumnUiState {
   readonly order?: readonly string[];
   readonly columns?: Readonly<Record<string, ColumnUiColumnState>>;
+  readonly groups?: Readonly<Record<string, ColumnUiGroupState>>;
 }
 
 export interface ColumnUiColumnState {
   readonly width?: number;
   readonly hidden?: boolean;
   readonly pinned?: PinnedSide | null;
+}
+
+export interface ColumnUiGroupState {
+  readonly open?: boolean;
 }
 
 export interface SetColumnStateOptions {
@@ -54,8 +68,7 @@ export interface ColumnMenuExtensionContext<TData = unknown> {
   readonly column: DataColumnDef<TData>;
 }
 
-export type ColumnMenuExtensionPredicate<TData = unknown> =
-  (context: ColumnMenuExtensionContext<TData>) => boolean;
+export type ColumnMenuExtensionPredicate<TData = unknown> = (context: ColumnMenuExtensionContext<TData>) => boolean;
 
 export interface ColumnMenuExtensionPayload<TData = unknown> {
   readonly label: string;
@@ -73,6 +86,8 @@ export interface ColumnsToolPanelColumn {
   readonly headerName: string;
   readonly hidden: boolean;
   readonly pinned: PinnedSide | undefined;
+  readonly hideable: boolean;
+  readonly pinnable: boolean;
   readonly groupPath: readonly string[];
 }
 
@@ -83,7 +98,7 @@ export function resizeColumn<TData>(
   width: number
 ): ColumnUiState {
   const column = getDataColumn(model, columnId);
-  if (!column || column.source.resizable === false) {
+  if (!column || !canResizeColumn(column)) {
     return state;
   }
 
@@ -97,7 +112,7 @@ export function autoSizeColumn<TData>(
   options: ColumnAutoSizeOptions<TData> = {}
 ): ColumnUiState {
   const column = getDataColumn(model, columnId);
-  if (!column || column.source.resizable === false) {
+  if (!column || !canResizeColumn(column)) {
     return state;
   }
 
@@ -112,19 +127,24 @@ export function moveColumn<TData>(
   targetIndex: number
 ): ColumnUiState {
   const order = getEffectiveOrder(model, state);
-  const sourceIndex = order.indexOf(columnId);
-  const column = getDataColumn(model, columnId);
-  if (sourceIndex < 0 || !column || column.source.movable === false) {
+  const movingIds = getMovableBlockIds(model, order, columnId);
+  const sourceIndex = order.findIndex((id) => movingIds.includes(id));
+  if (sourceIndex < 0 || movingIds.length === 0) {
     return state;
   }
 
-  const withoutSource = order.filter((id) => id !== columnId);
+  const movingIdSet = new Set(movingIds);
+  const withoutSource = order.filter((id) => !movingIdSet.has(id));
   const nextIndex = clampIndex(targetIndex, withoutSource.length);
-  const nextOrder = [
-    ...withoutSource.slice(0, nextIndex),
-    columnId,
-    ...withoutSource.slice(nextIndex)
-  ];
+  const nextOrder = enforceColumnPositionPolicy(
+    model,
+    order,
+    enforceMarriedColumnOrder(model, [
+      ...withoutSource.slice(0, nextIndex),
+      ...movingIds,
+      ...withoutSource.slice(nextIndex)
+    ])
+  );
 
   return { ...state, order: Object.freeze(nextOrder) };
 }
@@ -136,23 +156,42 @@ export function moveColumnBefore<TData>(
   targetColumnId: string
 ): ColumnUiState {
   const order = getEffectiveOrder(model, state);
-  const targetIndex = order.filter((id) => id !== columnId).indexOf(targetColumnId);
+  const movingIds = new Set(getMarriedColumnBlock(model, columnId));
+  if (movingIds.has(targetColumnId)) {
+    return state;
+  }
+
+  const targetBlock = getMarriedColumnBlock(model, targetColumnId).filter((id) => order.includes(id));
+  const targetAnchorId = targetBlock[0] ?? targetColumnId;
+  const targetIndex = order.filter((id) => !movingIds.has(id)).indexOf(targetAnchorId);
   return targetIndex < 0 ? state : moveColumn(model, state, columnId, targetIndex);
 }
 
-export function setColumnHidden(
+export function setColumnHidden<TData>(
+  model: ColumnModel<TData>,
   state: ColumnUiState,
   columnId: string,
   hidden: boolean
 ): ColumnUiState {
+  const column = getDataColumn(model, columnId);
+  if (!column || !canChangeColumnVisibility(column)) {
+    return state;
+  }
+
   return patchColumnState(state, columnId, { hidden });
 }
 
-export function pinColumn(
+export function pinColumn<TData>(
+  model: ColumnModel<TData>,
   state: ColumnUiState,
   columnId: string,
   pinned: PinnedSide | null
 ): ColumnUiState {
+  const column = getDataColumn(model, columnId);
+  if (!column || !canChangeColumnPinning(column)) {
+    return state;
+  }
+
   return patchColumnState(state, columnId, { pinned });
 }
 
@@ -160,9 +199,13 @@ export function freezeColumnUiState(state: ColumnUiState): ColumnUiState {
   const columns = Object.fromEntries(
     Object.entries(state.columns ?? {}).map(([columnId, column]) => [columnId, Object.freeze({ ...column })])
   );
+  const groups = Object.fromEntries(
+    Object.entries(state.groups ?? {}).map(([groupId, group]) => [groupId, Object.freeze({ ...group })])
+  );
   return Object.freeze({
     ...(state.order === undefined ? {} : { order: Object.freeze([...state.order]) }),
-    ...(Object.keys(columns).length === 0 ? {} : { columns: Object.freeze(columns) })
+    ...(Object.keys(columns).length === 0 ? {} : { columns: Object.freeze(columns) }),
+    ...(Object.keys(groups).length === 0 ? {} : { groups: Object.freeze(groups) })
   });
 }
 
@@ -178,18 +221,20 @@ export function createColumnMenuModel<TData>(
 
   const order = getEffectiveOrder(model, state);
   const orderIndex = order.indexOf(columnId);
-  const movable = column.source.movable !== false;
-  const resizable = column.source.resizable !== false;
+  const movable = getMovableBlockIds(model, order, columnId).length > 0;
+  const resizable = canResizeColumn(column);
+  const hideable = canChangeColumnVisibility(column);
+  const pinnable = canChangeColumnPinning(column);
 
   return Object.freeze({
     columnId,
     headerName: column.headerName,
     items: Object.freeze([
       createMenuItem("autoSize", `Auto size ${column.headerName}`, resizable),
-      createMenuItem("hide", `Hide ${column.headerName}`, true),
-      createMenuItem("pinLeft", `Pin ${column.headerName} left`, column.pinned !== "left"),
-      createMenuItem("pinRight", `Pin ${column.headerName} right`, column.pinned !== "right"),
-      createMenuItem("unpin", `Unpin ${column.headerName}`, column.pinned !== undefined),
+      createMenuItem("hide", `Hide ${column.headerName}`, hideable),
+      createMenuItem("pinLeft", `Pin ${column.headerName} left`, pinnable && column.pinned !== "left"),
+      createMenuItem("pinRight", `Pin ${column.headerName} right`, pinnable && column.pinned !== "right"),
+      createMenuItem("unpin", `Unpin ${column.headerName}`, pinnable && column.pinned !== undefined),
       createMenuItem("moveLeft", `Move ${column.headerName} left`, movable && orderIndex > 0),
       createMenuItem(
         "moveRight",
@@ -200,9 +245,7 @@ export function createColumnMenuModel<TData>(
   });
 }
 
-export function createColumnsToolPanelModel<TData>(
-  model: ColumnModel<TData>
-): ColumnsToolPanelModel {
+export function createColumnsToolPanelModel<TData>(model: ColumnModel<TData>): ColumnsToolPanelModel {
   return Object.freeze({
     columns: Object.freeze(
       model.leafColumns.map((column) =>
@@ -211,6 +254,8 @@ export function createColumnsToolPanelModel<TData>(
           headerName: column.headerName,
           hidden: column.hidden,
           pinned: column.pinned,
+          hideable: canChangeColumnVisibility(column),
+          pinnable: canChangeColumnPinning(column),
           groupPath: Object.freeze(getGroupPath(model, column))
         })
       )
@@ -218,10 +263,7 @@ export function createColumnsToolPanelModel<TData>(
   });
 }
 
-function getDataColumn<TData>(
-  model: ColumnModel<TData>,
-  columnId: string
-): NormalizedDataColumn<TData> | undefined {
+function getDataColumn<TData>(model: ColumnModel<TData>, columnId: string): NormalizedDataColumn<TData> | undefined {
   const column = model.byId.get(columnId);
   return column?.kind === "data" ? column : undefined;
 }
@@ -230,11 +272,7 @@ function getEffectiveOrder<TData>(model: ColumnModel<TData>, state: ColumnUiStat
   return state.order ?? model.order.all;
 }
 
-function patchColumnState(
-  state: ColumnUiState,
-  columnId: string,
-  patch: ColumnUiColumnState
-): ColumnUiState {
+function patchColumnState(state: ColumnUiState, columnId: string, patch: ColumnUiColumnState): ColumnUiState {
   const columns = state.columns ?? {};
   const previous = columns[columnId] ?? {};
 
@@ -250,37 +288,18 @@ function patchColumnState(
   });
 }
 
-function measureColumnWidth<TData>(
-  column: NormalizedDataColumn<TData>,
-  options: ColumnAutoSizeOptions<TData>
-): number {
-  const rows = options.rows ?? [];
-  const maxRows = options.maxRows ?? 1_000;
-  const charWidth = options.charWidth ?? 8;
-  const horizontalPadding = options.horizontalPadding ?? 36;
-  let longestText = column.headerName.length;
+function getMovableBlockIds<TData>(
+  model: ColumnModel<TData>,
+  order: readonly string[],
+  columnId: string
+): readonly string[] {
+  const blockIds = getMarriedColumnBlock(model, columnId).filter((id) => order.includes(id));
+  const allMovable = blockIds.every((id) => {
+    const column = getDataColumn(model, id);
+    return column !== undefined && canMoveColumn(column);
+  });
 
-  for (const row of rows.slice(0, maxRows)) {
-    longestText = Math.max(longestText, formatCellValue(readField(row, column.field)).length);
-  }
-
-  return longestText * charWidth + horizontalPadding;
-}
-
-function readField(row: unknown, field: string): unknown {
-  if (row === null || typeof row !== "object") {
-    return undefined;
-  }
-
-  return (row as Readonly<Record<string, unknown>>)[field];
-}
-
-function formatCellValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  return String(value);
+  return allMovable ? Object.freeze(blockIds) : Object.freeze([]);
 }
 
 function clampWidth<TData>(width: number, column: NormalizedDataColumn<TData>): number {
@@ -299,11 +318,7 @@ function clampIndex(index: number, maxIndex: number): number {
   return Math.max(0, Math.min(Math.trunc(index), maxIndex));
 }
 
-function createMenuItem(
-  action: ColumnMenuAction,
-  label: string,
-  enabled: boolean
-): ColumnMenuItem {
+function createMenuItem(action: ColumnMenuAction, label: string, enabled: boolean): ColumnMenuItem {
   return Object.freeze({ action, label, enabled });
 }
 

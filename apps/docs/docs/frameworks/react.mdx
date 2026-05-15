@@ -89,9 +89,17 @@ renderer path, keeping the default text renderer and sanitizer behavior intact.
     cells: {
       status: ({ value }) => <strong>{String(value)}</strong>
     }
-  }}
+}}
 />
 ```
+
+The placeholder is OneGrid-owned, but the React subtree is application-owned.
+React text bindings are safe by default. `dangerouslySetInnerHTML`, direct DOM
+writes from refs, third-party components that write raw HTML, and unreviewed URL
+or style attributes are outside OneGrid's sanitizer boundary. Use the shared
+core `kind: "html"` renderer with `security.html.sanitizer` when OneGrid must
+own markup sanitization, or sanitize in application code before a React HTML
+sink. See [Wrapper Renderer Security Boundary](../security/wrapper-renderers).
 
 Editor UI still uses the core `EditorDef` contract (`text`, `number`,
 `select`, `checkbox`, `radio`, and related built-ins). This keeps React, Vue,

@@ -12,6 +12,16 @@ export type {
   ThemeVariableName
 } from "./siTheme.js";
 export { createSiTheme, siTokenMappings } from "./siTheme.js";
+export type {
+  ThemeContrastCheck,
+  ThemeContrastPair,
+  ThemeValidationIssue,
+  ThemeValidationIssueCode,
+  ThemeValidationOptions,
+  ThemeValidationResult,
+  ThemeValidationSeverity
+} from "./themeValidation.js";
+export { defaultThemeContrastPairs, validateSiTheme } from "./themeValidation.js";
 
 export interface ThemeToken {
   readonly name: string;

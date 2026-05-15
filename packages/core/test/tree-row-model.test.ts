@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTreeRows, TreeRowModel } from "../src/index.js";
+import { DuplicateRowKeyError, normalizeTreeRows, TreeRowModel } from "../src/index.js";
 import type { ColumnDef } from "../src/index.js";
 
 interface TreeOrderRow {
@@ -35,6 +35,27 @@ describe("tree row model", () => {
     expect(child?.parentKey).toBe("A");
     expect(child?.depth).toBe(1);
     expect(child?.path).toEqual(["A", "A-1"]);
+  });
+
+  it("rejects duplicate explicit tree row ids by default", () => {
+    expect(() => normalizeTreeRows([
+      { id: "A", name: "Assets" },
+      { id: "A", name: "Duplicate" }
+    ], { rowKey: "id" })).toThrow(DuplicateRowKeyError);
+  });
+
+  it("applies duplicate row id policy to lazy tree children", async () => {
+    const model = new TreeRowModel<TreeOrderRow>(rows, {
+      rowKey: "id",
+      hasChildrenField: "hasChildren",
+      dataSource: {
+        async getChildren() {
+          return { rows: [{ id: "A", name: "Duplicate root key" }] };
+        }
+      }
+    });
+
+    await expect(model.expand("B")).rejects.toBeInstanceOf(DuplicateRowKeyError);
   });
 
   it("expands and collapses visible tree rows", async () => {
@@ -74,6 +95,60 @@ describe("tree row model", () => {
 
     expect(model.visibleRows.map((entry) => entry.key)).toEqual(["B", "B-1"]);
     expect(model.visibleRows.find((entry) => entry.key === "B-1")?.depth).toBe(1);
+  });
+
+  it("retries lazy children and exposes standardized DataSource status", async () => {
+    let calls = 0;
+    const model = new TreeRowModel<TreeOrderRow>(rows, {
+      rowKey: "id",
+      hasChildrenField: "hasChildren",
+      retryPolicy: { attempts: 2 },
+      dataSource: {
+        async getChildren() {
+          calls += 1;
+          if (calls === 1) {
+            throw Object.assign(new Error("Temporary tree failure"), { statusCode: 503 });
+          }
+          return { rows: [{ id: "B-1", name: "Payables" }] };
+        }
+      }
+    });
+
+    await model.expand("B");
+
+    expect(calls).toBe(2);
+    expect(model.status).toMatchObject({
+      requestKind: "getChildren",
+      status: "success",
+      attempt: 2,
+      maxAttempts: 2
+    });
+    expect(model.visibleRows.map((entry) => entry.key)).toEqual(["A", "B", "B-1"]);
+  });
+
+  it("clears lazy children loading state after standardized DataSource errors", async () => {
+    const model = new TreeRowModel<TreeOrderRow>(rows, {
+      rowKey: "id",
+      hasChildrenField: "hasChildren",
+      dataSource: {
+        async getChildren() {
+          throw Object.assign(new Error("Validation failed"), { statusCode: 400 });
+        }
+      }
+    });
+
+    await expect(model.expand("B")).rejects.toMatchObject({
+      requestKind: "getChildren",
+      statusCode: 400,
+      retryable: false
+    });
+
+    expect(model.status).toMatchObject({
+      requestKind: "getChildren",
+      status: "error",
+      retryable: false
+    });
+    expect(model.visibleRows.find((entry) => entry.key === "B")?.loading).toBe(false);
   });
 
   it("filters tree rows with ancestor context", async () => {
@@ -126,6 +201,30 @@ describe("tree row model", () => {
 
     model.select("A", false);
     expect(model.selected).toEqual([]);
+  });
+
+  it("captures and restores expanded and selected tree row state", async () => {
+    const model = new TreeRowModel<TreeOrderRow>(rows, {
+      rowKey: "id",
+      expandedKeys: ["A"],
+      selection: { policy: "descendants" }
+    });
+    model.select("A-1", true);
+
+    const restored = new TreeRowModel<TreeOrderRow>(rows, {
+      rowKey: "id",
+      selection: { policy: "descendants" }
+    });
+    restored.restoreState(model.getState());
+
+    expect(model.getState()).toMatchObject({
+      rowModel: "tree",
+      rowCount: 4,
+      expandedKeys: ["A"],
+      selectedKeys: ["A-1"]
+    });
+    expect(restored.visibleRows.map((entry) => entry.key)).toEqual(["A", "A-1", "A-2", "B"]);
+    expect(restored.selected).toEqual(["A-1"]);
   });
 
   it("marks partially selected parents as mixed", async () => {

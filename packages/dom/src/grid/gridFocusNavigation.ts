@@ -1,3 +1,5 @@
+import type { GridScrollCoordinator } from "./scrollCoordinator.js";
+
 export interface CellPosition {
   readonly rowIndex: number;
   readonly colIndex: number;
@@ -13,6 +15,7 @@ export interface NavigationTarget {
 interface FocusViewportInput {
   readonly grid: HTMLElement;
   readonly viewport: HTMLElement;
+  readonly scrollCoordinator?: GridScrollCoordinator;
 }
 
 const CELL_SELECTOR = [
@@ -196,17 +199,20 @@ export function scrollTowardTarget(
 
   const rowDelta = target.rowIndex - current.rowIndex;
   if (rowDelta !== 0) {
-    input.viewport.scrollTop = Math.max(0, (target.rowIndex - 1) * getEstimatedRowHeight(input.grid));
+    setViewportScroll(input, "vertical", Math.max(
+      0,
+      (target.rowIndex - 1) * getEstimatedRowHeight(input.grid)
+    ));
   }
 
   const colDelta = target.colIndex - current.colIndex;
   if (colDelta !== 0) {
-    input.viewport.scrollLeft = Math.max(
+    setViewportScroll(input, "horizontal", Math.max(
       0,
-      input.viewport.scrollLeft + Math.sign(colDelta) * getEstimatedColumnWidth(input.grid)
-    );
+      getViewportScroll(input, "horizontal")
+        + Math.sign(colDelta) * getEstimatedColumnWidth(input.grid)
+    ));
   }
-  input.viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
 }
 
 export function scrollNavigationCellIntoView(
@@ -215,8 +221,8 @@ export function scrollNavigationCellIntoView(
 ): void {
   const rect = cell.getBoundingClientRect();
   const clip = getNavigationClipRect(cell, input.viewport);
-  let nextScrollTop = input.viewport.scrollTop;
-  let nextScrollLeft = input.viewport.scrollLeft;
+  let nextScrollTop = getViewportScroll(input, "vertical");
+  let nextScrollLeft = getViewportScroll(input, "horizontal");
 
   if (rect.top < clip.top) {
     nextScrollTop -= clip.top - rect.top;
@@ -234,16 +240,17 @@ export function scrollNavigationCellIntoView(
 
   nextScrollTop = Math.max(0, nextScrollTop);
   nextScrollLeft = Math.max(0, nextScrollLeft);
+  const currentTop = getViewportScroll(input, "vertical");
+  const currentLeft = getViewportScroll(input, "horizontal");
   if (
-    Math.abs(nextScrollTop - input.viewport.scrollTop) < 1
-    && Math.abs(nextScrollLeft - input.viewport.scrollLeft) < 1
+    Math.abs(nextScrollTop - currentTop) < 1
+    && Math.abs(nextScrollLeft - currentLeft) < 1
   ) {
     return;
   }
 
-  input.viewport.scrollTop = nextScrollTop;
-  input.viewport.scrollLeft = nextScrollLeft;
-  input.viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
+  setViewportScroll(input, "vertical", nextScrollTop);
+  setViewportScroll(input, "horizontal", nextScrollLeft);
 }
 
 export function getInitialEditText(
@@ -367,6 +374,41 @@ function isRowCovered(position: CellPosition, rowIndex: number): boolean {
 
 function isColumnCovered(position: CellPosition, colIndex: number): boolean {
   return colIndex >= position.colIndex && colIndex < position.colIndex + position.colSpan;
+}
+
+function getViewportScroll(
+  input: FocusViewportInput,
+  axis: "vertical" | "horizontal"
+): number {
+  const state = input.scrollCoordinator?.read();
+  if (axis === "vertical") {
+    return state?.scrollTop ?? input.viewport.scrollTop;
+  }
+
+  return state?.scrollLeft ?? input.viewport.scrollLeft;
+}
+
+function setViewportScroll(
+  input: FocusViewportInput,
+  axis: "vertical" | "horizontal",
+  value: number
+): void {
+  const current = getViewportScroll(input, axis);
+  if (Math.abs(current - value) < 1) {
+    return;
+  }
+
+  if (input.scrollCoordinator) {
+    input.scrollCoordinator.setScroll(axis, value);
+    return;
+  }
+
+  if (axis === "vertical") {
+    input.viewport.scrollTop = value;
+  } else {
+    input.viewport.scrollLeft = value;
+  }
+  input.viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
 }
 
 function readPositiveNumber(value: string | undefined | null): number | undefined {

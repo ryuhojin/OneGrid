@@ -1,15 +1,46 @@
-import { createFixtureRows } from "@onegrid/testing";
+export {
+  createMeasureMetrics,
+  measureOnce,
+  measureOperations,
+  round
+} from "./perfMarker.js";
+export type {
+  PerformanceMeasure,
+  PerformanceMetric
+} from "./perfMarker.js";
+export {
+  benchmarkScenarios,
+  runAllBenchmarkScenarios,
+  runBenchmarkScenario
+} from "./scenarios.js";
+export type {
+  BenchmarkCategory,
+  BenchmarkScenario,
+  BenchmarkScenarioReport
+} from "./scenarios.js";
+export {
+  assertBenchmarkSuitePassed,
+  formatBenchmarkReport,
+  runBenchmarkSuite
+} from "./report.js";
+export type {
+  BenchmarkSuiteOptions,
+  BenchmarkSuiteReport,
+  BenchmarkSuiteSummary
+} from "./report.js";
 
-export interface BenchmarkScenario {
-  readonly id: string;
-  readonly rows: number;
-  readonly description: string;
+if (isDirectCliRun()) {
+  const { assertBenchmarkSuitePassed, formatBenchmarkReport, runBenchmarkSuite } = await import("./report.js");
+  const report = runBenchmarkSuite();
+  console.log(formatBenchmarkReport(report));
+  assertBenchmarkSuitePassed(report);
 }
 
-export const benchmarkScenarios: readonly BenchmarkScenario[] = [
-  {
-    id: "baseline-small-client",
-    rows: createFixtureRows(10).length,
-    description: "Smoke scenario for benchmark app wiring."
+function isDirectCliRun(): boolean {
+  if (typeof process === "undefined") {
+    return false;
   }
-];
+
+  const entry = process.argv[1];
+  return entry !== undefined && import.meta.url === new URL(entry, "file:").href;
+}

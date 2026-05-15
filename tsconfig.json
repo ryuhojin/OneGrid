@@ -8,6 +8,8 @@
     { "path": "packages/vue" },
     { "path": "packages/themes" },
     { "path": "packages/adapters" },
+    { "path": "packages/adapter-xlsx-exceljs" },
+    { "path": "packages/adapter-pdf-pdfkit" },
     { "path": "packages/testing" },
     { "path": "apps/examples" },
     { "path": "apps/benchmark" },

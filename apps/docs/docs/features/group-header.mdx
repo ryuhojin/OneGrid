@@ -33,5 +33,47 @@ headerModel.ariaLabels;
 Use `presentation: "label"` when the intent is to annotate an existing group header without adding
 another structural header row.
 
+Header merge rules are validated by core before the header matrix is rendered:
+
+- `columnIds` must reference leaf data column ids, not group ids.
+- Structural merge rows must cover contiguous visible leaf columns.
+- Structural merge rows cannot overlap each other.
+- Label rules must target one existing group or leaf header cell.
+- Rule ids must be unique. Blank header names, blank ids, blank column ids, and duplicate ids in a
+  single rule are rejected.
+
+Group headers can opt into child order constraints with `marryChildren: true`:
+
+```ts
+const columns = [
+  {
+    columnId: "workflow",
+    headerName: "Workflow",
+    marryChildren: true,
+    children: [
+      { columnId: "workflow-status", field: "status" },
+      { columnId: "workflow-owner", field: "owner" }
+    ]
+  }
+];
+```
+
+When a saved `columnOrder`, `columnState.order`, `api.applyColumnState()`, or a drag/reorder action
+tries to split a married group, OneGrid keeps the group's leaf columns as a single contiguous block.
+Pinned columns can still be clipped into left, center, and right panes; the constraint controls the
+logical column order before pinned-region clipping.
+
+Column groups also support a stateful open/closed contract. `openByDefault` defines the initial
+state, `columnGroupShow: "open"` renders a child only in the expanded state, and
+`columnGroupShow: "closed"` renders a compact child only in the collapsed state:
+
+```ts
+api.setColumnGroupOpen("workflow", true);
+api.toggleColumnGroup("workflow");
+```
+
+The state is persisted under `ColumnUiState.groups`, so saved views and `initialState` can restore
+expanded group headers without wrapper-specific logic.
+
 The executable example is registered as `COL-002` in the examples app and includes vanilla, React,
 and Vue source files.

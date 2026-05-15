@@ -23,6 +23,309 @@
 
 아직 기록된 public API 변경 없음.
 
+## 2026-05-15 — Theme validation gate
+
+- Status: accepted
+- Area: Theme
+- Change:
+  - `@onegrid/themes` now exports `validateSiTheme()` and `defaultThemeContrastPairs`.
+  - Public validation result types expose contrast checks, errors, warnings, and issue codes.
+- Reason: SI tenant palettes need a release gate for color contrast, minimum hit-target sizes, and
+  unsafe CSS variable values before a brand theme is applied across enterprise grids.
+- Impact: Additive API. Existing `createSiTheme()` behavior is unchanged.
+- Migration: Continue creating themes with `createSiTheme()`. Run `validateSiTheme(theme)` in
+  CI, theme builders, or deployment review flows before applying customer palettes.
+
+## 2026-05-15 — Wrapper renderer security boundary
+
+- Status: accepted
+- Area: Wrapper | Security | Documentation
+- Change:
+  - React `reactRenderers` and Vue slot renderers are documented as framework-owned subtrees mounted
+    inside OneGrid-owned safe placeholder elements.
+  - The XSS guide now distinguishes OneGrid-owned core renderer sinks from React/Vue-owned HTML
+    sinks such as `dangerouslySetInnerHTML` and `v-html`.
+- Reason: Wrapper custom renderer slots must not be mistaken for sanitizer-backed HTML sinks.
+- Impact: Documentation-only clarification. Runtime behavior is unchanged.
+- Migration: Use framework text bindings for user data. Use core `kind: "html"` plus
+  `security.html.sanitizer` when OneGrid must own sanitization, or sanitize application HTML before
+  using framework HTML sinks.
+
+## 2026-05-15 — Sanitizer adapter hardening
+
+- Status: accepted
+- Area: Security | GridOptions | DOM
+- Change:
+  - `HtmlSanitizer` now carries optional `name`, `mode`, and `HtmlSanitizerContext` metadata.
+  - `@onegrid/dom` exports `createAllowlistHtmlSanitizer()` and `sanitizeHtmlWithAllowlist()`.
+  - Sanitizer output is post-sanitized by the DOM HTML boundary before it is written to `innerHTML`.
+  - The allowlist parser and final HTML sink both use the configured Trusted Types policy when the
+    browser enforces `require-trusted-types-for 'script'`.
+- Reason: Markup-preserving sanitizer adapters must be injectable without turning a misconfigured
+  adapter into a raw HTML sink.
+- Impact: Additive API. Existing sanitizers that implement `sanitize(html)` still work.
+- Migration: Use `strictTextOnlySanitizer` for text-only safety, `createAllowlistHtmlSanitizer()`
+  for dependency-free simple markup, or an organization-reviewed external adapter for regulated SI
+  deployments.
+
+## 2026-05-15 — Server result column schema
+
+- Status: accepted
+- Area: DataSource | RowModel | Pivot
+- Change:
+  - `GetRowsResult<TData>.columns` was added as an optional server-provided result schema.
+  - `ServerLoadResult<TData>.columns` carries that schema through the server row model.
+  - DOM rendering can use server result columns while pivot builder panels keep the original source
+    columns as the field catalog.
+- Reason: Server-side pivot and other remote projections need to change rendered result columns
+  without moving projection logic into browser wrappers.
+- Impact: Additive API. Existing data sources that return only rows continue to work.
+- Migration: Return `columns` from `DataSource.getRows()` when a server projection changes the
+  result shape, especially for `pivot.serverOnly`.
+
+## 2026-05-15 — Pivot builder API
+
+- Status: accepted
+- Area: GridApi | Pivot | Wrapper | DOM
+- Change:
+  - `GridApi.setPivotModel(model)` and `GridApi.getPivotModel()` were added.
+  - React refs and Vue exposes now include the same pivot model methods.
+  - The DOM pivot panel is now a draft/apply builder for row, column, value, totals, and subtotal
+    configuration instead of a read-only inspector.
+- Reason: Pivot UI mutation must use the same public model contract as vanilla, React, Vue, client
+  pivot, and server pivot requests.
+- Impact: Additive API. Existing `pivot.model` options still work.
+- Migration: Existing code can keep passing `pivot.model`. Use `setPivotModel()` for runtime
+  pivot builder changes or external pivot configuration panels.
+
+## 2026-05-15 — Official document adapter packages
+
+- Status: accepted
+- Area: Plugins | Export | Import
+- Change:
+  - `@onegrid/adapter-xlsx-exceljs` was added as the official ExcelJS-backed XLSX export/import
+    adapter package.
+  - `@onegrid/adapter-pdf-pdfkit` was added as the official PDFKit-backed PDF export adapter package.
+  - `createServerDocumentExportAdapter()` and `createServerDocumentExportAdapterPlugin()` were added
+    to `@onegrid/adapters` for server-side regulated document rendering.
+- Reason: CJK/custom-font PDF, external compressed XLSX compatibility, and regulated document
+  rendering require vetted engines without forcing those dependencies into `@onegrid/core`.
+- Impact: Additive API. Built-in CSV/JSON/XLSX/PDF behavior remains available.
+- Migration: Keep using built-in formats for lightweight exports. Register the official adapters
+  when a deployment requires engine-backed XLSX/PDF fidelity.
+
+## 2026-05-14 — Merge span indexing
+
+- Status: accepted
+- Area: GridApi | Selection | Export
+- Change:
+  - `CellSpanModel.index` was added as a public merge-span index contract.
+  - `CellSpanIndex` now exposes anchor-cell, row, column, and sparse covered-coordinate indexes.
+  - Merge range expansion now queries indexed span buckets instead of scanning every span.
+- Reason: Enterprise merge behavior must remain stable when selection, clipboard, export, hit testing,
+  and virtual windows interact with many spans or large server-provided span metadata.
+- Impact: Additive API. Existing `CellSpanModel.spans` and `CellSpanModel.byCell` remain available.
+- Migration: Existing consumers can keep using `byCell`. New integrations should use
+  `getCellSpansForRange()`, `getCellSpansForRow()`, or `getCellSpansForColumn()` for merge-aware
+  range/window work.
+
+## 2026-05-14 — Auto row height DOM measurement
+
+- Status: accepted
+- Area: GridOptions | Virtualization
+- Change:
+  - `rowHeight: "auto"` now has a DOM renderer contract for local/client row virtualization.
+  - The renderer measures rendered center-pane rows, stores sparse measured heights, and reuses them
+    for virtual spacers and `scrollToRow` positioning.
+  - Segmented viewport, server, and infinite large-row models continue to require fixed numeric row
+    heights for stable 10M to 100M row scrolling.
+- Reason: Commercial grids need wrapped-content rows without giving up DOM-bounded rendering, while
+  large remote row models cannot hold a full per-row height map in the browser.
+- Impact: Additive behavior for existing `rowHeight: "auto"` configs. Remote large-row behavior is
+  unchanged.
+- Migration: Use `rowHeight: "auto"` only with local/client virtualized grids. Use numeric row
+  heights for viewport/infinite/server large-row grids.
+
+## 2026-05-13 — Segmented viewport fixed row height policy
+
+- Status: accepted
+- Area: GridOptions | RowModel | Virtualization
+- Change:
+  - `rowModel: "viewport"` with `virtualization.segmented: true` now requires one consistent fixed
+    numeric row height across `viewport.rowHeight`, `virtualization.rowHeight`, and numeric
+    `rowHeight`.
+  - `rowHeight: "auto"` and row-height callbacks are rejected for segmented viewport grids.
+  - The 100M viewport example, docs, and tests no longer expose sparse measured row height inputs for
+    segmented viewport scrolling.
+- Reason: Enterprise large-scroll row models must map unloaded row positions without a client-side
+  per-row height map. This matches commercial grid behavior for viewport/infinite row models.
+- Impact: Grids that combined segmented viewport scrolling with auto or callback row heights now fail
+  fast instead of producing blank body gaps or unstable bottom-seek behavior.
+- Migration: Use fixed numeric row height for 10M to 100M viewport grids. Move long content into
+  detail panels, row expansion, side panels, or smaller client/local variable-height grids.
+
+## 2026-05-12 — Row model capability matrix
+
+- Status: accepted
+- Area: RowModel | DataSource | GridOptions
+- Change:
+  - `rowModelCapabilityMatrix` was added as the public source of truth for row model feature support.
+  - `getRowModelCapabilityProfile(rowModel)` was added for retrieving one row model profile.
+  - `RowModelCapabilityProfile`, `RowModelCapabilityMatrix`, `RowModelCapabilityKey`, and
+    `RowModelCapabilitySupport` were added to the public type surface.
+  - The docs now include a row model capability matrix for client, infinite, server, viewport, and
+    tree row models.
+- Reason: Enterprise users need a stable contract that explains which row model owns each feature and
+  which capabilities are delegated to the server through `DataSource` requests.
+- Impact: Additive API. Existing row model behavior is unchanged.
+- Migration: Use `rowModelCapabilityMatrix` in wrapper docs, examples, and integration checks instead
+  of duplicating row model capability claims.
+
+## 2026-05-12 — Duplicate row id policy
+
+- Status: accepted
+- Area: GridOptions | RowModel | Wrapper
+- Change:
+  - `GridOptions.duplicateRowKeyPolicy` was added with `"error"` and `"suffix"` policies.
+  - Explicit `rowKey` duplicates now fail by default in client, server, viewport, and tree row models.
+  - The legacy auto-suffix behavior remains available only with `duplicateRowKeyPolicy: "suffix"`.
+  - React and Vue wrappers pass the same option through without wrapper-specific behavior.
+- Reason: Selection, editing, merge layout, clipboard, row state restore, and remote transactions require one logical row id to identify one row.
+- Impact: Grids that provide duplicate explicit row ids now throw instead of silently creating synthetic ids.
+- Migration: Fix source data ids, or explicitly opt in to suffix mode for legacy datasets while planning a data cleanup.
+
+## 2026-05-11 — Client Row Model transaction result contract
+
+- Status: accepted
+- Area: GridApi | RowModel | Wrapper
+- Change:
+  - `ClientRowTransactionResult` and related row/update/reject result types were added.
+  - `setClientRowsWithResult()`, `appendClientRowsWithResult()`, `updateClientRowsWithResult()`, and `removeClientRowsWithResult()` were added while keeping the existing store-returning helpers.
+  - Client-backed `GridApi.setData()`, `appendRows()`, `updateRows()`, and `removeRows()` now return a transaction result when the mutation is applied synchronously.
+  - React and Vue wrappers expose the same return contract through their grid handles.
+- Reason: Client row mutations previously swallowed missing keys and duplicate requests, making enterprise audit, toast, rollback, and integration logic unreliable.
+- Impact: Additive API with a widened return type from `void` to `ClientRowTransactionResult | undefined`.
+- Migration: Existing callers may ignore the return value. Use `result.rejected` and `result.updated/added/removed` when an integration needs precise mutation feedback.
+
+## 2026-05-11 — DataSource error retry status contract
+
+- Status: accepted
+- Area: GridOptions | DataSource | Events
+- Change:
+  - `DataSourceError`, `DataSourceStatusSnapshot`, `DataSourceRetryPolicy`, and related status/request-kind types were added.
+  - `GridOptions.dataSourceOptions.retry` was added and is passed to infinite, server, viewport, and lazy tree row models.
+  - Core row models now execute `DataSource.getRows()` and lazy `DataSource.getChildren()` through a shared retry/status pipeline.
+  - DOM remote row loading, server update transactions, and remote set-filter distinct-value loading now emit standardized DataSource request/error events.
+- Reason: Remote row models previously handled errors inconsistently, and retry/status metadata was not available as a public contract.
+- Impact: Additive API. Existing DataSource implementations keep working; retry is disabled unless configured.
+- Migration: Configure `dataSourceOptions.retry` for transient network/server failures and handle `events.error` for normalized `DataSourceError` payloads.
+
+## 2026-05-11 — Server Row Model route cache
+
+- Status: accepted
+- Area: DataSource | GridApi
+- Change:
+  - `ServerRowModelStateSnapshot.routes` and `ServerRowRouteSnapshot` were added for route-aware cursor persistence.
+  - `ServerRowCacheEntry` now exposes `routeKey`, `routePath`, and `page` metadata.
+  - `ServerRowModel.loadRoutePage(groupKeys, page, refresh)` was added for explicit route page loading.
+  - Server cursor storage is now isolated per `groupKeys` route instead of being root-page-only.
+- Reason: Server grouping, infinite route expansion, and saved enterprise views need root and child route pages to cache and restore independently.
+- Impact: Additive API. Existing `cursors` snapshots remain as the backward-compatible root route format.
+- Migration: Use `rowModelState.routes` when persisting server model state that includes expanded group routes.
+
+## 2026-05-11 — Row model state snapshot restore
+
+- Status: accepted
+- Area: GridOptions | GridApi
+- Change:
+  - `RowModelStateSnapshot` was added to the public type surface.
+  - `GridStateSnapshot.rowModelState` now captures row-model-specific runtime state for client, infinite, server, viewport, and tree row models.
+  - `GridOptions.initialState.rowModelState` and `GridApi.setState({ rowModelState })` restore append cursors, server page/group expansion/cursors, viewport range metadata, and tree expansion/selection.
+- Reason: Large-data row models need a persistence contract that does not overload generic scroll/pagination state or require full client-side row data.
+- Impact: Additive API. Data caches are intentionally not serialized; restored remote models re-request data through their configured `DataSource`.
+- Migration: Store `api.getState().rowModelState` with `scroll`, `pagination`, `sortModel`, and `filterModel` for saved enterprise views.
+
+## 2026-05-11 — Duplicate explicit column identity validation
+
+- Status: accepted
+- Area: ColumnDef | ColumnModel
+- Change:
+  - Explicit `columnId`, legacy `id`, and legacy `groupId` now share one validated identity namespace.
+  - Duplicate explicit identities throw during column model creation instead of being silently suffixed.
+  - Blank explicit identities now throw during column model creation.
+  - Explicit identities are reserved before field fallback IDs are assigned, independent of column order.
+  - Duplicate `field`-only columns remain supported and continue to receive fallback suffixes such as `amount__2`.
+- Reason: Enterprise column state, events, wrapper slots, header merge rules, and export/import mappings require explicit column identities to be stable and user-owned.
+- Impact: Grids that intentionally reused the same explicit identity must assign distinct `columnId` values.
+- Migration: Keep duplicate `field` values if needed, but give each rendered column a unique `columnId`, for example `amount-raw` and `amount-formatted`.
+
+## 2026-05-11 — Column State API maturity
+
+- Status: accepted
+- Area: GridApi | ColumnModel | Wrapper | DOM
+- Change:
+  - `GridApi.getColumnState(options)` now accepts `{ includeDefaults: true }` for a complete leaf-column snapshot.
+  - `GridApi.applyColumnState(params, options)` was added for partial column state application.
+  - `ApplyColumnStateParams`, `ColumnStateApplyResult`, and `GetColumnStateOptions` were added to the public type surface.
+  - Partial apply supports `defaultState`, `applyOrder`, missing-column validation, and opt-in `ignoreMissingColumns`.
+  - React and Vue wrappers expose the same method without reimplementing column state logic.
+- Reason: Enterprise saved views, per-user preferences, schema evolution, and wrapper parity need a safer incremental state API than whole-state replacement.
+- Impact: Additive API. `setColumnState()` remains the replacement API and keeps existing behavior.
+- Migration: Use `applyColumnState()` for saved user preferences and keep `setColumnState()` for full controlled replacement.
+
+## 2026-05-11 — Group header child order constraints
+
+- Status: accepted
+- Area: ColumnDef | ColumnModel | HeaderModel
+- Change:
+  - `ColumnGroupDef.marryChildren` is now enforced by the core column order model.
+  - `columnOrder`, `columnState.order`, `api.applyColumnState()`, and column move operations keep married group leaves contiguous.
+  - Header matrix creation now receives already-constrained leaf order, so a married group does not split into multiple header cells after restore or reorder.
+- Reason: Group header contracts must survive saved views and runtime column moves without visually broken group spans.
+- Impact: Additive behavior for groups that opted into `marryChildren: true`. Existing groups without the flag keep current reorder behavior.
+- Migration: Set `marryChildren: true` only for groups whose children must move as one logical block.
+
+## 2026-05-11 — Header merge rule validation
+
+- Status: accepted
+- Area: GridOptions | HeaderModel
+- Change:
+  - Core now validates `GridOptions.headerMerge.rules` before header matrix rendering.
+  - Header merge rules must use unique ids, non-empty names, and leaf data column ids.
+  - Structural row merge rules must be contiguous and cannot overlap another structural row rule.
+  - Label merge rules must resolve to one existing group or leaf header cell.
+  - `validateHeaderMergeRules()`, `assertValidHeaderMergeRules()`, and header merge validation result types are exported from `@onegrid/core`.
+- Reason: Invalid header merge rules previously failed silently or split into visually ambiguous cells, which can corrupt pinned clipping, exports, accessibility labels, and saved column-state restore.
+- Impact: Invalid header merge configurations now throw during grid/header model creation instead of being ignored.
+- Migration: Replace group ids with leaf column ids, split non-contiguous row merges into separate rules, and give repeated header names explicit unique ids.
+
+## 2026-05-11 — Column policy flags
+
+- Status: accepted
+- Area: ColumnDef | ColumnModel | GridApi | DOM | Wrapper
+- Change:
+  - `DataColumnDef.hideable`, `pinnable`, `lockVisible`, `lockPinned`, and `lockPosition` were added.
+  - Column menu, columns tool panel, public column APIs, `setColumnState()`, and `applyColumnState()` now honor these flags.
+  - Locked column order is preserved during state restore and reorder operations.
+  - `resizable: false` continues to block resize and auto-size.
+- Reason: Enterprise grids need required columns, fixed-position columns, and locked pinned columns to survive user actions and saved-view restore.
+- Impact: Additive API. Columns without these flags keep existing behavior.
+- Migration: Use `hideable: false` or `lockVisible: true` for required columns, `lockPinned: true` for mandatory pinned columns, and `lockPosition: true` for fixed-order columns.
+
+## 2026-05-11 — Column group open state
+
+- Status: accepted
+- Area: ColumnDef | ColumnModel | GridApi | Wrapper | DOM
+- Change:
+  - `DataColumnDef.columnGroupShow` and `ColumnGroupDef.columnGroupShow` were added with `"always"`, `"open"`, and `"closed"` visibility modes.
+  - `ColumnGroupDef.openByDefault` is now consumed by the column model instead of remaining a type-only option.
+  - `ColumnUiState.groups` stores persisted group open state by group `columnId`.
+  - `GridApi.setColumnGroupOpen()` and `GridApi.toggleColumnGroup()` were added and exposed through React and Vue wrappers.
+  - `applyColumnState()` validates group ids and reports `appliedGroupIds` / `missingGroupIds`.
+- Reason: Group header open/closed behavior must be stateful, restorable, and wrapper-parity before header features can be considered structurally complete.
+- Impact: Additive API. Existing groups without `columnGroupShow` render the same in open and closed states.
+- Migration: Use `columnGroupShow: "open"` for detail columns and `"closed"` for compact summary columns under the same group.
+
 ## 2026-05-08 — Column defaults and reusable column types
 
 - Status: accepted
@@ -524,3 +827,42 @@
 - Reason: plugin integrations need stable extension points for menus, render adapters, export/import adapters, themes, and future enterprise hooks without wrapper-specific reimplementation.
 - Impact: No breaking change. Extension payloads are metadata or adapter hooks and do not bypass renderer security, CSP, or sanitizer policy.
 - Migration: Existing plugins can keep using `addCleanup()` and `onDispose()`; use `registerExtension()` for discoverable contributions.
+
+## 2026-05-15 — Export/import adapter hardening
+
+- Status: accepted
+- Area: Export | Import | Plugin | Adapters | DOM
+- Change:
+  - `ImportOptions.format` now accepts custom format strings so import adapters can own non-core formats.
+  - Core exports `GridImportAdapterPayload`, `GridImportAdapterContext`, and shared adapter capability metadata.
+  - DOM `GridApi.importData()` now consumes `import.adapter` extensions before falling back to the dependency-free built-in importer.
+  - Built-in `createGridExport()` and `createGridImport()` reject unknown formats without an explicit adapter instead of silently treating them as CSV.
+  - `@onegrid/adapters` exports `createGridIoAdapterPlugin()`, `createExportAdapterPlugin()`, and `createImportAdapterPlugin()` helper factories.
+- Reason: Korean/CJK PDF font embedding and arbitrary external XLSX compatibility require a stable adapter boundary without adding document-engine dependencies to `@onegrid/core`.
+- Impact: No breaking change for built-in `csv`, `xlsx`, `pdf`, `json`, and `print` usage. Direct core calls with unknown custom formats must now register/use an adapter at the DOM/plugin boundary.
+- Migration: Package enterprise PDF/XLSX engines as `export.adapter` or `import.adapter` plugins and pass them through `GridOptions.plugins`.
+
+## 2026-05-15 — Pivot and grouping UX maturity
+
+- Status: accepted
+- Area: Grouping | Pivot | DOM | Examples | Docs
+- Change:
+  - Group rows now render a stable group label plus separate aggregate chips instead of one long aggregate string.
+  - The grouping example exposes client expand-all, collapse-all, reset, and server route state controls.
+  - Pivot toolbar text changed to `Pivot fields`, and the panel now shows client/server runtime mode, row/column/value buckets, totals, and runtime metadata.
+  - Full row editing remains excluded; this UX pass does not reintroduce row-wide editor APIs.
+- Reason: Grouping and pivot need inspectable enterprise UX, not only internal model correctness.
+- Impact: Existing pivot panels remain opt-in through `pivot.panel: true`. Tests and docs should target `Pivot fields` for the toolbar label.
+- Migration: If an app selected the old `Pivot` button text in tests, update selectors to `Pivot fields`.
+
+## 2026-05-15 — Export and clipboard spreadsheet hardening
+
+- Status: accepted
+- Area: Export | Clipboard | Security
+- Change:
+  - CSV export now neutralizes formula-like string cells by prefixing an apostrophe at the delimited text boundary.
+  - Clipboard TSV copy uses the same neutralization before writing `text/plain`.
+  - XLSX export is covered by regression tests to keep formula-like values as inline strings rather than formula cells.
+- Reason: CSV and TSV are often opened or pasted into spreadsheet tools, where leading `=`, `+`, `-`, or `@` strings can be interpreted as formulas.
+- Impact: Grid source data is not mutated. Delimited text handoff may contain a leading apostrophe for formula-like strings so spreadsheet tools display them as text.
+- Migration: Applications that intentionally export executable formulas should provide an audited custom export adapter and keep that behavior explicit.

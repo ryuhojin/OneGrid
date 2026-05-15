@@ -1,4 +1,4 @@
-import { createColumnsToolPanelModel } from "@onegrid/core";
+import { canMoveColumn, canResizeColumn } from "@onegrid/core";
 import type {
   ColumnModel,
   ColumnMenuExtensionPayload,
@@ -6,9 +6,11 @@ import type {
   ColumnUiState,
   GridPluginExtension,
   HeaderCell,
+  NormalizedDataColumn,
   PinnedSide
 } from "@onegrid/core";
 import { createColumnMenuButton } from "./columnMenu.js";
+import { createToolPanel } from "./columnToolPanel.js";
 import type { HeaderFilterRuntime } from "./filterRuntime.js";
 
 export interface ColumnUiRuntime {
@@ -35,7 +37,6 @@ export interface ResolvedColumnUiOptions {
 }
 
 const DRAG_MIME_TYPE = "text/onegrid-column-id";
-let nextToolPanelId = 0;
 
 export function resolveColumnUiOptions(
   options: ColumnUiOptions | undefined
@@ -63,7 +64,7 @@ export function enhanceHeaderCell<TData>(
   }
 
   if (options.reorder) {
-    attachColumnDragDrop(element, cell, runtime);
+    attachColumnDragDrop(element, cell, model, runtime);
   }
 
   const actions = document.createElement("span");
@@ -78,8 +79,11 @@ export function enhanceHeaderCell<TData>(
   }
 
   if (options.resize) {
-    attachBorderResize(element, cell, model, options, runtime);
-    element.append(createResizeHandle(cell, model, options, runtime));
+    const column = getDataColumn(model, cell.sourceId);
+    if (column && canResizeColumn(column)) {
+      attachBorderResize(element, cell, model, options, runtime);
+      element.append(createResizeHandle(cell, model, options, runtime));
+    }
   }
 }
 
@@ -225,11 +229,17 @@ function isResizeZone(element: HTMLElement, clientX: number): boolean {
   return clientX >= rect.right - 8 && clientX <= rect.right + 6;
 }
 
-function attachColumnDragDrop(
+function attachColumnDragDrop<TData>(
   element: HTMLElement,
   cell: HeaderCell,
+  model: ColumnModel<TData>,
   runtime: ColumnUiRuntime
 ): void {
+  const column = getDataColumn(model, cell.sourceId);
+  if (!column || !canMoveColumn(column)) {
+    return;
+  }
+
   element.draggable = true;
   element.addEventListener("pointerdown", (event) => {
     if (
@@ -298,64 +308,10 @@ function isColumnControlTarget(target: EventTarget | null): boolean {
   );
 }
 
-function createToolPanel<TData>(
+function getDataColumn<TData>(
   model: ColumnModel<TData>,
-  runtime: ColumnUiRuntime
-): HTMLElement {
-  const panel = document.createElement("div");
-  panel.className = "og-grid__tool-panel";
-  panel.id = `og-columns-tool-panel-${++nextToolPanelId}`;
-  panel.setAttribute("role", "region");
-  panel.setAttribute("aria-label", "Columns tool panel");
-
-  const panelModel = createColumnsToolPanelModel(model);
-  for (const column of panelModel.columns) {
-    const row = document.createElement("div");
-    row.className = "og-grid__tool-panel-row";
-
-    const label = document.createElement("label");
-    label.className = "og-grid__tool-panel-label";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "og-grid__checkbox";
-    checkbox.checked = !column.hidden;
-    checkbox.addEventListener("change", () => {
-      if (checkbox.checked) {
-        runtime.showColumn(column.id);
-      } else {
-        runtime.hideColumn(column.id);
-      }
-    });
-    const text = document.createElement("span");
-    text.textContent = column.headerName;
-    label.append(checkbox, text);
-
-    row.append(
-      label,
-      createPinButton(column.headerName, "L", () => runtime.pinColumn(column.id, "left"))
-    );
-    row.append(createPinButton(column.headerName, "R", () => runtime.pinColumn(column.id, "right")));
-    row.append(createPinButton(column.headerName, "-", () => runtime.pinColumn(column.id, null)));
-    panel.append(row);
-  }
-
-  return panel;
-}
-
-function createPinButton(label: string, text: string, onClick: () => void): HTMLButtonElement {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "og-grid__tool-panel-pin";
-  button.textContent = text;
-  button.setAttribute("aria-label", getPinButtonLabel(label, text));
-  button.addEventListener("click", onClick);
-  return button;
-}
-
-function getPinButtonLabel(label: string, text: string): string {
-  if (text === "-") {
-    return `Unpin ${label}`;
-  }
-
-  return `Pin ${label} ${text === "L" ? "left" : "right"}`;
+  columnId: string
+): NormalizedDataColumn<TData> | undefined {
+  const column = model.byId.get(columnId);
+  return column?.kind === "data" ? column : undefined;
 }

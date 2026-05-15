@@ -2,17 +2,17 @@ export {
   cancelCellEdit,
   commitCellEdit,
   isCellEditable,
-  resolveEditKeyboardPolicy,
   resolveEditStartMode,
   resolveEditorDef,
   startCellEdit
 } from "./editorLifecycle.js";
+export { resolveEditKeyboardPolicy } from "./editKeyboardPolicy.js";
 export type {
   CellEditCancelResult,
   CellEditCommitResult,
   CellEditSession,
   CommitCellEditInput,
-  ResolvedEditingKeyboardPolicy,
   ResolvedEditorDef,
   StartCellEditInput
 } from "./editorLifecycle.js";
+export type { ResolvedEditingKeyboardPolicy } from "./editKeyboardPolicy.js";

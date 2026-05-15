@@ -327,9 +327,14 @@ pnpm test:unit
 pnpm test:e2e
 pnpm test:a11y
 pnpm test:perf:smoke
+pnpm bench:metrics
 pnpm build
 pnpm docs:build
 ```
+
+`bench:metrics`는 100M viewport, 10M segmented scroll, 50K column virtualization,
+variable row height, merge, frozen+virtual 조합의 실제 `ms`, `ops/s`, `ms/op`
+지표를 출력합니다.
 
 시각 회귀 smoke:
 

@@ -68,3 +68,38 @@ When disabled, the grid still renders normally and marks the host with
 The SEC-001 example is available at `/#SEC-001`, and the standalone CSP page is available at
 `/csp.html` in the examples app. Playwright verifies that the standalone page runs without CSP
 violations and that the injected runtime style carries the configured nonce.
+
+## Package and CDN validation
+
+Distribution CSP validation must exercise built package artifacts, not workspace source aliases.
+OneGrid keeps this as a separate packaging smoke test:
+
+```bash
+pnpm test:e2e:package-csp
+```
+
+The test serves `packages/dom/dist/index.js`, `packages/dom/dist/onegrid.umd.js`, and
+`packages/themes/dist/default.css` through a local CDN-like route. It applies strict CSP response
+headers, enforces Trusted Types for the ESM sanitizer path in Chromium, and verifies SRI for the
+UMD/CSS smoke pages. It verifies that the grid mounts from published ESM output, runtime styles
+carry the nonce, external theme CSS loads without `unsafe-inline`, and sanitized HTML renderers do
+not open a raw HTML sink.
+
+For direct CDN CSS paths, use the built CSS files under `dist`. The theme package rewrites package
+CSS imports to relative imports during `pnpm build`, so `/dist/default.css` can load its token and
+partial CSS files without a bundler.
+
+## Browser security matrix
+
+Run the security matrix before release hardening or when changing renderer, sanitizer, clipboard,
+export, or package distribution code:
+
+```bash
+pnpm test:e2e:security:browser-matrix
+```
+
+The matrix builds the packages and runs the security-focused E2E specs against Playwright Chromium
+and WebKit. It also runs against installed Chrome and Edge browser channels when those applications
+are present on the machine. Trusted Types enforcement is Chromium-based, so those assertions run in
+Chromium-family projects and are skipped in WebKit while CSP, XSS, clipboard, export, and package
+CSP checks still execute.

@@ -26,6 +26,28 @@ await model.loadViewport({ scrollTop: 0, viewportHeight: 600 });
 model.applyLiveUpdate({ rowIndex: 10, row: nextRow });
 ```
 
+For 10M to 100M logical rows, segmented scrolling maps the browser scrollbar to a bounded physical
+range while the row model keeps using logical row indexes. This mode intentionally requires a fixed
+numeric row height. It should not be mixed with `rowHeight: "auto"` or per-row height callbacks,
+because a 100M-row viewport cannot know every preceding row offset without a server-owned index:
+
+```ts
+new OneGrid({
+  el,
+  columns,
+  rowModel: "viewport",
+  dataSource,
+  viewport: { rowHeight: 30, initialRowCount: 100_000_000 },
+  virtualization: { segmented: true, rowHeight: 30 }
+});
+```
+
+This is an explicit 1.0 contract, not a temporary limitation. The viewport row model optimizes for
+constant-time logical row seeking, bounded DOM, and stable scrollbar behavior. A server-provided
+variable-height offset index would be a separate protocol with its own cache, invalidation, and
+scrollbar semantics; until that protocol exists, variable and auto row heights are limited to local
+client virtualization.
+
 DOM, React, and Vue use the same `GridOptions` contract:
 
 ```ts
@@ -33,6 +55,7 @@ new OneGrid({
   el,
   columns,
   rowKey: "id",
+  duplicateRowKeyPolicy: "error",
   rowModel: "viewport",
   dataSource,
   viewport: {
@@ -44,6 +67,10 @@ new OneGrid({
   }
 });
 ```
+
+Viewport responses with duplicate explicit row ids are rejected by default. This keeps live updates,
+focus restore, and selection anchored to a single logical row even when only a slice of a very large
+dataset is loaded.
 
 The example route `ROW-004` renders a synchronized viewport over 10M logical rows without creating a
 full client array.

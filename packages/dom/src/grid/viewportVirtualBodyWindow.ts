@@ -1,4 +1,4 @@
-import { createSegmentedVirtualScroll } from "@onegrid/core";
+import { resolveSegmentedVirtualRowWindow } from "@onegrid/core";
 import type { FixedRowVirtualWindow } from "@onegrid/core";
 import type { DomGridOptions } from "./OneGrid.js";
 import type { RowRenderState } from "./renderGridTypes.js";
@@ -10,8 +10,7 @@ import {
 } from "./virtualScrollRuntime.js";
 import type { VirtualScrollRuntime } from "./virtualScrollRuntime.js";
 import {
-  replaceBodyRows,
-  setControlledViewportScroll
+  replaceBodyRows
 } from "./virtualBodyWindow.js";
 import type { BodyRowEntry } from "./bodyRowRenderer.js";
 import type { VirtualScrollAttachInput } from "./virtualBodyWindow.js";
@@ -20,9 +19,12 @@ import {
   isWheelBoundaryHit,
   normalizeWheelDelta
 } from "./wheelScroll.js";
-
-const CONTROLLED_SCROLL_RESTORE = "true";
-const LOGICAL_SCROLL_EVENT = "onegrid:logical-scroll";
+import type { GridScrollCoordinator } from "./scrollCoordinator.js";
+import {
+  CONTROLLED_SCROLL_RESTORE,
+  LOGICAL_SCROLL_EVENT
+} from "./scrollCoordinator.js";
+import { observeElementResize } from "./resizeObserver.js";
 
 interface LogicalScrollDetail {
   readonly scrollTop?: unknown;
@@ -44,33 +46,30 @@ export function createViewportVirtualWindow<TData>(
 
   const rowHeight = resolveVirtualRowHeight(options);
   const viewportHeight = virtualScrollRuntime?.viewportHeight ?? resolveVirtualViewportHeight(options);
-  const segmented = createSegmentedVirtualScroll({
+  const window = resolveSegmentedVirtualRowWindow({
     rowCount: rowRenderState.rowCount,
     rowHeight,
     viewportHeight,
     logicalScrollTop: virtualScrollRuntime?.scrollTop ?? 0,
+    ...(options.viewport?.overscan === undefined ? {} : { overscan: options.viewport.overscan }),
+    ...(options.virtualization?.maxDomRows === undefined ? {} : { maxDomRows: options.virtualization.maxDomRows }),
     ...(options.virtualization?.maxScrollHeight === undefined
       ? {}
         : { maxScrollHeight: options.virtualization.maxScrollHeight })
   });
-  const firstVisibleRow = Math.floor(segmented.logicalScrollTop / rowHeight);
-  const rowOffset = segmented.logicalScrollTop - firstVisibleRow * rowHeight;
-  const visibleRowCount = Math.max(1, Math.ceil(viewportHeight / rowHeight));
-  const visibleLastRow = Math.min(rowRenderState.rowCount - 1, firstVisibleRow + visibleRowCount - 1);
-  const renderedRowCount = Math.max(0, visibleLastRow - firstVisibleRow + 1);
 
   return Object.freeze({
-    firstRow: firstVisibleRow,
-    lastRow: visibleLastRow,
-    visibleFirstRow: firstVisibleRow,
-    visibleLastRow,
+    firstRow: window.firstVisibleRow,
+    lastRow: window.lastVisibleRow,
+    visibleFirstRow: window.firstVisibleRow,
+    visibleLastRow: window.lastVisibleRow,
     rowHeight,
-    offsetTop: -rowOffset,
+    offsetTop: -window.rowOffset,
     beforeHeight: 0,
     afterHeight: 0,
-    totalHeight: Math.max(viewportHeight, renderedRowCount * rowHeight),
-    renderedRowCount,
-    visibleRowCount,
+    totalHeight: Math.max(viewportHeight, window.visibleRowCount * rowHeight),
+    renderedRowCount: window.visibleRowCount,
+    visibleRowCount: window.visibleRowCount,
     overscanBefore: 0,
     overscanAfter: 0,
     scrollTop: 0,
@@ -106,6 +105,7 @@ export function attachViewportVirtualScroll<TData>(input: VirtualScrollAttachInp
     centerOwnsTreeControls,
     virtualScrollRuntime
   } = input;
+  const scrollCoordinator: GridScrollCoordinator | undefined = input.scrollCoordinator;
   if (
     rowRenderState?.rowModel !== "viewport"
     || !virtualScrollRuntime?.enabled
@@ -118,10 +118,32 @@ export function attachViewportVirtualScroll<TData>(input: VirtualScrollAttachInp
   const rowHeight = resolveVirtualRowHeight(options);
   let logicalScrollTop = virtualScrollRuntime.scrollTop;
   const getViewportHeight = (): number => scrollElement.clientHeight || virtualScrollRuntime.viewportHeight;
+  const getSegmentedWindow = (input: {
+    readonly logicalScrollTop?: number;
+    readonly physicalScrollTop?: number;
+    readonly viewportHeight: number;
+  }) => {
+    return resolveSegmentedVirtualRowWindow({
+      rowCount,
+      rowHeight,
+      viewportHeight: input.viewportHeight,
+      ...(input.logicalScrollTop === undefined ? {} : { logicalScrollTop: input.logicalScrollTop }),
+      ...(input.physicalScrollTop === undefined ? {} : { physicalScrollTop: input.physicalScrollTop }),
+      ...(options.viewport?.overscan === undefined ? {} : { overscan: options.viewport.overscan }),
+      ...(options.virtualization?.maxDomRows === undefined ? {} : { maxDomRows: options.virtualization.maxDomRows }),
+      ...(options.virtualization?.maxScrollHeight === undefined
+        ? {}
+        : { maxScrollHeight: options.virtualization.maxScrollHeight })
+    });
+  };
   const setLogicalScrollMetadata = (scrollTop: number, viewportHeight: number): void => {
-    scrollElement.dataset.logicalScrollTop = String(scrollTop);
-    scrollElement.dataset.logicalScrollMax = String(Math.max(0, rowCount * rowHeight - viewportHeight));
-    scrollElement.dataset.logicalScrollHeight = String(rowCount * rowHeight);
+    const window = getSegmentedWindow({ logicalScrollTop: scrollTop, viewportHeight });
+    scrollElement.dataset.logicalScrollTop = String(window.logicalScrollTop);
+    scrollElement.dataset.logicalScrollMax = String(window.maxLogicalScrollTop);
+    scrollElement.dataset.logicalScrollHeight = String(window.totalLogicalHeight);
+    scrollElement.dataset.physicalScrollTop = String(window.physicalScrollTop);
+    scrollElement.dataset.physicalScrollMax = String(window.maxPhysicalScrollTop);
+    scrollCoordinator?.sync();
   };
   const createWindowForLogicalScroll = (
     scrollTop: number,
@@ -150,8 +172,8 @@ export function attachViewportVirtualScroll<TData>(input: VirtualScrollAttachInp
   };
   const applyLogicalScroll = (targetScrollTop: number, deferRemoteLoad = false): void => {
     const viewportHeight = getViewportHeight();
-    const maxLogicalScrollTop = Math.max(0, rowCount * rowHeight - viewportHeight);
-    const nextLogicalScrollTop = clampScrollPosition(targetScrollTop, maxLogicalScrollTop);
+    const logicalWindow = getSegmentedWindow({ logicalScrollTop: targetScrollTop, viewportHeight });
+    const nextLogicalScrollTop = logicalWindow.logicalScrollTop;
     logicalScrollTop = nextLogicalScrollTop;
     setLogicalScrollMetadata(nextLogicalScrollTop, viewportHeight);
     virtualScrollRuntime.onScroll(nextLogicalScrollTop, viewportHeight);
@@ -167,8 +189,8 @@ export function attachViewportVirtualScroll<TData>(input: VirtualScrollAttachInp
       nextWindow.visibleLastRow
     );
     if (canReuseRows) {
-      setControlledViewportScroll(scrollElement, nextWindow.scrollTop);
       updateRenderedViewportRows(nextWindow);
+      scrollCoordinator?.sync();
       return;
     }
 
@@ -189,25 +211,16 @@ export function attachViewportVirtualScroll<TData>(input: VirtualScrollAttachInp
       return;
     }
 
-    const segmented = createSegmentedVirtualScroll({
-      rowCount,
-      rowHeight,
-      viewportHeight,
-      physicalScrollTop: scrollElement.scrollTop,
-      ...(options.virtualization?.maxScrollHeight === undefined
-        ? {}
-        : { maxScrollHeight: options.virtualization.maxScrollHeight })
-    });
-    logicalScrollTop = segmented.logicalScrollTop;
-    setLogicalScrollMetadata(segmented.logicalScrollTop, viewportHeight);
-    virtualScrollRuntime.onScroll(segmented.logicalScrollTop, viewportHeight);
-    const firstVisibleRow = Math.floor(segmented.logicalScrollTop / rowHeight);
-    const lastVisibleRow = Math.min(
-      rowCount - 1,
-      firstVisibleRow + Math.ceil(viewportHeight / rowHeight) - 1
-    );
-    if (!isViewportRangeRendered(rowRenderState.entries, firstVisibleRow, lastVisibleRow)) {
-      onLogicalRowScroll(firstVisibleRow, segmented.logicalScrollTop);
+    const window = getSegmentedWindow({ physicalScrollTop: scrollElement.scrollTop, viewportHeight });
+    logicalScrollTop = window.logicalScrollTop;
+    setLogicalScrollMetadata(window.logicalScrollTop, viewportHeight);
+    virtualScrollRuntime.onScroll(window.logicalScrollTop, viewportHeight);
+    if (!isViewportRangeRendered(
+      rowRenderState.entries,
+      window.firstVisibleRow,
+      window.lastVisibleRow
+    )) {
+      onLogicalRowScroll(window.firstVisibleRow, window.logicalScrollTop);
     }
   };
 
@@ -218,7 +231,10 @@ export function attachViewportVirtualScroll<TData>(input: VirtualScrollAttachInp
     }
 
     const viewportHeight = getViewportHeight();
-    const maxLogicalScrollTop = Math.max(0, rowCount * rowHeight - viewportHeight);
+    const maxLogicalScrollTop = getSegmentedWindow({
+      logicalScrollTop,
+      viewportHeight
+    }).maxLogicalScrollTop;
     const nextLogicalScrollTop = clampScrollPosition(
       logicalScrollTop + deltaY,
       maxLogicalScrollTop
@@ -249,6 +265,7 @@ export function attachViewportVirtualScroll<TData>(input: VirtualScrollAttachInp
       currentWindow.visibleLastRow
     )) {
       updateRenderedViewportRows(currentWindow);
+      scrollCoordinator?.sync();
       return;
     }
 
@@ -257,6 +274,7 @@ export function attachViewportVirtualScroll<TData>(input: VirtualScrollAttachInp
 
   syncCurrentViewportWindow();
   requestAnimationFrame(syncCurrentViewportWindow);
+  observeElementResize(scrollElement, syncCurrentViewportWindow);
   scrollElement.addEventListener(LOGICAL_SCROLL_EVENT, (event) => {
     const detail = (event as CustomEvent<LogicalScrollDetail>).detail;
     if (typeof detail?.scrollTop !== "number") {

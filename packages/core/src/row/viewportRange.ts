@@ -1,4 +1,5 @@
 import type { ViewportRange } from "../types/shared.js";
+import { resolveLogicalRowWindow } from "./logicalRowWindow.js";
 
 export interface ViewportRangeInput {
   readonly scrollTop: number;
@@ -11,19 +12,33 @@ export interface ViewportRangeInput {
 }
 
 export function calculateViewportRange(input: ViewportRangeInput): ViewportRange {
+  const rowCount = input.rowCount;
+  if (rowCount !== undefined) {
+    const window = resolveLogicalRowWindow({
+      rowCount,
+      rowHeight: input.rowHeight,
+      viewportHeight: input.viewportHeight,
+      scrollTop: input.scrollTop,
+      ...(input.overscan === undefined ? {} : { overscan: input.overscan })
+    });
+    return Object.freeze({
+      firstRow: window.firstRenderedRow,
+      lastRow: window.lastRenderedRow,
+      ...(input.firstColumn === undefined ? {} : { firstColumn: input.firstColumn }),
+      ...(input.lastColumn === undefined ? {} : { lastColumn: input.lastColumn })
+    });
+  }
+
   const rowHeight = normalizePositive(input.rowHeight, 36);
   const viewportHeight = normalizePositive(input.viewportHeight, rowHeight);
   const overscan = Math.max(0, Math.trunc(input.overscan ?? 0));
   const firstVisible = Math.floor(Math.max(0, input.scrollTop) / rowHeight);
   const visibleCount = Math.max(1, Math.ceil(viewportHeight / rowHeight));
-  const maxRow = input.rowCount === undefined ? undefined : Math.max(0, input.rowCount - 1);
   const firstRow = Math.max(0, firstVisible - overscan);
-  const uncappedLastRow = firstVisible + visibleCount - 1 + overscan;
-  const lastRow = maxRow === undefined ? uncappedLastRow : Math.min(uncappedLastRow, maxRow);
-
+  const lastRow = firstVisible + visibleCount - 1 + overscan;
   return Object.freeze({
     firstRow,
-    lastRow: Math.max(firstRow, lastRow),
+    lastRow,
     ...(input.firstColumn === undefined ? {} : { firstColumn: input.firstColumn }),
     ...(input.lastColumn === undefined ? {} : { lastColumn: input.lastColumn })
   });

@@ -12,6 +12,7 @@ import type {
   SortModel,
   ViewportRange
 } from "./shared.js";
+import type { ColumnDef } from "./column.js";
 
 export interface DataSource<TData = unknown> {
   getRows(request: GetRowsRequest): Promise<GetRowsResult<TData>>;
@@ -20,6 +21,61 @@ export interface DataSource<TData = unknown> {
   getDistinctValues?(request: DistinctValuesRequest): Promise<DistinctValuesResult>;
   getAggregates?(request: AggregateRequest): Promise<AggregateResult>;
   destroy?(): void;
+}
+
+export type DataSourceRequestKind =
+  | "getRows"
+  | "getChildren"
+  | "updateRows"
+  | "getDistinctValues"
+  | "getAggregates";
+
+export type DataSourceRequestStatus =
+  | "idle"
+  | "loading"
+  | "retrying"
+  | "success"
+  | "error"
+  | "cancelled";
+
+export interface DataSourceRetryPolicy {
+  readonly attempts?: number;
+  readonly delayMs?: number;
+  readonly maxDelayMs?: number;
+  readonly backoff?: "none" | "linear" | "exponential";
+  retry?(context: DataSourceRetryContext): boolean;
+}
+
+export interface DataSourceRetryContext {
+  readonly requestKind: DataSourceRequestKind;
+  readonly requestId: string;
+  readonly attempt: number;
+  readonly maxAttempts: number;
+  readonly error: DataSourceError;
+}
+
+export interface DataSourceStatusSnapshot {
+  readonly requestKind: DataSourceRequestKind;
+  readonly requestId: string;
+  readonly status: DataSourceRequestStatus;
+  readonly attempt: number;
+  readonly maxAttempts: number;
+  readonly retryable: boolean;
+  readonly recoverable: boolean;
+  readonly error?: DataSourceError;
+}
+
+export interface DataSourceError {
+  readonly name: string;
+  readonly message: string;
+  readonly requestKind: DataSourceRequestKind;
+  readonly requestId: string;
+  readonly attempt: number;
+  readonly retryable: boolean;
+  readonly recoverable: boolean;
+  readonly code?: string;
+  readonly statusCode?: number;
+  readonly cause?: unknown;
 }
 
 export interface GetRowsRequest {
@@ -43,6 +99,7 @@ export interface GetRowsRequest {
 
 export interface GetRowsResult<TData = unknown> {
   readonly rows: readonly TData[];
+  readonly columns?: readonly ColumnDef<TData>[];
   readonly rowCount?: number;
   readonly nextCursor?: string;
   readonly hasMore?: boolean;

@@ -1,0 +1,74 @@
+---
+title: Row Model Capability Matrix
+---
+
+# Row Model Capability Matrix
+
+OneGrid exposes `rowModelCapabilityMatrix` from `@onegrid/core` as the public source of truth for
+row model ownership and feature support. The matrix prevents examples, wrappers, and enterprise
+integrations from overclaiming a model's capabilities.
+
+```ts
+import { getRowModelCapabilityProfile, rowModelCapabilityMatrix } from "@onegrid/core";
+
+const viewport = getRowModelCapabilityProfile("viewport");
+console.log(viewport.capabilities.largeScroll.support); // "native"
+console.log(rowModelCapabilityMatrix.server.capabilities.pivot.support); // "request"
+```
+
+## Support Levels
+
+| Level | Meaning |
+| --- | --- |
+| `native` | The row model owns the behavior in core. |
+| `request` | The row model serializes the model into `DataSource` requests; the server owns execution. |
+| `partial` | Supported only for loaded rows, visible windows, or a constrained policy. |
+| `notSupported` | Use a different row model or an integration-specific extension. |
+
+## Model Selection
+
+| Row model | Ownership | Scale target | Best fit |
+| --- | --- | --- | --- |
+| `client` | Client | Browser memory bounded datasets | Local transforms, offline-style data, synchronous transactions |
+| `infinite` | Server | Sparse block loading | Append/seek lists where block cache is enough |
+| `server` | Server | Route, page, and cursor cache | Server sort/filter/group/aggregate/pivot and remote transactions |
+| `viewport` | Server | 10M to 100M logical rows | Continuous large scrolling with bounded DOM and request windows |
+| `tree` | Hybrid | Loaded hierarchy plus lazy children | Explicit parent/child data and descendant selection |
+
+## Feature Matrix
+
+| Capability | Client | Infinite | Server | Viewport | Tree |
+| --- | --- | --- | --- | --- | --- |
+| Row identity | Native | Partial | Native | Native | Native |
+| Large scroll | Partial | Native | Partial | Native | Partial |
+| Sort | Native | Request | Request | Request | Partial |
+| Filter | Native | Request | Request | Request | Partial |
+| Group | Native | Request | Request | Request | Not supported |
+| Aggregate | Native | Request | Request | Request | Not supported |
+| Pivot | Native | Not supported | Request | Request | Not supported |
+| Transactions | Native | Not supported | Request | Not supported | Partial |
+| Pagination | Native | Partial | Native | Not supported | Not supported |
+| Selection | Native | Partial | Partial | Partial | Native |
+| Merge metadata | Native | Partial | Request | Request | Partial |
+| State snapshot | Native | Native | Native | Native | Native |
+| Duplicate row keys | Native | Partial | Native | Native | Native |
+| Retry/status | Not supported | Native | Native | Native | Native |
+| Live update | Partial | Not supported | Partial | Native | Partial |
+| Lazy children | Not supported | Not supported | Partial | Not supported | Native |
+
+## Design Constraints
+
+- `client` must not be used as a workaround for 10M to 100M rows. It owns the full row array.
+- `infinite` is a block model. It can forward sort/filter/group/aggregate intent, but it does not own
+  server route expansion or pivot requests.
+- `server` is the enterprise remote model for route cache, cursor state, grouping, aggregation, pivot,
+  and authoritative transactions.
+- `viewport` is the large-scroll model. It maps huge fixed-height logical row counts to a bounded
+  viewport window and must keep DOM rows proportional to the visible range plus overscan.
+- `viewport` segmented mode is fixed-height only in the 1.0 contract. Remote variable-height
+  scrolling needs a server offset-index protocol and is not claimed by the current capability matrix.
+- `tree` is hierarchy-first. It is not a substitute for row grouping or pivoting.
+
+Use `rowModelCapabilityMatrix` in tests and wrapper documentation when adding a new row feature. If
+a capability level changes, update the core matrix, this guide, and `API_CHANGELOG.md` in the same
+change.

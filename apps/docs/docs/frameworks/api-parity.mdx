@@ -12,7 +12,7 @@ component props.
 | Area | Shared option keys |
 | --- | --- |
 | Columns | `columns`, `defaultColumnDef`, `columnTypes`, `columnOrder`, `columnState`, `columnUi`, `headerMerge` |
-| Rows | `data`, `dataSource`, `rowModel`, `infinite`, `server`, `viewport`, `rowKey` |
+| Rows | `data`, `dataSource`, `rowModel`, `infinite`, `server`, `viewport`, `rowKey`, `duplicateRowKeyPolicy` |
 | Layout | `width`, `height`, `bodyHeight`, `layout`, `virtualization`, `rowHeight`, `headerHeight`, `frozenRows`, `frozenColumns` |
 | Features | `selection`, `editing`, `filtering`, `sorting`, `grouping`, `aggregation`, `pivot`, `summary`, `tree`, `merge`, `pagination`, `clipboard`, `export`, `import`, `contextMenu` |
 | Platform | `accessibility`, `security`, `theme`, `locale`, `plugins`, `events`, `beforeEvents` |
@@ -88,7 +88,7 @@ The same command surface is available from:
 | Selection | `getSelectionState`, `getSelectedRows`, `selectRows`, `selectCell`, `selectCellRange`, `selectAllVisibleRows`, `selectServerDataset`, `clearSelection` |
 | Editing | `startEdit`, `stopEdit`, `startBatchEditSession`, `getBatchEditSession`, `commitBatchEditSession`, `cancelBatchEditSession`, `undoEdit`, `redoEdit`, `getEditHistoryState`, `clearEditHistory`, `getPendingEdits`, `commitPendingEdits`, `cancelPendingEdits`, `validate` |
 | Columns | `setColumns`, `showColumn`, `hideColumn`, `pinColumn`, `autoSizeColumn` |
-| Models | `setFilterModel`, `getFilterModel`, `setSortModel`, `getSortModel`, `setGroupModel`, `getGroupModel` |
+| Models | `setFilterModel`, `getFilterModel`, `setSortModel`, `getSortModel`, `setGroupModel`, `getGroupModel`, `setPivotModel`, `getPivotModel` |
 | Tree and grouping | `expandGroup`, `collapseGroup`, `toggleGroup`, `expandTreeNode`, `collapseTreeNode`, `toggleTreeNode`, `selectTreeNode`, `getTreeSelection` |
 | Paging and scroll | `setPage`, `getPage`, `setPageSize`, `getPageSize`, `scrollToRow`, `scrollToColumn` |
 | I/O | `exportData`, `importData`, `copyToClipboard`, `pasteFromClipboard` |

@@ -18,4 +18,5 @@ export type {
   SetGridStateOptions,
   SelectionState
 } from "./gridState.js";
+export type { RowModelStateSnapshot } from "../row/rowModelState.js";
 export type { GridStateListener, GridStateStore, StateTransaction } from "./stateStore.js";

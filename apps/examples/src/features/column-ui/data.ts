@@ -19,11 +19,20 @@ export const columnUiOptions: ColumnUiOptions = {
 };
 
 export const columnUiColumns: readonly ColumnDef<ColumnUiOrderRow>[] = [
-  { id: "id", field: "id", headerName: "ID", pinned: "left", width: 96, resizable: false },
+  {
+    id: "id",
+    field: "id",
+    headerName: "ID",
+    pinned: "left",
+    width: 96,
+    resizable: false,
+    hideable: false,
+    lockPosition: true
+  },
   { field: "customer", headerName: "Customer", width: 150, minWidth: 120 },
   { field: "region", headerName: "Region", width: 118 },
   { field: "amount", headerName: "Amount", type: "number", width: 112, minWidth: 96 },
-  { field: "owner", headerName: "Owner", width: 128 },
+  { field: "owner", headerName: "Owner", width: 128, pinnable: false },
   { field: "auditNote", headerName: "Audit Note", hidden: true, width: 150 },
   { field: "status", headerName: "Status", width: 128 }
 ];

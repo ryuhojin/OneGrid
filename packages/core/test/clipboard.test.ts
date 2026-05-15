@@ -15,6 +15,18 @@ describe("clipboard model", () => {
     ])).toBe("ID\tMemo\r\nR1\t\"line 1\nline 2\"\r\nR2\t\"quote \"\"ok\"\"\"");
   });
 
+  it("neutralizes formula-like text before copying to spreadsheets", () => {
+    expect(serializeClipboardMatrix([
+      ["Formula", "Signed text", "Number"],
+      ["=HYPERLINK(\"https://example.test\")", "-risk", -42],
+      [" +SUM(1,2)", "@lookup", 42]
+    ])).toBe([
+      "Formula\tSigned text\tNumber",
+      "\"'=HYPERLINK(\"\"https://example.test\"\")\"\t'-risk\t-42",
+      "' +SUM(1,2)\t'@lookup\t42"
+    ].join("\r\n"));
+  });
+
   it("parses quoted text/plain TSV cells", () => {
     expect(parseClipboardText("ID\tMemo\r\nR1\t\"a\tb\"\r\nR2\t\"x\"\"y\"")).toEqual([
       ["ID", "Memo"],

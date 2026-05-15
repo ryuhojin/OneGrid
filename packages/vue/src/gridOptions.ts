@@ -8,6 +8,7 @@ import type {
   ColumnUiState,
   ContextMenuOptions,
   DataSource,
+  DuplicateRowKeyPolicy,
   EditingOptions,
   ExportOptions,
   FilteringOptions,
@@ -55,6 +56,7 @@ export interface OneGridProps {
   readonly data?: readonly unknown[] | undefined;
   readonly dataSource?: DataSource<unknown> | undefined;
   readonly rowKey?: string | ((row: unknown, index: number) => RowKey) | undefined;
+  readonly duplicateRowKeyPolicy?: DuplicateRowKeyPolicy | undefined;
   readonly rowModel?: RowModelKind | undefined;
   readonly rowHeight?: NonNullable<GridOptions<unknown>["rowHeight"]> | undefined;
   readonly width?: NonNullable<GridOptions<unknown>["width"]> | undefined;
@@ -112,6 +114,7 @@ export function toGridOptions(
     data?: readonly unknown[];
     dataSource?: DataSource<unknown>;
     rowKey?: string | ((row: unknown, index: number) => RowKey);
+    duplicateRowKeyPolicy?: DuplicateRowKeyPolicy;
     rowModel?: RowModelKind;
     rowHeight?: NonNullable<GridOptions<unknown>["rowHeight"]>;
     width?: NonNullable<GridOptions<unknown>["width"]>;
@@ -178,6 +181,9 @@ export function toGridOptions(
   }
   if (props.rowKey !== undefined) {
     options.rowKey = props.rowKey;
+  }
+  if (props.duplicateRowKeyPolicy !== undefined) {
+    options.duplicateRowKeyPolicy = props.duplicateRowKeyPolicy;
   }
   if (props.rowModel !== undefined) {
     options.rowModel = props.rowModel;

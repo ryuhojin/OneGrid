@@ -9,6 +9,7 @@ import type {
   ContextMenuOptions,
   DataSource,
   DataColumnDefaults,
+  DuplicateRowKeyPolicy,
   EditingOptions,
   ExportOptions,
   FilteringOptions,
@@ -86,6 +87,10 @@ export const oneGridProps = {
     type: [String, Function] as PropType<
       string | ((row: unknown, index: number) => RowKey) | undefined
     >,
+    default: undefined
+  },
+  duplicateRowKeyPolicy: {
+    type: String as PropType<DuplicateRowKeyPolicy | undefined>,
     default: undefined
   },
   rowModel: {

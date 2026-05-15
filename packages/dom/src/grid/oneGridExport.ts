@@ -2,6 +2,7 @@ import type {
   ExportOptions,
   GridExportAdapterPayload,
   GridExportResult,
+  GridImportAdapterPayload,
   GridImportResult,
   ImportOptions
 } from "@onegrid/core";
@@ -40,21 +41,28 @@ export class OneGridExport<TData = unknown> extends OneGridClipboard<TData> {
     options?: ImportOptions<TData>
   ): Promise<GridImportResult<TData>> {
     const importOptions = { ...(this.options.import ?? {}), ...(options ?? {}) };
-    const result = importDomGridData(
-      content,
-      importOptions,
-      getImportFallbackColumns(this.options.columns)
-    );
-    const mode = importOptions.mode ?? "replace";
+    const fallbackColumns = getImportFallbackColumns(this.options.columns);
+    const adapter = this.findImportAdapter(importOptions.format);
+    const result = adapter
+      ? await adapter.import({ content, options: importOptions, fallbackColumns })
+      : importDomGridData(content, importOptions, fallbackColumns);
+    await this.applyImportResult(result, importOptions.mode ?? "replace");
+    return result;
+  }
+
+  private async applyImportResult(
+    result: GridImportResult<TData>,
+    mode: NonNullable<ImportOptions<TData>["mode"]>
+  ): Promise<void> {
     if (mode === "replace" || result.rows.length > 0) {
       this.dataRows = mode === "append"
         ? Object.freeze([...(this.dataRows ?? this.options.data ?? []), ...result.rows])
         : result.rows;
       this.virtualScrollTop = 0;
       this.paginationPage = 1;
+      this.clearAutoRowHeightCache();
       await this.render(invalidate(["rows", "layout", "overlay"], "import-data"));
     }
-    return result;
   }
 
   private findExportAdapter(
@@ -65,6 +73,18 @@ export class OneGridExport<TData = unknown> extends OneGridClipboard<TData> {
     }
 
     return this.getPluginExtensions<GridExportAdapterPayload<TData>>("export.adapter")
+      .find((extension) => extension.payload?.format === format)
+      ?.payload;
+  }
+
+  private findImportAdapter(
+    format: ImportOptions<TData>["format"] | undefined
+  ): GridImportAdapterPayload<TData> | undefined {
+    if (format === undefined) {
+      return undefined;
+    }
+
+    return this.getPluginExtensions<GridImportAdapterPayload<TData>>("import.adapter")
       .find((extension) => extension.payload?.format === format)
       ?.payload;
   }

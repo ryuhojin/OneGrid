@@ -26,6 +26,13 @@ export interface PivotServerStats {
   readonly values: string;
 }
 
+export const pivotUxSummary = Object.freeze({
+  rows: "region, agency",
+  columns: "quarter",
+  values: "Amount=sum(amount), Avg budget=avg(budget)",
+  totals: "row totals, column totals, subtotals"
+});
+
 export const pivotSourceColumns: readonly ColumnDef<PivotSourceRow>[] = [
   { field: "id", headerName: "ID", width: 110 },
   { field: "region", headerName: "Region", width: 140 },
@@ -74,32 +81,7 @@ export const clientPivotOptions: Pick<
 };
 
 export const serverPivotColumns: readonly ColumnDef<PivotResultRow>[] = [
-  { field: "region", headerName: "Region", pinned: "left", width: 150 },
-  { field: "agency", headerName: "Agency", width: 180 },
-  {
-    groupId: "server-q1",
-    headerName: "Q1",
-    children: [
-      { field: "pivot:Q1:amountTotal", headerName: "Amount", type: "number", width: 130 },
-      { field: "pivot:Q1:avgBudget", headerName: "Avg budget", type: "number", width: 130 }
-    ]
-  },
-  {
-    groupId: "server-q2",
-    headerName: "Q2",
-    children: [
-      { field: "pivot:Q2:amountTotal", headerName: "Amount", type: "number", width: 130 },
-      { field: "pivot:Q2:avgBudget", headerName: "Avg budget", type: "number", width: 130 }
-    ]
-  },
-  {
-    groupId: "server-total",
-    headerName: "Total",
-    children: [
-      { field: "pivot:total:amountTotal", headerName: "Amount", type: "number", width: 130 },
-      { field: "pivot:total:avgBudget", headerName: "Avg budget", type: "number", width: 130 }
-    ]
-  }
+  ...createServerPivotColumns(pivotModel)
 ];
 
 export const serverPivotRows: readonly PivotResultRow[] = Object.freeze([
@@ -135,11 +117,65 @@ export function createPivotDataSource(
       });
       return {
         rows: serverPivotRows.slice(request.startRow, request.endRow),
+        columns: createServerPivotColumns(request.pivotModel),
         rowCount: serverPivotRows.length,
         snapshotVersion: "pivot-snapshot-1"
       };
     }
   };
+}
+
+function createServerPivotColumns(
+  model: PivotModel | undefined
+): readonly ColumnDef<PivotResultRow>[] {
+  const rowFields = model?.rows.length ? model.rows : pivotModel.rows;
+  const valueFields = model?.values.length ? model.values : pivotModel.values;
+  const rowColumns = rowFields.map((field, index) => ({
+    field,
+    headerName: getServerFieldHeader(field),
+    ...(index === 0 ? { pinned: "left" as const } : {}),
+    width: field === "agency" ? 180 : 150
+  }));
+  const groups = getServerColumnGroups(model).map((columnValue) =>
+    createServerPivotColumnGroup(columnValue, valueFields)
+  );
+  const totalGroup = model?.totals === "columns" || model?.totals === "both"
+    ? [createServerPivotColumnGroup("total", valueFields, "Total")]
+    : [];
+  return Object.freeze([...rowColumns, ...groups, ...totalGroup]);
+}
+
+function createServerPivotColumnGroup(
+  columnValue: string,
+  values: PivotModel["values"],
+  headerName = columnValue
+): ColumnDef<PivotResultRow> {
+  return {
+    groupId: `server-${columnValue}`,
+    headerName,
+    children: values.map((value) => ({
+      field: `pivot:${columnValue}:${getServerValueAlias(value)}`,
+      headerName: getServerValueHeader(value),
+      type: "number",
+      width: 130
+    }))
+  };
+}
+
+function getServerColumnGroups(model: PivotModel | undefined): readonly string[] {
+  return model?.columns.includes("quarter") === false ? [] : ["Q1", "Q2"];
+}
+
+function getServerFieldHeader(field: string): string {
+  return field === "region" ? "Region" : field === "agency" ? "Agency" : field === "status" ? "Status" : field;
+}
+
+function getServerValueAlias(value: PivotModel["values"][number]): string {
+  return typeof value === "string" ? value : value.alias ?? value.field;
+}
+
+function getServerValueHeader(value: PivotModel["values"][number]): string {
+  return typeof value === "string" ? getServerFieldHeader(value) : value.label ?? getServerFieldHeader(value.field);
 }
 
 function formatValues(request: GetRowsRequest): string {

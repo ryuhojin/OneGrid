@@ -25,6 +25,7 @@ export interface BodyPaneRuntime<TData = unknown> {
   readonly editing?: EditingOptions;
   readonly i18n: LocaleFormatterBridge;
   readonly rowHeight?: BodyRowHeightResolver<TData>;
+  readonly autoRowHeight?: boolean;
 }
 
 export function createBodyPane<TData>(
@@ -41,6 +42,7 @@ export function createBodyPane<TData>(
   const rowIndexOffset = runtime?.rowIndexOffset ?? 0;
   const i18n = runtime?.i18n ?? createLocaleFormatter();
   const cellSpanWindow = createPaneCellSpanWindow(pane, rows, virtualWindow, rowIndexOffset);
+  const getRowSpanHeight = createRowSpanHeightResolver(rows, runtime, virtualWindow, rowIndexOffset);
 
   appendVirtualSpacer(body, "top", virtualWindow?.beforeHeight ?? 0);
 
@@ -64,12 +66,56 @@ export function createBodyPane<TData>(
       ...(runtime?.editing === undefined ? {} : { editing: runtime.editing }),
       i18n,
       ...(runtime?.rowHeight === undefined ? {} : { rowHeight: runtime.rowHeight }),
+      ...(runtime?.autoRowHeight === true ? { autoRowHeight: true } : {}),
+      ...(getRowSpanHeight === undefined ? {} : { getRowSpanHeight }),
       ...(cellSpanWindow === undefined ? {} : { cellSpanWindow })
     }));
   });
 
   appendVirtualSpacer(body, "bottom", virtualWindow?.afterHeight ?? 0);
   return body;
+}
+
+function createRowSpanHeightResolver<TData>(
+  rows: readonly BodyRowEntry<TData>[],
+  runtime: BodyPaneRuntime<TData> | undefined,
+  virtualWindow: FixedRowVirtualWindow | undefined,
+  rowIndexOffset: number
+): ((rowIndex: number, rowSpan: number) => number | undefined) | undefined {
+  if (!runtime?.rowHeight && !virtualWindow) {
+    return undefined;
+  }
+
+  const rowHeights = new Map<number, number>();
+  rows.forEach((entry, rowOffset) => {
+    if (!("data" in entry)) {
+      return;
+    }
+
+    const rowIndex = "rowIndex" in entry
+      ? entry.rowIndex
+      : rowIndexOffset + (virtualWindow?.firstRow ?? 0) + rowOffset;
+    const rowHeight = runtime?.rowHeight?.(entry.data, rowIndex) ?? virtualWindow?.rowHeight;
+    if (rowHeight !== undefined && rowHeight > 0) {
+      rowHeights.set(rowIndex, rowHeight);
+    }
+  });
+
+  return (rowIndex, rowSpan) => {
+    if (rowSpan <= 1) {
+      return undefined;
+    }
+
+    let blockSize = 0;
+    for (let offset = 0; offset < rowSpan; offset += 1) {
+      const rowHeight = rowHeights.get(rowIndex + offset) ?? virtualWindow?.rowHeight;
+      if (rowHeight === undefined || rowHeight <= 0) {
+        return undefined;
+      }
+      blockSize += rowHeight;
+    }
+    return blockSize;
+  };
 }
 
 function applyRowVirtualOffset(

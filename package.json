@@ -10,9 +10,15 @@
     "typecheck": "turbo run typecheck",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test --config playwright.config.ts tests/e2e/features --project=chromium",
+    "test:e2e:webkit": "playwright test --config playwright.config.ts tests/e2e/features --project=webkit",
+    "test:e2e:edge": "playwright test --config playwright.config.ts tests/e2e/features --project=edge",
+    "test:e2e:browser-matrix": "pnpm test:e2e && pnpm test:e2e:webkit && pnpm test:e2e:edge",
+    "test:e2e:package-csp": "pnpm build && playwright test --config playwright.config.ts tests/e2e/packaging/package-csp.spec.ts --project=chromium",
+    "test:e2e:security:browser-matrix": "node tests/e2e/security/run-browser-security-matrix.mjs",
     "test:e2e:visual": "playwright test --config playwright.config.ts tests/e2e/visual --project=chromium",
     "test:a11y": "playwright test --config playwright.config.ts tests/a11y --project=chromium",
     "test:perf:smoke": "vitest run --config vitest.config.ts tests/perf",
+    "bench:metrics": "pnpm --filter @onegrid/core build && pnpm --filter @onegrid/benchmark build && pnpm --filter @onegrid/benchmark report",
     "build": "turbo run build",
     "docs:build": "pnpm --filter @onegrid/docs build"
   },
@@ -38,6 +44,10 @@
   },
   "pnpm": {
     "overrides": {
+      "@babel/plugin-transform-modules-systemjs": "7.29.4",
+      "fast-uri": "3.1.2",
+      "serialize-javascript": "7.0.5",
+      "webpack": "5.104.1",
       "webpackbar": "file:tools/webpackbar-noop"
     }
   }

@@ -41,6 +41,16 @@ test("export example creates CSV, selected CSV, XLSX, PDF, and print payloads", 
   expectPrintHeaderLayout(await readDownload(printDownload));
   await expect(summaryValue(page, "Media type")).toHaveText("text/html");
   await expect(summaryValue(page, "Preview")).toContainText("data-onegrid-print-layout");
+
+  const adapterDownload = await clickAndDownload(page, "Export adapter JSON", "onegrid-enterprise-export.json");
+  const adapterContent = await readDownload(adapterDownload);
+  expect(adapterContent).toContain("\"capabilities\"");
+  expect(adapterContent).toContain("\"mergedLayout\": true");
+  await expect(summaryValue(page, "Media type")).toHaveText("application/vnd.onegrid.enterprise+json");
+
+  await page.getByRole("button", { name: "Import adapter JSON" }).click();
+  await expect(summaryValue(page, "Imported rows")).toHaveText("2");
+  await expect(page.getByRole("grid", { name: "Export import grid" })).toContainText("ENT-3002");
 });
 
 test("export example imports CSV and XLSX files through public API", async ({ page }) => {

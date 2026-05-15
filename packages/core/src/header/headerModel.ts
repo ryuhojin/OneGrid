@@ -2,6 +2,7 @@ import { collectHeaderAriaLabels } from "./headerAria.js";
 import { applyHeaderLabels } from "./headerLabels.js";
 import { createHeaderMatrixRows, offsetHeaderRows } from "./headerMatrix.js";
 import { createHeaderMergeRows } from "./headerMerge.js";
+import { assertValidHeaderMergeRules } from "./headerMergeValidation.js";
 import { createHeaderRegions } from "./headerRegions.js";
 import { createHeaderTree } from "./headerTree.js";
 import type { ColumnModel } from "../column/index.js";
@@ -17,8 +18,9 @@ export function createHeaderModel<TData>(
   options: HeaderModelOptions = {}
 ): HeaderModel<TData> {
   const tree = createHeaderTree(columnModel);
-  const mergeRows = createHeaderMergeRows(columnModel, options.merge);
   const matrixRows = createHeaderMatrixRows(columnModel);
+  assertValidHeaderMergeRules(columnModel, options.merge, matrixRows);
+  const mergeRows = createHeaderMergeRows(columnModel, options.merge);
   const rows = applyHeaderLabels(composeHeaderRows(mergeRows, matrixRows), options.merge);
 
   return Object.freeze({

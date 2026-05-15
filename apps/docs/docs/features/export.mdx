@@ -30,6 +30,12 @@ const imported = await grid.importData(csv.content as string, {
 `preserveVisualLayout` is enabled, merged headers and merged body cells are represented by blank
 covered cells in CSV and merge ranges in XLSX/print HTML.
 
+CSV export is spreadsheet-hardened by default. String cells that begin with a spreadsheet formula
+prefix after leading whitespace (`=`, `+`, `-`, or `@`) are prefixed with an apostrophe in the CSV
+payload. This protects downstream Excel/Google Sheets opens without changing the grid's source
+data. Numeric values remain numeric, and XLSX export writes text values as inline strings rather
+than formula cells.
+
 XLSX export includes the visual basics needed for handoff files: header fills, bold headers,
 cell borders, merged-cell fills, calculated column widths, frozen header rows, autofilter metadata,
 landscape print setup, and numeric cells emitted as spreadsheet numbers instead of text. PDF export
@@ -88,6 +94,93 @@ CJK/custom font embedded PDF and full compatibility with arbitrary deflate-compr
 belong in explicit export/import adapters or plugins. That keeps the core bundle, CSP review, and
 security surface stable while still leaving a supported path for SI projects that require deeper
 document fidelity.
+
+```ts
+import { createGridIoAdapterPlugin } from "@onegrid/adapters";
+
+const enterpriseDocumentPlugin = createGridIoAdapterPlugin<OrderRow>({
+  id: "enterprise-document-io",
+  exports: [{
+    format: "pdf",
+    capabilities: { cjkFonts: true, customFonts: true, mergedLayout: true },
+    export: ({ matrix, options }) => enterprisePdfEngine.render(matrix, options)
+  }],
+  imports: [{
+    format: "enterprise-xlsx",
+    capabilities: { compressedXlsx: true, externalWorkbook: true },
+    import: ({ content, options }) => enterpriseWorkbookEngine.parse(content, options)
+  }]
+});
+```
+
+Custom formats are explicit. Calling `exportData({ format: "enterprise-xlsx" })` or
+`importData(content, { format: "enterprise-xlsx" })` without a matching adapter fails instead of
+silently falling back to CSV. The examples include an `enterprise-json` adapter path to demonstrate
+the same plugin boundary in vanilla, React, and Vue.
+
+## Official Document Adapters
+
+OneGrid treats high-fidelity document generation as an adapter decision instead of a core
+dependency. This keeps `@onegrid/core` small and deterministic while giving SI deployments a
+supported path for audited document engines.
+
+| Capability | Built-in | Official adapter path |
+|---|---|---|
+| CSV / JSON handoff | `@onegrid/core` | Not required |
+| OneGrid-generated XLSX | `@onegrid/core` | Optional |
+| Styled XLSX with external workbook engine | Basic | `@onegrid/adapter-xlsx-exceljs` |
+| External compressed XLSX import | Limited | `@onegrid/adapter-xlsx-exceljs` |
+| Lightweight tabular PDF | `@onegrid/core` | Optional |
+| CJK/custom-font PDF | No bundled font engine | `@onegrid/adapter-pdf-pdfkit` or server adapter |
+| Regulated server-side document rendering | No | `createServerDocumentExportAdapter()` |
+
+The official ExcelJS adapter uses engine injection so each application controls the reviewed
+`exceljs` version and license inventory:
+
+```ts
+import ExcelJS from "exceljs";
+import { createExcelJsIoAdapterPlugin } from "@onegrid/adapter-xlsx-exceljs";
+
+const excelPlugin = createExcelJsIoAdapterPlugin<OrderRow>({
+  export: {
+    workbookFactory: () => new ExcelJS.Workbook()
+  },
+  import: {
+    workbookFactory: () => new ExcelJS.Workbook()
+  }
+});
+```
+
+The official PDFKit adapter follows the same pattern. CJK or branded fonts are supplied by the app,
+which keeps font licensing outside OneGrid core:
+
+```ts
+import PDFDocument from "pdfkit";
+import { createPdfKitExportAdapterPlugin } from "@onegrid/adapter-pdf-pdfkit";
+
+const pdfPlugin = createPdfKitExportAdapterPlugin<OrderRow>({
+  documentFactory: () => new PDFDocument({ autoFirstPage: true, layout: "landscape" }),
+  fonts: {
+    regularName: "NotoSansKR",
+    regular: notoSansKrRegularBytes,
+    boldName: "NotoSansKRBold",
+    bold: notoSansKrBoldBytes
+  }
+});
+```
+
+For highly regulated outputs, render on the server and return the reviewed artifact:
+
+```ts
+import { createServerDocumentExportAdapterPlugin } from "@onegrid/adapters";
+
+const serverPdfPlugin = createServerDocumentExportAdapterPlugin<OrderRow>("official-server-pdf", {
+  format: "server-pdf",
+  endpoint: "/api/grid/export/pdf",
+  filename: "onegrid-audit.pdf",
+  mediaType: "application/pdf"
+});
+```
 
 The vanilla example uses actual file inputs for CSV and XLSX import. Its downloadable test fixtures
 are available as `/export-testFile.csv` and `/export-testFile.xlsx` in the examples app.

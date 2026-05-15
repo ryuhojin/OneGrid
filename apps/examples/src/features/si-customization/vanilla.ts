@@ -1,7 +1,7 @@
 import { OneGrid } from "@onegrid/dom";
 import { createTenantTheme, siGridOptions, siPresets } from "./data.js";
 import type { SiCustomizationRow, SiPresetId } from "./data.js";
-import type { ThemeDensity } from "@onegrid/themes";
+import { validateSiTheme, type ThemeDensity } from "@onegrid/themes";
 
 const densities: readonly ThemeDensity[] = ["comfortable", "standard", "compact"];
 
@@ -43,6 +43,7 @@ export function mountSiCustomizationExample(el: HTMLElement): { destroy(): void 
   const themeValue = appendValue(inspector, "Tenant theme", "");
   const densityValue = appendValue(inspector, "Density", density);
   const accentValue = appendValue(inspector, "Accent", "");
+  const validationValue = appendValue(inspector, "Validation", "");
 
   const grid = new OneGrid<SiCustomizationRow>({
     ...siGridOptions,
@@ -59,6 +60,8 @@ export function mountSiCustomizationExample(el: HTMLElement): { destroy(): void 
     themeValue.textContent = theme.name;
     densityValue.textContent = theme.density ?? "standard";
     accentValue.textContent = theme.variables["--og-color-accent"] ?? "default";
+    const validation = validateSiTheme(theme);
+    validationValue.textContent = validation.valid ? "pass" : `${validation.errors.length} errors`;
     updatePressed(presetButtons, presetId);
     updatePressed(densityButtons, density);
   }

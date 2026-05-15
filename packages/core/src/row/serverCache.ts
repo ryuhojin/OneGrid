@@ -26,6 +26,17 @@ export function clearServerRowCache<TData>(cache: ServerRowCache<TData>): void {
   (cache.entries as Map<string, ServerRowCacheEntry<TData>>).clear();
 }
 
+export function clearServerRowRouteCache<TData>(
+  cache: ServerRowCache<TData>,
+  routeKey: string
+): void {
+  for (const [cacheKey, entry] of cache.entries) {
+    if (entry.routeKey === routeKey) {
+      (cache.entries as Map<string, ServerRowCacheEntry<TData>>).delete(cacheKey);
+    }
+  }
+}
+
 export function listServerCacheEntries<TData>(
   cache: ServerRowCache<TData>
 ): readonly ServerRowCacheEntry<TData>[] {

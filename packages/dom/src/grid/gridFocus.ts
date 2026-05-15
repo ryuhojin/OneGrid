@@ -23,10 +23,12 @@ import {
   handleKeyboardSelection
 } from "./selectionRuntime.js";
 import type { GridSelectionRuntime } from "./selectionRuntime.js";
+import type { GridScrollCoordinator } from "./scrollCoordinator.js";
 
 export interface GridFocusInput {
   readonly grid: HTMLElement;
   readonly viewport: HTMLElement;
+  readonly scrollCoordinator?: GridScrollCoordinator;
   readonly editRuntime?: GridEditRuntime;
   readonly editKeyboardPolicy?: ResolvedEditingKeyboardPolicy;
   readonly selectionRuntime?: GridSelectionRuntime;

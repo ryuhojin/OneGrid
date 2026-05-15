@@ -48,9 +48,20 @@ export function createGridHandle<TData>(
     validate: () => getGrid()?.validate()
       ?? Object.freeze({ valid: true, issues: Object.freeze([]) }),
     setColumns: (columns) => getGrid()?.setColumns(columns),
-    getColumnState: () => getGrid()?.getColumnState() ?? freezeColumnUiState({}),
+    getColumnState: (options) => getGrid()?.getColumnState(options) ?? freezeColumnUiState({}),
     setColumnState: (state, options) => getGrid()?.setColumnState(state, options),
+    applyColumnState: (params, options) => getGrid()?.applyColumnState(params, options)
+      ?? Object.freeze({
+        applied: false,
+        state: freezeColumnUiState({}),
+        appliedColumnIds: Object.freeze([]),
+        appliedGroupIds: Object.freeze([]),
+        missingColumnIds: Object.freeze([]),
+        missingGroupIds: Object.freeze([])
+      }),
     resetColumnState: (options) => getGrid()?.resetColumnState(options),
+    setColumnGroupOpen: (groupId, open, options) => getGrid()?.setColumnGroupOpen(groupId, open, options),
+    toggleColumnGroup: (groupId, options) => getGrid()?.toggleColumnGroup(groupId, options),
     showColumn: (field) => getGrid()?.showColumn(field),
     hideColumn: (field) => getGrid()?.hideColumn(field),
     pinColumn: (field, side) => getGrid()?.pinColumn(field, side),
@@ -61,6 +72,8 @@ export function createGridHandle<TData>(
     getSortModel: () => getGrid()?.getSortModel() ?? Object.freeze([]),
     setGroupModel: (model) => getGrid()?.setGroupModel(model),
     getGroupModel: () => getGrid()?.getGroupModel() ?? Object.freeze({}),
+    setPivotModel: (model) => getGrid()?.setPivotModel(model),
+    getPivotModel: () => getGrid()?.getPivotModel(),
     expandGroup: (groupKey) => getGrid()?.expandGroup(groupKey),
     collapseGroup: (groupKey) => getGrid()?.collapseGroup(groupKey),
     toggleGroup: (groupKey) => getGrid()?.toggleGroup(groupKey),

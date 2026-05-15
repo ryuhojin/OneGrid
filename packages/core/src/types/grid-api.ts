@@ -8,9 +8,16 @@ import type {
 } from "./events.js";
 import type { ExportOptions, ImportOptions, ThemeInput } from "./grid-options.js";
 import type { GridPluginExtension, GridPluginExtensionPoint } from "./plugin.js";
-import type { ColumnUiState, SetColumnStateOptions } from "../column/index.js";
+import type {
+  ApplyColumnStateParams,
+  ColumnStateApplyResult,
+  ColumnUiState,
+  GetColumnStateOptions,
+  SetColumnStateOptions
+} from "../column/index.js";
 import type { GridSelectionState, SelectedCell } from "../selection/index.js";
 import type { GridStateSnapshot, SetGridStateOptions } from "../state/index.js";
+import type { ClientRowTransactionResult } from "../row/index.js";
 import type {
   CellPosition,
   ColumnId,
@@ -18,6 +25,7 @@ import type {
   GridExportResult,
   GridImportResult,
   GroupModel,
+  PivotModel,
   RowKey,
   ScrollAlign,
   SortModel,
@@ -30,10 +38,10 @@ export interface GridApi<TData = unknown> {
   refresh(options?: RefreshOptions): Promise<void>;
   getState(): GridStateSnapshot;
   setState(state: GridStateSnapshot, options?: SetGridStateOptions): void;
-  setData(rows: readonly TData[]): void;
-  appendRows(rows: readonly TData[]): void;
-  updateRows(rows: readonly RowUpdate<TData>[]): void;
-  removeRows(rowKeys: readonly RowKey[]): void;
+  setData(rows: readonly TData[]): ClientRowTransactionResult<TData> | undefined;
+  appendRows(rows: readonly TData[]): ClientRowTransactionResult<TData> | undefined;
+  updateRows(rows: readonly RowUpdate<TData>[]): ClientRowTransactionResult<TData> | undefined;
+  removeRows(rowKeys: readonly RowKey[]): ClientRowTransactionResult<TData> | undefined;
   getRow(rowKey: RowKey): TData | undefined;
   getSelectionState(): GridSelectionState;
   getSelectedRows(): readonly TData[];
@@ -58,9 +66,15 @@ export interface GridApi<TData = unknown> {
   cancelPendingEdits(): void;
   validate(): ValidationResult;
   setColumns(columns: readonly ColumnDef<TData>[]): void;
-  getColumnState(): ColumnUiState;
+  getColumnState(options?: GetColumnStateOptions): ColumnUiState;
   setColumnState(state: ColumnUiState, options?: SetColumnStateOptions): void;
+  applyColumnState(
+    params: ApplyColumnStateParams,
+    options?: SetColumnStateOptions
+  ): ColumnStateApplyResult;
   resetColumnState(options?: SetColumnStateOptions): void;
+  setColumnGroupOpen(groupId: ColumnId, open: boolean, options?: SetColumnStateOptions): void;
+  toggleColumnGroup(groupId: ColumnId, options?: SetColumnStateOptions): void;
   showColumn(columnId: ColumnId): void;
   hideColumn(columnId: ColumnId): void;
   pinColumn(columnId: ColumnId, side: "left" | "right" | null): void;
@@ -71,6 +85,8 @@ export interface GridApi<TData = unknown> {
   getSortModel(): readonly SortModel[];
   setGroupModel(model: GroupModel): void;
   getGroupModel(): GroupModel;
+  setPivotModel(model: PivotModel): void;
+  getPivotModel(): PivotModel | undefined;
   expandGroup(groupKey: string): void;
   collapseGroup(groupKey: string): void;
   toggleGroup(groupKey: string): void;

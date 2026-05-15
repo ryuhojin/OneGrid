@@ -21,6 +21,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "@onegrid/adapters": resolve(repoRoot, "packages/adapters/src/index.ts"),
       "@onegrid/core": resolve(repoRoot, "packages/core/src/index.ts"),
       "@onegrid/dom": resolve(repoRoot, "packages/dom/src/index.ts"),
       "@onegrid/react": resolve(repoRoot, "packages/react/src/index.ts"),

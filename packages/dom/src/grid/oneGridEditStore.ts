@@ -109,6 +109,7 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
         const nextRows = [...rows];
         nextRows[index] = nextRow;
         this.dataRows = Object.freeze(nextRows);
+        this.clearAutoRowHeightCache();
         return true;
       }
     }
@@ -142,6 +143,9 @@ export abstract class OneGridEditStore<TData = unknown> extends OneGridSelection
       replaced = true;
       return Object.freeze({ ...entry, data: nextRow });
     });
+    if (replaced) {
+      this.clearAutoRowHeightCache();
+    }
     return replaced;
   }
 

@@ -4,6 +4,7 @@ import {
   createPivotDataSource,
   pivotRows,
   pivotSourceColumns,
+  pivotUxSummary,
   serverPivotColumns,
   serverPivotOptions
 } from "./data.js";
@@ -11,12 +12,14 @@ import {
 export function PivotReactExample() {
   return (
     <>
+      <h3 className="example-subheading">Client pivot</h3>
       <OneGrid
         columns={pivotSourceColumns}
         data={pivotRows}
         accessibility={{ label: "Client pivot grid" }}
         {...clientPivotOptions}
       />
+      <h3 className="example-subheading">Server pivot</h3>
       <OneGrid
         columns={serverPivotColumns}
         dataSource={createPivotDataSource()}
@@ -24,10 +27,14 @@ export function PivotReactExample() {
         {...serverPivotOptions}
       />
       <dl className="example-inspector" aria-label="Pivot summary">
-        <dt>Pivot contracts</dt>
-        <dd>row fields, column fields, value fields, row totals, column totals, subtotals</dd>
-        <dt>Wrapper behavior</dt>
-        <dd>React forwards the shared pivot model to @onegrid/dom</dd>
+        <dt>Pivot row fields</dt>
+        <dd>{pivotUxSummary.rows}</dd>
+        <dt>Pivot column fields</dt>
+        <dd>{pivotUxSummary.columns}</dd>
+        <dt>Pivot value fields</dt>
+        <dd>{pivotUxSummary.values}</dd>
+        <dt>Pivot totals</dt>
+        <dd>{pivotUxSummary.totals}</dd>
       </dl>
     </>
   );

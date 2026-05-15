@@ -1,3 +1,7 @@
+import {
+  normalizeHeaderMergeColumnIds,
+  resolveHeaderMergeRuleId
+} from "./headerMergeValidation.js";
 import type { HeaderMergeOptions, HeaderMergeRule } from "../types/grid-options.js";
 import type { HeaderCell, HeaderLabel, HeaderRow } from "./headerTypes.js";
 
@@ -41,22 +45,23 @@ function findLabelTargetCell(
   rows: readonly HeaderRow[],
   rule: HeaderMergeRule
 ): HeaderCell | undefined {
+  const columnIds = normalizeHeaderMergeColumnIds(rule.columnIds);
   const candidates = rows
     .flatMap((row) => row.cells)
     .filter((cell) => cell.kind !== "merge")
-    .filter((cell) => containsAllColumnIds(cell.columnIds, rule.columnIds))
+    .filter((cell) => containsAllColumnIds(cell.columnIds, columnIds))
     .sort(byBestLabelTarget);
 
   return candidates[0];
 }
 
 function createHeaderLabel(rule: HeaderMergeRule, targetCell: HeaderCell): HeaderLabel {
-  const labelId = rule.id ?? `header-label:${rule.headerName}`;
+  const labelId = resolveHeaderMergeRuleId(rule);
   return Object.freeze({
     id: labelId,
     text: rule.headerName,
     targetCellId: targetCell.id,
-    columnIds: Object.freeze([...rule.columnIds]),
+    columnIds: normalizeHeaderMergeColumnIds(rule.columnIds),
     ariaLabel: rule.ariaLabel ?? rule.headerName
   });
 }

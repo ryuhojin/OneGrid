@@ -1,0 +1,225 @@
+.og-grid__pivot-panel {
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-border);
+  box-shadow: var(--og-shadow-popover);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(144px, 1fr));
+  inline-size: min(920px, calc(100vw - 48px));
+  inset-block-start: 36px;
+  padding: 10px;
+  position: absolute;
+  z-index: 900;
+}
+
+.og-grid__pivot-panel[hidden] {
+  display: none;
+}
+
+.og-grid__pivot-panel-header {
+  align-items: center;
+  border-block-end: 1px solid var(--og-color-subtle-border);
+  display: flex;
+  gap: 8px;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  min-width: 0;
+  padding-block-end: 8px;
+}
+
+.og-grid__pivot-mode {
+  background: var(--og-color-header-bg);
+  border: 1px solid var(--og-color-subtle-border);
+  color: var(--og-color-muted);
+  font-size: 12px;
+  font-weight: 650;
+  padding: 3px 7px;
+}
+
+.og-grid__pivot-bucket {
+  border: 1px solid var(--og-color-subtle-border);
+  display: grid;
+  gap: 6px;
+  grid-auto-rows: min-content;
+  min-width: 0;
+  padding: 8px;
+}
+
+.og-grid__pivot-bucket[data-drop-state="valid"] {
+  background: var(--og-color-accent-soft);
+  border-color: var(--og-color-focus-ring);
+}
+
+.og-grid__pivot-bucket[data-drop-position="append"] .og-grid__pivot-list {
+  border-block-end: 2px solid var(--og-color-focus-ring);
+  padding-block-end: 3px;
+}
+
+.og-grid__pivot-bucket[data-drop-state="invalid"] {
+  border-color: var(--og-color-danger-fg);
+  box-shadow: inset 0 0 0 1px var(--og-color-danger-fg);
+}
+
+.og-grid__pivot-field-catalog {
+  grid-column: span 2;
+}
+
+.og-grid__pivot-controls {
+  align-content: start;
+}
+
+.og-grid__pivot-panel-footer {
+  border-block-start: 1px solid var(--og-color-subtle-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-column: 1 / -1;
+  padding-block-start: 8px;
+}
+
+.og-grid__pivot-bucket-title {
+  color: var(--og-color-muted);
+  font-size: 11px;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.og-grid__pivot-list {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.og-grid__pivot-search {
+  appearance: none;
+  background: var(--og-color-bg);
+  border: 1px solid var(--og-color-border);
+  box-sizing: border-box;
+  color: var(--og-color-fg);
+  font: inherit;
+  min-block-size: 30px;
+  padding: 4px 8px;
+}
+
+.og-grid__pivot-search:focus {
+  border-color: var(--og-color-focus-ring);
+  box-shadow: 0 0 0 2px var(--og-color-focus-ring-soft);
+  outline: 0;
+}
+
+.og-grid__pivot-item {
+  background: var(--og-color-header-bg);
+  border: 1px solid var(--og-color-subtle-border);
+  display: grid;
+  gap: 4px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 6px;
+  position: relative;
+}
+
+.og-grid__pivot-item[data-drop-position="before"]::before,
+.og-grid__pivot-item[data-drop-position="after"]::after {
+  background: var(--og-color-focus-ring);
+  block-size: 2px;
+  content: "";
+  inset-inline: 0;
+  position: absolute;
+}
+
+.og-grid__pivot-item[data-drop-position="before"]::before {
+  inset-block-start: 0;
+}
+
+.og-grid__pivot-item[data-drop-position="after"]::after {
+  inset-block-end: 0;
+}
+
+.og-grid__pivot-item--dragging {
+  opacity: 0.55;
+}
+
+.og-grid__pivot-drag-preview {
+  background: var(--og-color-panel-bg);
+  border: 1px solid var(--og-color-focus-ring);
+  box-shadow: var(--og-shadow-popover);
+  color: var(--og-color-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 4px 8px;
+  pointer-events: none;
+  position: fixed;
+  top: -1000px;
+  z-index: 9999;
+}
+
+.og-grid__pivot-item-content,
+.og-grid__pivot-item-label,
+.og-grid__pivot-item-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.og-grid__pivot-item-label {
+  font-weight: 650;
+}
+
+.og-grid__pivot-item-meta {
+  color: var(--og-color-muted);
+  font-size: 12px;
+}
+
+.og-grid__pivot-item-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.og-grid__pivot-action,
+.og-grid__pivot-item-controls select,
+.og-grid__pivot-controls select {
+  background: var(--og-color-bg);
+  border: 1px solid var(--og-color-border);
+  color: var(--og-color-text);
+  font: inherit;
+  font-size: 12px;
+  min-height: 26px;
+  padding: 2px 6px;
+}
+
+.og-grid__pivot-action {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.og-grid__pivot-action:disabled {
+  color: var(--og-color-muted);
+  cursor: default;
+}
+
+.og-grid__pivot-action:hover:not(:disabled),
+.og-grid__pivot-action:focus-visible {
+  border-color: var(--og-color-focus-ring);
+  box-shadow: 0 0 0 2px var(--og-color-focus-ring);
+}
+
+.og-grid__pivot-empty {
+  color: var(--og-color-muted);
+  font-size: 12px;
+  list-style: none;
+  padding: 4px 0;
+}
+
+.og-grid__pivot-checkbox {
+  align-items: center;
+  color: var(--og-color-text);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 4px;
+}

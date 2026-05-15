@@ -36,13 +36,46 @@ const columnState = resizeColumn(model, {}, "customer", 220);
 const nextModel = createColumnModel(columns, { columnState });
 ```
 
+Runtime APIs use the same state shape. `setColumnState()` replaces the current state, while
+`applyColumnState()` applies partial patches and reports missing column ids:
+
+```ts
+const result = api.applyColumnState({
+  state: {
+    order: ["amount", "customer"],
+    columns: {
+      amount: { width: 180 },
+      customer: { pinned: "right" }
+    },
+    groups: {
+      workflow: { open: true }
+    }
+  },
+  defaultState: { pinned: null },
+  applyOrder: true
+});
+
+const fullSnapshot = api.getColumnState({ includeDefaults: true });
+```
+
 Supported operations in this foundation:
 
 - resize and auto-size a leaf column
 - reorder a leaf column through an immutable order array
 - show or hide a leaf column
 - pin left, pin right, or unpin a leaf column
+- open or close a column group for compact/expanded group headers
 - build a renderer-agnostic column menu model
 - build a renderer-agnostic columns tool panel model
+
+Column policy flags are enforced before any UI state mutation is stored:
+
+- `resizable: false` disables resize handles, border resize, and auto-size
+- `movable: false` or `lockPosition: true` disables drag/drop and state-restored movement
+- `hideable: false` or `lockVisible: true` disables hide/show from menus, panels, and APIs
+- `pinnable: false` or `lockPinned: true` disables pin/unpin from menus, panels, and APIs
+
+The same policy layer is used by vanilla, React, and Vue because wrappers delegate to the shared
+DOM/core column APIs.
 
 The example catalog includes route `COL-003` with vanilla, React, and Vue source files.

@@ -94,6 +94,7 @@ test("row virtualization updates the visible window in the same scroll event", a
     return {
       firstRowIndex: Number(firstRow?.getAttribute("aria-rowindex")),
       gridScrollTop: grid?.scrollTop ?? -1,
+      layoutScrollTop: Number((grid as HTMLElement | null)?.dataset.layoutScrollTop),
       headerOffset: Math.abs((headerRect?.top ?? 0) - (gridRect?.top ?? 0)),
       scrollTop: element.scrollTop,
       viewportOffset: Math.abs(viewportRect.top - (headerRect?.bottom ?? viewportRect.top))
@@ -101,6 +102,7 @@ test("row virtualization updates the visible window in the same scroll event", a
   });
 
   expect(metrics.scrollTop).toBe(96_000);
+  expect(metrics.layoutScrollTop).toBe(96_000);
   expect(metrics.gridScrollTop).toBe(0);
   expect(metrics.firstRowIndex).toBeGreaterThanOrEqual(2_997);
   expect(metrics.headerOffset).toBeLessThanOrEqual(2);

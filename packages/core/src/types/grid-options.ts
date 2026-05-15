@@ -1,5 +1,5 @@
 import type { CellContext, ColumnDef, ColumnTypeRegistry, DataColumnDefaults } from "./column.js";
-import type { DataSource } from "./data.js";
+import type { DataSource, DataSourceRetryPolicy } from "./data.js";
 import type { GridBeforeEventHandlers, GridEventHandlers } from "./events.js";
 import type { GridPlugin } from "./plugin.js";
 import type {
@@ -20,6 +20,7 @@ import type {
 } from "./shared.js";
 import type { ColumnUiState } from "../column/columnUi.js";
 import type { ContextMenuOptions } from "../menu/index.js";
+import type { DuplicateRowKeyPolicy } from "../row/rowIdentity.js";
 import type { GridStateSnapshot } from "../state/gridState.js";
 import type { VirtualizationOptions } from "../virtualization/index.js";
 
@@ -34,11 +35,13 @@ export interface GridOptions<TData = unknown> {
   readonly headerMerge?: HeaderMergeOptions;
   readonly data?: readonly TData[];
   readonly dataSource?: DataSource<TData>;
+  readonly dataSourceOptions?: DataSourceOptions;
   readonly rowModel?: RowModelKind;
   readonly infinite?: InfiniteRowOptions;
   readonly server?: ServerRowOptions;
   readonly viewport?: ViewportRowOptions;
   readonly rowKey?: string | ((row: TData, index: number) => RowKey);
+  readonly duplicateRowKeyPolicy?: DuplicateRowKeyPolicy;
   readonly width?: number | string;
   readonly height?: number | string;
   readonly bodyHeight?: number | string;
@@ -70,6 +73,10 @@ export interface GridOptions<TData = unknown> {
   readonly plugins?: readonly GridPlugin<TData>[];
   readonly events?: GridEventHandlers<TData>;
   readonly beforeEvents?: GridBeforeEventHandlers<TData>;
+}
+
+export interface DataSourceOptions {
+  readonly retry?: DataSourceRetryPolicy;
 }
 
 export interface HeaderMergeOptions {
@@ -270,7 +277,7 @@ export interface ExportOptions {
 }
 
 export interface ImportOptions<TData = unknown> {
-  readonly format?: "csv" | "xlsx" | "json";
+  readonly format?: "csv" | "xlsx" | "json" | (string & {});
   readonly mode?: "replace" | "append";
   readonly hasHeaders?: boolean;
   readonly headerRowCount?: number;

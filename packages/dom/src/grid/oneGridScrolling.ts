@@ -4,7 +4,7 @@ import type { ColumnVirtualScrollRuntime } from "./columnVirtualScrollRuntime.js
 import { invalidate } from "./renderInvalidation.js";
 import { resolveScrollLeftForField } from "./scrollPosition.js";
 import { isRowVirtualizationEnabled, resolveVirtualViewportHeight } from "./virtualScrollRuntime.js";
-import type { VirtualScrollRuntime } from "./virtualScrollRuntime.js";
+import type { AutoRowHeightMeasurementResult, VirtualScrollRuntime } from "./virtualScrollRuntime.js";
 import { OneGridPagination } from "./oneGridPagination.js";
 
 export abstract class OneGridScrolling<TData = unknown> extends OneGridPagination<TData> {
@@ -18,9 +18,17 @@ export abstract class OneGridScrolling<TData = unknown> extends OneGridPaginatio
       enabled: isRowVirtualizationEnabled(this.options),
       scrollTop: this.virtualScrollTop,
       viewportHeight: this.virtualViewportHeight ?? resolveVirtualViewportHeight(this.options),
+      ...(this.options.rowHeight === "auto" ? { autoRowHeightCache: this.autoRowHeightCache } : {}),
       onScroll: (scrollTop, viewportHeight) => {
         this.updateVirtualScroll(scrollTop, viewportHeight);
-      }
+      },
+      ...(this.options.rowHeight === "auto"
+        ? {
+            onAutoRowHeightsMeasured: (result: AutoRowHeightMeasurementResult) => {
+              this.applyAutoRowHeightMeasurement(result);
+            }
+          }
+        : {})
     };
   }
 
@@ -49,6 +57,20 @@ export abstract class OneGridScrolling<TData = unknown> extends OneGridPaginatio
 
     this.virtualScrollTop = nextScrollTop;
     this.virtualViewportHeight = nextViewportHeight;
+  }
+
+  protected applyAutoRowHeightMeasurement(result: AutoRowHeightMeasurementResult): void {
+    if (this.destroyed || !result.changed) {
+      return;
+    }
+
+    if (Math.abs(result.scrollTopAdjustment) >= 1) {
+      this.virtualScrollTop = Math.max(0, this.virtualScrollTop + result.scrollTopAdjustment);
+    }
+    if (result.viewportHeight > 0) {
+      this.virtualViewportHeight = result.viewportHeight;
+    }
+    void this.render(invalidate(["rows", "layout"], "auto-row-height-measured"));
   }
 
   protected updateColumnVirtualScroll(scrollLeft: number, viewportWidth: number): void {

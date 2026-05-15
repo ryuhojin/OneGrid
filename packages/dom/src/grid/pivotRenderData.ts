@@ -33,6 +33,9 @@ export function createPivotRenderData<TData>(
     : options.sorting?.model;
   const clientRows = createClientRowModel(options.data, {
     ...(options.rowKey === undefined ? {} : { rowKey: options.rowKey }),
+    ...(options.duplicateRowKeyPolicy === undefined
+      ? {}
+      : { duplicateRowKeyPolicy: options.duplicateRowKeyPolicy }),
     columns: options.columns,
     ...(filterModel === undefined ? {} : { filterModel }),
     ...(sortModel === undefined ? {} : { sortModel })

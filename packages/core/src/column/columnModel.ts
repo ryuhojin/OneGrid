@@ -1,6 +1,18 @@
-import { allocateColumnId, resolveDataColumnId, resolveGroupColumnId } from "./columnIds.js";
+import {
+  resolveDataColumnIdCandidate,
+  resolveGroupColumnIdCandidate,
+  reserveColumnId
+} from "./columnIds.js";
 import { resolveColumnDefinitions } from "./columnDefaults.js";
+import {
+  resolveColumnGroupOpen,
+  shouldShowInColumnGroup
+} from "./columnGroupState.js";
 import { applyColumnOrder, splitPinnedLeafColumns } from "./columnOrder.js";
+import {
+  canChangeColumnPinningDef,
+  canChangeColumnVisibilityDef
+} from "./columnPolicy.js";
 import { normalizeColumnSizingOptions, resolveColumnSizing } from "./columnSizing.js";
 import type {
   ColumnDef,
@@ -66,6 +78,7 @@ export interface NormalizedColumnGroup<TData = unknown> extends NormalizedColumn
   readonly source: ColumnGroupDef<TData>;
   readonly children: readonly NormalizedColumn<TData>[];
   readonly leafIds: readonly string[];
+  readonly open: boolean;
 }
 
 export interface PinnedLeafColumns<TData = unknown> {
@@ -84,8 +97,18 @@ interface NormalizeContext<TData = unknown> {
   readonly options: ResolvedColumnSizingOptions;
   readonly columnState: ColumnUiState | undefined;
   readonly ids: Set<string>;
+  readonly reservedExplicitIds: ReadonlySet<string>;
   readonly byId: Map<string, NormalizedColumn<TData>>;
   readonly leaves: NormalizedDataColumn<TData>[];
+}
+
+interface NormalizeParent {
+  readonly depth: number;
+  readonly parentId: string | undefined;
+  readonly inheritedPinned: PinnedSide | undefined;
+  readonly inheritedGroupVisible: boolean;
+  readonly parentGroupOpen: boolean | undefined;
+  readonly path: readonly string[];
 }
 
 export function createColumnModel<TData>(
@@ -100,6 +123,7 @@ export function createColumnModel<TData>(
     options: normalizeColumnSizingOptions(options),
     columnState: options.columnState,
     ids: new Set<string>(),
+    reservedExplicitIds: collectExplicitColumnIds(resolvedColumns),
     byId: new Map<string, NormalizedColumn<TData>>(),
     leaves: []
   };
@@ -108,12 +132,15 @@ export function createColumnModel<TData>(
       depth: 0,
       parentId: undefined,
       inheritedPinned: undefined,
+      inheritedGroupVisible: true,
+      parentGroupOpen: undefined,
       path: [String(index + 1)]
     })
   );
   const leafColumns = applyColumnOrder(
     context.leaves,
-    options.columnState?.order ?? options.columnOrder
+    options.columnState?.order ?? options.columnOrder,
+    rootColumns
   );
   for (const leafColumn of leafColumns) {
     context.byId.set(leafColumn.id, leafColumn);
@@ -139,12 +166,7 @@ export function createColumnModel<TData>(
 function normalizeColumn<TData>(
   column: ColumnDef<TData>,
   context: NormalizeContext<TData>,
-  parent: {
-    readonly depth: number;
-    readonly parentId: string | undefined;
-    readonly inheritedPinned: PinnedSide | undefined;
-    readonly path: readonly string[];
-  }
+  parent: NormalizeParent
 ): NormalizedColumn<TData> {
   if (isColumnGroup(column)) {
     return normalizeGroupColumn(column, context, parent);
@@ -156,23 +178,24 @@ function normalizeColumn<TData>(
 function normalizeGroupColumn<TData>(
   column: ColumnGroupDef<TData>,
   context: NormalizeContext<TData>,
-  parent: {
-    readonly depth: number;
-    readonly parentId: string | undefined;
-    readonly inheritedPinned: PinnedSide | undefined;
-    readonly path: readonly string[];
-  }
+  parent: NormalizeParent
 ): NormalizedColumnGroup<TData> {
-  const id = allocateColumnId(
-    resolveGroupColumnId(column, `group:${parent.path.join(".")}`),
-    context.ids
+  const id = reserveColumnId(
+    resolveGroupColumnIdCandidate(column, `group:${parent.path.join(".")}`),
+    context.ids,
+    context.reservedExplicitIds
   );
   const pinned = column.pinned ?? parent.inheritedPinned;
+  const groupVisible = parent.inheritedGroupVisible
+    && shouldShowInColumnGroup(column.columnGroupShow, parent.parentGroupOpen);
+  const open = resolveColumnGroupOpen(column, id, context.columnState);
   const children = column.children.map((child, index) =>
     normalizeColumn(child, context, {
       depth: parent.depth + 1,
       parentId: id,
       inheritedPinned: pinned,
+      inheritedGroupVisible: groupVisible,
+      parentGroupOpen: open,
       path: [...parent.path, String(index + 1)]
     })
   );
@@ -186,7 +209,8 @@ function normalizeGroupColumn<TData>(
     path: parent.path,
     pinned,
     children,
-    leafIds: collectLeafColumns(children).map((leaf) => leaf.id)
+    leafIds: collectLeafColumns(children).map((leaf) => leaf.id),
+    open
   });
 
   context.byId.set(id, group);
@@ -196,17 +220,19 @@ function normalizeGroupColumn<TData>(
 function normalizeDataColumn<TData>(
   column: DataColumnDef<TData>,
   context: NormalizeContext<TData>,
-  parent: {
-    readonly depth: number;
-    readonly parentId: string | undefined;
-    readonly inheritedPinned: PinnedSide | undefined;
-    readonly path: readonly string[];
-  }
+  parent: NormalizeParent
 ): NormalizedDataColumn<TData> {
-  const id = allocateColumnId(resolveDataColumnId(column, `column:${parent.path.join(".")}`), context.ids);
+  const id = reserveColumnId(
+    resolveDataColumnIdCandidate(column, `column:${parent.path.join(".")}`),
+    context.ids,
+    context.reservedExplicitIds
+  );
   const columnState = context.columnState?.columns?.[id];
   const sizing = resolveColumnSizing(column, context.options, columnState?.width);
   const leafIndex = context.leaves.length;
+  const hidden = resolvePolicyHidden(column, columnState?.hidden);
+  const groupVisible = parent.inheritedGroupVisible
+    && shouldShowInColumnGroup(column.columnGroupShow, parent.parentGroupOpen);
   const normalized: NormalizedDataColumn<TData> = Object.freeze({
     kind: "data",
     id,
@@ -215,14 +241,14 @@ function normalizeDataColumn<TData>(
     depth: parent.depth,
     parentId: parent.parentId,
     path: parent.path,
-    pinned: resolvePinned(columnState?.pinned, column.pinned ?? parent.inheritedPinned),
+    pinned: resolvePolicyPinned(column, columnState?.pinned, parent.inheritedPinned),
     field: column.field ?? id,
     width: sizing.width,
     minWidth: sizing.minWidth,
     maxWidth: sizing.maxWidth,
     flex: sizing.flex,
-    hidden: columnState?.hidden ?? column.hidden === true,
-    visible: !(columnState?.hidden ?? column.hidden === true),
+    hidden,
+    visible: !hidden && groupVisible,
     leafIndex,
     orderIndex: leafIndex
   });
@@ -243,6 +269,25 @@ function resolvePinned(
   return override ?? fallback;
 }
 
+function resolvePolicyHidden<TData>(
+  column: DataColumnDef<TData>,
+  override: boolean | undefined
+): boolean {
+  return canChangeColumnVisibilityDef(column)
+    ? override ?? column.hidden === true
+    : column.hidden === true;
+}
+
+function resolvePolicyPinned<TData>(
+  column: DataColumnDef<TData>,
+  override: PinnedSide | null | undefined,
+  inheritedPinned: PinnedSide | undefined
+): PinnedSide | undefined {
+  return canChangeColumnPinningDef(column)
+    ? resolvePinned(override, column.pinned ?? inheritedPinned)
+    : column.pinned ?? inheritedPinned;
+}
+
 export function collectLeafColumns<TData>(
   columns: readonly NormalizedColumn<TData>[]
 ): readonly NormalizedDataColumn<TData>[] {
@@ -261,6 +306,31 @@ export function collectLeafColumns<TData>(
 
 function isColumnGroup<TData>(column: ColumnDef<TData>): column is ColumnGroupDef<TData> {
   return "children" in column;
+}
+
+function collectExplicitColumnIds<TData>(columns: readonly ColumnDef<TData>[]): ReadonlySet<string> {
+  const ids = new Set<string>();
+
+  for (const column of columns) {
+    const resolution = isColumnGroup(column)
+      ? resolveGroupColumnIdCandidate(column, "")
+      : resolveDataColumnIdCandidate(column, "");
+    if (resolution.explicit) {
+      reserveColumnId(resolution, ids);
+    }
+    if (isColumnGroup(column)) {
+      for (const id of collectExplicitColumnIds(column.children)) {
+        if (ids.has(id)) {
+          throw new Error(
+            `Duplicate columnId "${id}". Column identifiers must be unique across data and group columns.`
+          );
+        }
+        ids.add(id);
+      }
+    }
+  }
+
+  return ids;
 }
 
 function freezeColumnModel<TData>(model: ColumnModel<TData>): ColumnModel<TData> {

@@ -42,6 +42,9 @@ export function createRowRenderState<TData>(
       rowCount: input.infiniteRowModel.rowCount ?? input.infiniteEntries.length,
       loading: input.infiniteLoading,
       hasMore: input.infiniteRowModel.hasMore,
+      ...(input.infiniteRowModel.status === undefined
+        ? {}
+        : { dataSourceStatus: input.infiniteRowModel.status }),
       onLoadMore: input.loadNextInfiniteBlock
     };
   }
@@ -64,6 +67,9 @@ function createServerRowRenderState<TData>(
     rowCount: input.serverRowModel.rowCount,
     loading: input.serverLoading,
     hasMore: input.serverRowModel.hasMore,
+    ...(input.serverRowModel.status === undefined
+      ? {}
+      : { dataSourceStatus: input.serverRowModel.status }),
     ...(input.serverAggregate === undefined ? {} : { aggregate: input.serverAggregate }),
     mergeMeta: input.serverMergeMeta,
     onLoadMore: () => undefined
@@ -83,6 +89,9 @@ function createViewportRowRenderState<TData>(
     rowCount: input.viewportRowModel.rowCount,
     loading: input.viewportLoading,
     hasMore: false,
+    ...(input.viewportRowModel.status === undefined
+      ? {}
+      : { dataSourceStatus: input.viewportRowModel.status }),
     onLoadMore: () => undefined
   };
 }
@@ -98,8 +107,12 @@ function createTreeRowRenderState<TData>(
     rowModel: "tree",
     entries: input.treeEntries,
     rowCount: input.treeRowModel.rowCount,
-    loading: false,
+    loading: input.treeRowModel.status?.status === "loading"
+      || input.treeRowModel.status?.status === "retrying",
     hasMore: false,
+    ...(input.treeRowModel.status === undefined
+      ? {}
+      : { dataSourceStatus: input.treeRowModel.status }),
     onLoadMore: () => undefined,
     treeRuntime: {
       ...(input.treeColumnField === undefined ? {} : { treeColumnField: input.treeColumnField }),

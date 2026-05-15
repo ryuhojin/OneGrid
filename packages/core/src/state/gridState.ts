@@ -1,6 +1,8 @@
 import type { ColumnDef } from "../types/column.js";
 import { freezeColumnUiState } from "../column/columnUi.js";
 import type { ColumnUiState } from "../column/columnUi.js";
+import { freezeRowModelStateSnapshot } from "../row/rowModelState.js";
+import type { RowModelStateSnapshot } from "../row/rowModelState.js";
 import type { GridSelectionState } from "../selection/selectionModel.js";
 import type { FilterModel, GroupModel, RowKey, RowModelKind, SortModel } from "../types/shared.js";
 
@@ -12,6 +14,7 @@ export interface GridStateSnapshot {
   readonly sortModel?: readonly SortModel[];
   readonly filterModel?: FilterModel;
   readonly groupModel?: GroupModel;
+  readonly rowModelState?: RowModelStateSnapshot;
   readonly selection?: GridSelectionState;
   readonly pagination?: GridStatePaginationSnapshot;
   readonly scroll?: GridStateScrollSnapshot;
@@ -109,6 +112,9 @@ export function freezeGridStateSnapshot(snapshot: GridStateSnapshot): GridStateS
     ...(snapshot.sortModel === undefined ? {} : { sortModel: cloneSortModel(snapshot.sortModel) }),
     ...(snapshot.filterModel === undefined ? {} : { filterModel: cloneFilterModel(snapshot.filterModel) }),
     ...(snapshot.groupModel === undefined ? {} : { groupModel: cloneGroupModel(snapshot.groupModel) }),
+    ...(snapshot.rowModelState === undefined
+      ? {}
+      : { rowModelState: freezeRowModelStateSnapshot(snapshot.rowModelState) }),
     ...(snapshot.selection === undefined ? {} : { selection: cloneSelection(snapshot.selection) }),
     ...(snapshot.pagination === undefined ? {} : { pagination: clonePagination(snapshot.pagination) }),
     ...(snapshot.scroll === undefined ? {} : { scroll: cloneScroll(snapshot.scroll) }),

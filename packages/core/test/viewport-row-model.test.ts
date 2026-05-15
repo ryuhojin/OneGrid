@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { calculateViewportRange, ViewportRowModel } from "../src/index.js";
+import {
+  calculateViewportRange,
+  DuplicateRowKeyError,
+  resolveLogicalRowWindow,
+  ViewportRowModel
+} from "../src/index.js";
 import type { GetRowsRequest } from "../src/index.js";
 
 interface ViewportOrderRow {
@@ -27,6 +32,29 @@ describe("viewport row model", () => {
         overscan: 2
       })
     ).toEqual({ firstRow: 13, lastRow: 20 });
+  });
+
+  it("clamps terminal viewport ranges for very large logical row counts", () => {
+    const window = resolveLogicalRowWindow({
+      rowCount: 100_000_000,
+      rowHeight: 30,
+      viewportHeight: 349,
+      scrollTop: Number.MAX_SAFE_INTEGER
+    });
+
+    expect(window.maxScrollTop).toBe(2_999_999_651);
+    expect(window.firstVisibleRow).toBe(99_999_988);
+    expect(window.lastVisibleRow).toBe(99_999_999);
+    expect(window.rowOffset).toBe(11);
+    expect(
+      calculateViewportRange({
+        rowCount: 100_000_000,
+        rowHeight: 30,
+        viewportHeight: 349,
+        scrollTop: Number.MAX_SAFE_INTEGER,
+        overscan: 2
+      })
+    ).toEqual({ firstRow: 99_999_986, lastRow: 99_999_999 });
   });
 
   it("requests viewport ranges with server models", async () => {
@@ -76,6 +104,90 @@ describe("viewport row model", () => {
     expect(requestCount).toBe(1);
     expect(first.cached).toBe(false);
     expect(second.cached).toBe(true);
+  });
+
+  it("rejects duplicate explicit row ids returned by a viewport range", async () => {
+    const duplicateRows = [createRows(0, 1)[0], createRows(0, 1)[0]] as readonly ViewportOrderRow[];
+    const model = new ViewportRowModel<ViewportOrderRow>({
+      rowKey: "id",
+      rowHeight: 10,
+      overscan: 0,
+      initialRowCount: 2,
+      dataSource: {
+        async getRows() {
+          return { rows: duplicateRows, rowCount: 2 };
+        }
+      }
+    });
+
+    await expect(model.loadViewport({ scrollTop: 0, viewportHeight: 20 })).rejects
+      .toBeInstanceOf(DuplicateRowKeyError);
+  });
+
+  it("retries viewport data source failures and exposes final status", async () => {
+    let requestCount = 0;
+    const model = new ViewportRowModel<ViewportOrderRow>({
+      rowHeight: 10,
+      overscan: 0,
+      initialRowCount: 100,
+      retryPolicy: { attempts: 2, delayMs: 0 },
+      dataSource: {
+        async getRows(request) {
+          requestCount += 1;
+          if (requestCount === 1) {
+            throw Object.assign(new Error("Rate limited"), { statusCode: 429 });
+          }
+          return { rows: createRows(request.startRow, request.endRow), rowCount: 100 };
+        }
+      }
+    });
+
+    const result = await model.loadViewport({ scrollTop: 20, viewportHeight: 30, nowMs: 0 });
+
+    expect(requestCount).toBe(2);
+    expect(result.status).toMatchObject({
+      status: "success",
+      requestKind: "getRows",
+      attempt: 2,
+      maxAttempts: 2
+    });
+    expect(model.status).toMatchObject({ status: "success", attempt: 2 });
+  });
+
+  it("captures and restores viewport row count and visible range state", async () => {
+    const model = new ViewportRowModel<ViewportOrderRow>({
+      rowHeight: 10,
+      overscan: 0,
+      initialRowCount: 100,
+      dataSource: {
+        async getRows(request) {
+          return { rows: createRows(request.startRow, request.endRow), rowCount: 100 };
+        }
+      }
+    });
+    await model.loadViewport({ scrollTop: 40, viewportHeight: 30, nowMs: 0 });
+
+    const restored = new ViewportRowModel<ViewportOrderRow>({
+      rowHeight: 10,
+      overscan: 0,
+      dataSource: {
+        async getRows(request) {
+          return { rows: createRows(request.startRow, request.endRow), rowCount: 100 };
+        }
+      }
+    });
+    restored.restoreState(model.getState());
+
+    expect(model.getState()).toMatchObject({
+      rowModel: "viewport",
+      rowCount: 100,
+      range: { firstRow: 4, lastRow: 6 }
+    });
+    expect(restored.getState()).toMatchObject({
+      rowModel: "viewport",
+      rowCount: 100,
+      range: { firstRow: 4, lastRow: 6 }
+    });
   });
 
   it("discards stale viewport responses", async () => {

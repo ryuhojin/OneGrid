@@ -7,8 +7,11 @@ import {
 } from "./viewportCache.js";
 import { calculatePrefetchRange, calculateViewportRange } from "./viewportRange.js";
 import { createViewportRowsRequest } from "./viewportRequest.js";
-import { resolveRowKey } from "./rowIdentity.js";
+import { createRowNodes, resolveRowKey } from "./rowIdentity.js";
+import { createDataSourceSuccessStatus, executeDataSourceRequest } from "../dataSource/index.js";
+import type { RowModelStateSnapshot, ViewportRowModelStateSnapshot } from "./rowModelState.js";
 import type { ViewportRowCache } from "./viewportCache.js";
+import type { DataSourceStatusSnapshot } from "../types/data.js";
 import type {
   ViewportLiveUpdate,
   ViewportLoadInput,
@@ -35,6 +38,7 @@ export class ViewportRowModel<TData = unknown> {
   private currentRange: ViewportRange | undefined;
   private currentEntries: readonly ViewportRowEntry<TData>[] = [];
   private lastLoad: { readonly firstRow: number; readonly nowMs: number } | undefined;
+  private dataSourceStatus: DataSourceStatusSnapshot | undefined;
 
   constructor(options: ViewportRowModelOptions<TData>) {
     this.options = options;
@@ -58,6 +62,34 @@ export class ViewportRowModel<TData = unknown> {
 
   get cachedKeys(): readonly RowKey[] {
     return listViewportCacheKeys(this.cache);
+  }
+
+  get status(): DataSourceStatusSnapshot | undefined {
+    return this.dataSourceStatus;
+  }
+
+  getState(): ViewportRowModelStateSnapshot {
+    return Object.freeze({
+      rowModel: "viewport",
+      rowCount: this.rowCount,
+      ...(this.currentRange === undefined
+        ? {}
+        : { range: Object.freeze({ ...this.currentRange }) })
+    });
+  }
+
+  restoreState(state: RowModelStateSnapshot): void {
+    if (state.rowModel !== "viewport") {
+      return;
+    }
+
+    this.totalRowCount = state.rowCount;
+    this.currentRange = state.range;
+    this.currentEntries = Object.freeze([]);
+    this.cache = createViewportRowCache<TData>(
+      normalizePositiveInteger(this.options.maxCachedRanges, DEFAULT_MAX_RANGES)
+    );
+    this.lastLoad = undefined;
   }
 
   loadViewport(input: ViewportLoadInput): Promise<ViewportLoadResult<TData>> {
@@ -114,7 +146,17 @@ export class ViewportRowModel<TData = unknown> {
     }
 
     const requestSequence = ++this.activeRequestSequence;
-    const result = await this.options.dataSource.getRows(request);
+    const result = await executeDataSourceRequest(
+      () => this.options.dataSource.getRows(request),
+      {
+        requestKind: "getRows",
+        requestId: request.requestId,
+        ...(this.options.retryPolicy === undefined ? {} : { retryPolicy: this.options.retryPolicy }),
+        status: (status) => {
+          this.dataSourceStatus = status;
+        }
+      }
+    );
     if (requestSequence !== this.activeRequestSequence) {
       return this.createResult(
         request,
@@ -155,13 +197,20 @@ export class ViewportRowModel<TData = unknown> {
     rows: readonly TData[],
     startRow: number
   ): readonly ViewportRowEntry<TData>[] {
+    const rowIdentity = {
+      ...(this.options.rowKey === undefined ? {} : { rowKey: this.options.rowKey }),
+      startIndex: startRow,
+      ...(this.options.duplicateRowKeyPolicy === undefined
+        ? {}
+        : { duplicateRowKeyPolicy: this.options.duplicateRowKeyPolicy })
+    };
     return Object.freeze(
-      rows.map<ViewportRowEntry<TData>>((row, index) =>
+      createRowNodes(rows, rowIdentity).map<ViewportRowEntry<TData>>((node) =>
         Object.freeze({
           kind: "data",
-          rowIndex: startRow + index,
-          key: resolveRowKey(row, startRow + index, this.options.rowKey),
-          data: row
+          rowIndex: node.sourceIndex,
+          key: node.key,
+          data: node.data
         })
       )
     );
@@ -184,7 +233,8 @@ export class ViewportRowModel<TData = unknown> {
       rowCount: this.rowCount,
       cached,
       stale,
-      prefetched
+      prefetched,
+      status: this.dataSourceStatus ?? createDataSourceSuccessStatus("getRows", request.requestId)
     });
   }
 

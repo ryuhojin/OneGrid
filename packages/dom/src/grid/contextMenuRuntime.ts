@@ -6,6 +6,8 @@ import type {
 import { attachOverlayFocusTrap } from "./focusTrap.js";
 import type { FocusTrapHandle } from "./focusTrap.js";
 import { positionOverlay } from "./overlayPosition.js";
+import { attachOverlayScrollSync } from "./overlayScrollSync.js";
+import type { OverlayScrollSyncHandle } from "./overlayScrollSync.js";
 
 export interface GridContextMenuRuntime<TData = unknown> {
   readonly enabled: boolean;
@@ -107,9 +109,12 @@ function showContextMenu<TData>(input: {
   menu.tabIndex = -1;
   let removeGlobalListeners = (): void => undefined;
   let focusTrap: FocusTrapHandle | undefined;
+  let scrollSync: OverlayScrollSyncHandle | undefined;
   const closeCurrentMenu = (): void => {
     focusTrap?.destroy();
     focusTrap = undefined;
+    scrollSync?.destroy();
+    scrollSync = undefined;
     menu.remove();
     removeGlobalListeners();
     if (closeCurrentContextMenu === closeCurrentMenu) {
@@ -128,6 +133,11 @@ function showContextMenu<TData>(input: {
   };
   document.body.append(menu);
   positionOverlay({ overlay: menu, point: input.point });
+  scrollSync = attachOverlayScrollSync({
+    ...(input.restoreFocusTo === undefined ? {} : { anchor: input.restoreFocusTo }),
+    onUpdate: closeCurrentMenu,
+    onAnchorMissing: closeCurrentMenu
+  });
   menu.addEventListener("keydown", (event) => {
     handleMenuKeyDown(menu, event);
   });

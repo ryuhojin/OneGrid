@@ -8,10 +8,16 @@ test("pivot grid exposes generated headers and panel semantics @a11y", async ({ 
   await expect(grid).toHaveAttribute("aria-colcount", "8");
   await expect(grid.getByRole("columnheader", { name: "Q1" })).toBeVisible();
 
-  const button = page.getByRole("button", { name: "Pivot" }).first();
+  const button = page.getByRole("button", { name: "Pivot fields" }).first();
   await button.click();
   await expect(button).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("region", { name: "Pivot panel" }).first()).toBeVisible();
+  const panel = page.getByRole("region", { name: "Client pivot panel" }).first();
+  await expect(panel).toBeVisible();
+  await expect(panel.getByLabel("Available pivot fields")).toContainText("status");
+  await panel.getByLabel("Search pivot fields").focus();
+  await expect(panel.getByLabel("Search pivot fields")).toBeFocused();
+  await panel.getByRole("button", { name: "Add status to rows" }).focus();
+  await expect(panel.getByRole("button", { name: "Add status to rows" })).toBeFocused();
 });
 
 test("pivot example passes axe-core scans @a11y", async ({ page }) => {

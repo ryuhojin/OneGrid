@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateFixedColumnVirtualWindow,
   calculateFixedRowVirtualWindow,
+  calculateVariableRowVirtualWindow,
   createCellSpanModel,
   createColumnModel,
+  createColumnVirtualizationIndex,
+  createRowHeightIndex,
   createSegmentedVirtualScroll
 } from "../../packages/core/src/index.js";
 import {
@@ -48,6 +52,42 @@ describe("performance harness smoke", () => {
 
     expect(window.renderedRowCount).toBeLessThanOrEqual(80);
     expect(window.firstRow).toBeGreaterThan(31_000_000);
+  });
+
+  it("resolves a 50K column viewport with bounded rendered columns", () => {
+    const columnWidths = Array.from({ length: 50_000 }, (_, index) => 96 + (index % 9));
+    const columnIndex = createColumnVirtualizationIndex({ columnWidths });
+    const window = calculateFixedColumnVirtualWindow({
+      columnWidths,
+      columnVirtualizationIndex: columnIndex,
+      scrollLeft: columnIndex.getColumnOffset(45_000),
+      viewportWidth: 960,
+      overscan: 4,
+      maxDomColumns: 18
+    });
+
+    expect(window.visibleFirstColumn).toBe(45_000);
+    expect(window.renderedColumnCount).toBeLessThanOrEqual(18);
+    expect(window.totalWidth).toBe(columnIndex.totalWidth);
+  });
+
+  it("resolves a 20K variable-height client row viewport with bounded rows", () => {
+    const rowHeightIndex = createRowHeightIndex({
+      rowCount: 20_000,
+      estimatedRowHeight: 44,
+      getRowHeight: (index) => 32 + (index % 5) * 8
+    });
+    const window = calculateVariableRowVirtualWindow({
+      rowHeightIndex,
+      scrollTop: rowHeightIndex.getRowOffset(15_000),
+      viewportHeight: 420,
+      overscan: 4,
+      maxDomRows: 32
+    });
+
+    expect(window.visibleFirstRow).toBe(15_000);
+    expect(window.renderedRowCount).toBeLessThanOrEqual(32);
+    expect(window.totalHeight).toBe(rowHeightIndex.totalHeight);
   });
 
   it("keeps EX-005 large-row examples deterministic without bulk arrays", () => {

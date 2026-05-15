@@ -13,6 +13,9 @@ export function createInfiniteRowModelOptions<TData>(
   const filterModel = getRemoteFilterModel(options);
   return {
     dataSource: options.dataSource as InfiniteRowModelOptions<TData>["dataSource"],
+    ...(options.dataSourceOptions?.retry === undefined
+      ? {}
+      : { retryPolicy: options.dataSourceOptions.retry }),
     ...(options.infinite?.blockSize === undefined ? {} : { blockSize: options.infinite.blockSize }),
     ...(options.infinite?.maxBlocksInCache === undefined
       ? {}
@@ -39,7 +42,13 @@ export function createServerRowModelOptions<TData>(
   const pageSize = getServerPageSize(options);
   return {
     dataSource: options.dataSource as ServerRowModelOptions<TData>["dataSource"],
+    ...(options.dataSourceOptions?.retry === undefined
+      ? {}
+      : { retryPolicy: options.dataSourceOptions.retry }),
     ...(options.rowKey === undefined ? {} : { rowKey: options.rowKey }),
+    ...(options.duplicateRowKeyPolicy === undefined
+      ? {}
+      : { duplicateRowKeyPolicy: options.duplicateRowKeyPolicy }),
     ...(pageSize === undefined ? {} : { pageSize }),
     ...(usesPager
       ? { initialPage: Math.max(0, (pagination.page ?? 1) - 1) }
@@ -70,11 +79,18 @@ function getServerPageSize<TData>(options: GridOptions<TData>): number | undefin
 export function createViewportRowModelOptions<TData>(
   options: GridOptions<TData>
 ): ViewportRowModelOptions<TData> {
+  assertSegmentedViewportFixedRowHeight(options);
   const sortModel = getRemoteSortModel(options);
   const filterModel = getRemoteFilterModel(options);
   return {
     dataSource: options.dataSource as ViewportRowModelOptions<TData>["dataSource"],
+    ...(options.dataSourceOptions?.retry === undefined
+      ? {}
+      : { retryPolicy: options.dataSourceOptions.retry }),
     ...(options.rowKey === undefined ? {} : { rowKey: options.rowKey }),
+    ...(options.duplicateRowKeyPolicy === undefined
+      ? {}
+      : { duplicateRowKeyPolicy: options.duplicateRowKeyPolicy }),
     ...(options.viewport?.rowHeight === undefined ? {} : { rowHeight: options.viewport.rowHeight }),
     ...(options.viewport?.viewportSize === undefined
       ? {}
@@ -113,6 +129,9 @@ export function createTreeRowModelOptions<TData>(
 
   return {
     ...(options.rowKey === undefined ? {} : { rowKey: options.rowKey }),
+    ...(options.duplicateRowKeyPolicy === undefined
+      ? {}
+      : { duplicateRowKeyPolicy: options.duplicateRowKeyPolicy }),
     columns: options.columns,
     ...(options.tree?.childrenField === undefined ? {} : { childrenField: options.tree.childrenField }),
     ...(options.tree?.hasChildrenField === undefined
@@ -127,6 +146,9 @@ export function createTreeRowModelOptions<TData>(
     ...(options.tree?.sortPolicy === undefined ? {} : { sortPolicy: options.tree.sortPolicy }),
     ...(options.tree?.serverOnly === undefined ? {} : { serverOnly: options.tree.serverOnly }),
     ...(options.tree?.selection === undefined ? {} : { selection: options.tree.selection }),
+    ...(options.dataSourceOptions?.retry === undefined
+      ? {}
+      : { retryPolicy: options.dataSourceOptions.retry }),
     ...(options.dataSource === undefined ? {} : { dataSource: options.dataSource })
   };
 }
@@ -145,4 +167,38 @@ export function getViewportRowHeight<TData>(options: GridOptions<TData>): number
 
 export function getViewportHeight<TData>(options: GridOptions<TData>): number {
   return (options.viewport?.viewportSize ?? 12) * getViewportRowHeight(options);
+}
+
+function assertSegmentedViewportFixedRowHeight<TData>(options: GridOptions<TData>): void {
+  if (options.rowModel !== "viewport" || options.virtualization?.segmented !== true) {
+    return;
+  }
+
+  if (options.rowHeight === "auto" || typeof options.rowHeight === "function") {
+    throw new Error(
+      "OneGrid segmented viewport row model requires a fixed numeric rowHeight. "
+      + "Use viewport.rowHeight or virtualization.rowHeight for 10M~100M rows."
+    );
+  }
+
+  const configuredHeights = [
+    options.viewport?.rowHeight,
+    options.virtualization?.rowHeight,
+    typeof options.rowHeight === "number" ? options.rowHeight : undefined
+  ].filter(isPositiveNumber);
+  const firstHeight = configuredHeights[0];
+  if (firstHeight === undefined) {
+    return;
+  }
+
+  if (configuredHeights.some((height) => height !== firstHeight)) {
+    throw new Error(
+      "OneGrid segmented viewport row model requires one consistent fixed rowHeight "
+      + "across viewport.rowHeight, virtualization.rowHeight, and rowHeight."
+    );
+  }
+}
+
+function isPositiveNumber(value: number | undefined): value is number {
+  return Number.isFinite(value) && value !== undefined && value > 0;
 }

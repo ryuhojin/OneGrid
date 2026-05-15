@@ -180,6 +180,15 @@ export interface CancellationSignal {
   throwIfAborted?(): void;
 }
 
+export type HtmlSanitizerMode = "text" | "allowlist" | "external";
+
+export interface HtmlSanitizerContext {
+  readonly allowedProtocols: readonly string[];
+  readonly trustedTypesPolicyName?: string;
+}
+
 export interface HtmlSanitizer {
-  sanitize(html: string): string;
+  readonly name?: string;
+  readonly mode?: HtmlSanitizerMode;
+  sanitize(html: string, context?: HtmlSanitizerContext): string;
 }

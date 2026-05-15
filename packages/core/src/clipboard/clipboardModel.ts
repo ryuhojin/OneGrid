@@ -1,3 +1,5 @@
+import { formatSpreadsheetTextCell } from "../security/spreadsheetFormula.js";
+
 export interface ClipboardGridCell {
   readonly value: unknown;
   readonly covered?: boolean;
@@ -133,11 +135,7 @@ export function createClipboardPastePlan(input: ClipboardPastePlanInput): Clipbo
 }
 
 function formatClipboardValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  const text = String(value);
+  const text = formatSpreadsheetTextCell(value);
   return /[\t\r\n"]/u.test(text)
     ? `"${text.replaceAll("\"", "\"\"")}"`
     : text;

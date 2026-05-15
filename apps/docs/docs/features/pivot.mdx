@@ -62,12 +62,34 @@ const options: GridOptions<PivotResultRow> = {
 };
 ```
 
-`DataSource.getRows()` receives `request.pivotModel`. The server owns pivot execution and returns
-rows shaped for the configured result columns. This keeps 10M to 100M row scenarios out of browser
-memory.
+`DataSource.getRows()` receives `request.pivotModel`. The server owns pivot execution and can return
+`GetRowsResult.columns` with the result schema for the current pivot model. OneGrid uses those
+returned columns for rendering while the pivot builder still uses the original configured columns as
+the field catalog. This keeps 10M to 100M row scenarios out of browser memory without forcing the
+browser to infer a server pivot schema.
 
-## Panel Foundation
+## Pivot Builder
 
-`pivot.panel: true` renders a keyboard-reachable pivot panel that lists row fields, column fields,
-value fields, totals, and rendered pivot metadata. The current foundation is intentionally model
-driven; drag-and-drop mutation can build on the same public model later.
+`pivot.panel: true` renders a keyboard-reachable pivot builder. Users can search available fields,
+move fields into row, column, or value buckets, change value aggregation, toggle totals/subtotals,
+and apply the draft model. The builder also accepts drag-and-drop between the field catalog and
+buckets, shows valid/invalid drop feedback, and displays an insertion line so dragged fields land in
+the intended bucket position. Button controls remain available for keyboard and assistive technology
+users.
+
+The panel is draft-based. Editing the builder does not mutate the grid until the user chooses
+**Apply pivot model**. Apply calls `GridApi.setPivotModel(model)`, which keeps vanilla, React, Vue,
+client pivot, and server pivot on the same public contract.
+
+```ts
+api.setPivotModel({
+  rows: ["region", "agency", "status"],
+  columns: ["quarter"],
+  values: [{ field: "amount", function: "sum", alias: "amountTotal" }],
+  totals: "both",
+  subtotals: true
+});
+```
+
+Client panels state that the browser computed the pivot result. Server panels state that the data
+source owns execution and that `pivotModel` was forwarded with the request.

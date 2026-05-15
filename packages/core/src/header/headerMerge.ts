@@ -1,4 +1,8 @@
 import { createHeaderAriaLabel } from "./headerAria.js";
+import {
+  normalizeHeaderMergeColumnIds,
+  resolveHeaderMergeRuleId
+} from "./headerMergeValidation.js";
 import type { ColumnModel } from "../column/index.js";
 import type { HeaderMergeOptions, HeaderMergeRule } from "../types/grid-options.js";
 import type { PinnedSide } from "../types/shared.js";
@@ -35,7 +39,7 @@ function createMergeCellsForRule<TData>(
   columnModel: ColumnModel<TData>,
   usedLeafIndexes: Set<number>
 ): readonly HeaderCell[] {
-  const requestedIds = new Set(rule.columnIds);
+  const requestedIds = new Set(normalizeHeaderMergeColumnIds(rule.columnIds));
   const matchingIndexes = columnModel.visibleLeafColumns
     .map((column, index) => ({ column, index }))
     .filter(({ column, index }) => requestedIds.has(column.id) && !usedLeafIndexes.has(index))
@@ -66,7 +70,7 @@ function createMergeCell<TData>(
       .slice(startLeafIndex, endLeafIndex + 1)
       .map((column) => column.id)
   );
-  const id = rule.id ?? `header-merge:${rule.headerName}`;
+  const id = resolveHeaderMergeRuleId(rule);
 
   return Object.freeze({
     id: `${id}:${segmentIndex}`,

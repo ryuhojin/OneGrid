@@ -9,6 +9,10 @@ test("row virtualization exposes a draggable vertical scrollbar across browsers"
 
   await expect(vertical).toBeVisible();
   await expect(thumb).toBeVisible();
+  await expect(page.getByRole("scrollbar", { name: "Vertical grid scrollbar" })).toBeVisible();
+  await expect(vertical).toHaveAttribute("aria-orientation", "vertical");
+  await expect(vertical).toHaveAttribute("aria-valuemin", "0");
+  await expect(vertical).toHaveAttribute("aria-controls", await viewport.evaluate((element) => element.id));
 
   const geometry = await page.evaluate(() => {
     const rect = (selector: string) =>
@@ -41,6 +45,72 @@ test("row virtualization exposes a draggable vertical scrollbar across browsers"
     .toBeGreaterThan(initialScrollTop);
   await expect(page.locator('[data-layout-section="body"] [data-layout-pane="center"] [data-row-key]').first())
     .toHaveAttribute("data-row-key", /VR-/);
+
+  await vertical.focus();
+  await page.keyboard.press("End");
+  await expect.poll(() => vertical.getAttribute("aria-valuetext")).toBe("100%");
+  await page.keyboard.press("Home");
+  await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBe(0);
+});
+
+test("variable row height keeps custom scrollbar aligned during fast rerenders", async ({ page }) => {
+  await page.goto("/#EX-002-008");
+
+  await expect(page.getByRole("heading", { name: "Variable row height" })).toBeVisible();
+  const viewport = page.locator('[data-layout-viewport="body"]');
+  const vertical = page.locator(".og-grid__scrollbar--vertical:not([hidden])");
+  await expect(vertical).toBeVisible();
+
+  const viewportBox = await viewport.boundingBox();
+  if (!viewportBox) {
+    throw new Error("Variable row height viewport was not measurable.");
+  }
+
+  await page.mouse.move(viewportBox.x + viewportBox.width / 2, viewportBox.y + 80);
+  for (let index = 0; index < 12; index += 1) {
+    await page.mouse.wheel(0, 720);
+  }
+
+  await expect.poll(() => page.evaluate(() => {
+    const firstRow = document.querySelector<HTMLElement>(
+      '[data-layout-section="body"] [data-layout-pane="center"] .og-grid__row[data-row-key]'
+    );
+    return firstRow?.dataset.rowKey ?? "";
+  })).not.toBe("VRH-0001");
+
+  const geometry = await page.evaluate(() => {
+    const rect = (selector: string) => {
+      const value = document.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+      return value
+        ? {
+            top: value.top,
+            bottom: value.bottom,
+            left: value.left,
+            right: value.right,
+            height: value.height
+          }
+        : undefined;
+    };
+    const bodyShell = rect(".og-grid__body-shell");
+    const track = rect(".og-grid__scrollbar--vertical:not([hidden])");
+    const thumb = rect(".og-grid__scrollbar--vertical .og-grid__scrollbar-thumb");
+    const viewportElement = document.querySelector<HTMLElement>('[data-layout-viewport="body"]');
+    return {
+      bodyShell,
+      track,
+      thumb,
+      scrollTop: viewportElement?.scrollTop ?? 0
+    };
+  });
+
+  expect(geometry.track).toBeDefined();
+  expect(geometry.thumb).toBeDefined();
+  expect(geometry.bodyShell).toBeDefined();
+  expect(Math.abs((geometry.track?.top ?? 0) - (geometry.bodyShell?.top ?? 100))).toBeLessThanOrEqual(1);
+  expect(Math.abs((geometry.track?.bottom ?? 0) - (geometry.bodyShell?.bottom ?? 100))).toBeLessThanOrEqual(1);
+  expect(geometry.thumb?.top ?? 0).toBeGreaterThanOrEqual(geometry.track?.top ?? 0);
+  expect(geometry.thumb?.bottom ?? 0).toBeLessThanOrEqual((geometry.track?.bottom ?? 0) + 1);
+  expect(geometry.scrollTop).toBeGreaterThan(0);
 });
 
 test("column virtualization renders a thin horizontal scrollbar below pinned panes", async ({ page }) => {
@@ -52,6 +122,10 @@ test("column virtualization renders a thin horizontal scrollbar below pinned pan
 
   await expect(horizontal).toBeVisible();
   await expect(thumb).toBeVisible();
+  await expect(page.getByRole("scrollbar", { name: "Horizontal grid scrollbar" })).toBeVisible();
+  await expect(horizontal).toHaveAttribute("aria-orientation", "horizontal");
+  await expect(horizontal).toHaveAttribute("aria-valuemin", "0");
+  await expect(horizontal).toHaveAttribute("aria-controls", await viewport.evaluate((element) => element.id));
 
   const geometry = await page.evaluate(() => {
     const rect = (selector: string) =>
@@ -90,6 +164,12 @@ test("column virtualization renders a thin horizontal scrollbar below pinned pan
 
   await expect.poll(() => viewport.evaluate((element) => element.scrollLeft))
     .toBeGreaterThan(initialScrollLeft);
+
+  await horizontal.focus();
+  await page.keyboard.press("End");
+  await expect.poll(() => horizontal.getAttribute("aria-valuetext")).toBe("100%");
+  await page.keyboard.press("Home");
+  await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBe(0);
 });
 
 test("column virtualization masks center headers behind the right pinned scrollbar gutter", async ({ page }) => {

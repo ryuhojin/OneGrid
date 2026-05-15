@@ -1,5 +1,5 @@
-import { resolveRowKey } from "./rowIdentity.js";
-import type { RowKeyInput } from "./rowIdentity.js";
+import { createRowNodes } from "./rowIdentity.js";
+import type { DuplicateRowKeyPolicy, RowKeyInput } from "./rowIdentity.js";
 import type {
   ServerGroupFooterRowEntry,
   ServerGroupRowEntry,
@@ -11,19 +11,26 @@ export function createServerEntries<TData>(
   rows: readonly TData[],
   startRow: number,
   rowKey: RowKeyInput<TData> | undefined,
-  groupMeta: readonly GroupMeta[] | undefined = undefined
+  groupMeta: readonly GroupMeta[] | undefined = undefined,
+  duplicateRowKeyPolicy?: DuplicateRowKeyPolicy
 ): readonly ServerRowEntry<TData>[] {
   if (groupMeta && groupMeta.length > 0) {
-    return createGroupedServerEntries(rows, startRow, rowKey, groupMeta);
+    return createGroupedServerEntries(rows, startRow, rowKey, groupMeta, duplicateRowKeyPolicy);
   }
 
+  const rowIdentity = {
+    ...(rowKey === undefined ? {} : { rowKey }),
+    startIndex: startRow,
+    ...(duplicateRowKeyPolicy === undefined ? {} : { duplicateRowKeyPolicy })
+  };
   return Object.freeze(
-    rows.map<ServerRowEntry<TData>>((row, index) =>
+    createRowNodes(rows, rowIdentity)
+      .map<ServerRowEntry<TData>>((node) =>
       Object.freeze({
         kind: "data",
-        rowIndex: startRow + index,
-        key: resolveRowKey(row, startRow + index, rowKey),
-        data: row
+        rowIndex: node.sourceIndex,
+        key: node.key,
+        data: node.data
       })
     )
   );
@@ -33,11 +40,18 @@ function createGroupedServerEntries<TData>(
   rows: readonly TData[],
   startRow: number,
   rowKey: RowKeyInput<TData> | undefined,
-  groupMeta: readonly GroupMeta[]
+  groupMeta: readonly GroupMeta[],
+  duplicateRowKeyPolicy?: DuplicateRowKeyPolicy
 ): readonly ServerRowEntry<TData>[] {
   const headers = groupMeta.filter((meta) => meta.footer !== true).map(toServerGroupEntry);
   const footers = groupMeta.filter((meta) => meta.footer === true).map(toServerGroupFooterEntry);
-  const dataEntries = createServerEntries(rows, startRow + headers.length, rowKey);
+  const dataEntries = createServerEntries(
+    rows,
+    startRow + headers.length,
+    rowKey,
+    undefined,
+    duplicateRowKeyPolicy
+  );
   return Object.freeze([...headers, ...dataEntries, ...footers]);
 }
 

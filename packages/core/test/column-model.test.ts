@@ -58,6 +58,30 @@ describe("core column model", () => {
     expect(customer.flex).toBe(1);
   });
 
+  it("keeps column-state overrides from violating visibility and pinning policies", () => {
+    const model = createColumnModel<OrderRow>(
+      [
+        { columnId: "id", field: "id", headerName: "ID", lockVisible: true },
+        { columnId: "amount", field: "amount", headerName: "Amount", pinned: "left", lockPinned: true },
+        { columnId: "status", field: "status", headerName: "Status" }
+      ],
+      {
+        columnState: {
+          columns: {
+            id: { hidden: true },
+            amount: { pinned: null },
+            status: { hidden: true, pinned: "right" }
+          }
+        }
+      }
+    );
+
+    expect(model.visibleLeafColumns.map((column) => column.id)).toEqual(["id", "amount"]);
+    expect(model.pinnedLeafColumns.left.map((column) => column.id)).toEqual(["amount"]);
+    expect(model.pinnedLeafColumns.right.map((column) => column.id)).toEqual([]);
+    expect(model.byId.get("status")).toMatchObject({ hidden: true, pinned: "right" });
+  });
+
   it("uses columnId as the canonical data and group identity", () => {
     const model = createColumnModel<OrderRow>([
       {
@@ -66,7 +90,7 @@ describe("core column model", () => {
         headerName: "Customer Group",
         children: [
           { columnId: "customer-name", id: "legacy-customer", field: "customer" },
-          { columnId: "customer-name", field: "customer", headerName: "Duplicate Customer" }
+          { columnId: "customer-name-copy", field: "customer", headerName: "Duplicate Customer" }
         ]
       }
     ]);
@@ -74,9 +98,46 @@ describe("core column model", () => {
     expect(model.rootColumns[0]?.id).toBe("customer-group");
     expect(model.leafColumns.map((column) => column.id)).toEqual([
       "customer-name",
-      "customer-name__2"
+      "customer-name-copy"
     ]);
     expect(model.leafColumns.map((column) => column.field)).toEqual(["customer", "customer"]);
+  });
+
+  it("rejects duplicate explicit column identities", () => {
+    expect(() =>
+      createColumnModel<OrderRow>([
+        { columnId: "customer-name", field: "customer" },
+        { columnId: "customer-name", field: "customer", headerName: "Duplicate Customer" }
+      ])
+    ).toThrow('Duplicate columnId "customer-name"');
+
+    expect(() =>
+      createColumnModel<OrderRow>([
+        {
+          columnId: "workflow",
+          headerName: "Workflow",
+          children: [{ id: "workflow", field: "status" }]
+        }
+      ])
+    ).toThrow('Duplicate columnId "workflow"');
+  });
+
+  it("rejects empty explicit column identities", () => {
+    expect(() =>
+      createColumnModel<OrderRow>([
+        { columnId: " ", field: "customer" }
+      ])
+    ).toThrow("Column columnId must not be empty");
+  });
+
+  it("reserves explicit identities before suffixing field fallbacks", () => {
+    const model = createColumnModel<OrderRow>([
+      { field: "status", headerName: "Status fallback" },
+      { columnId: "status", field: "status", headerName: "Status explicit" }
+    ]);
+
+    expect(model.leafColumns.map((column) => column.id)).toEqual(["status__2", "status"]);
+    expect(model.leafColumns.map((column) => column.field)).toEqual(["status", "status"]);
   });
 
   it("supports fieldless value and display columns with stable column ids", () => {
@@ -119,6 +180,39 @@ describe("core column model", () => {
     expect(model.pinnedLeafColumns.right.map((column) => column.id)).toEqual(["status"]);
   });
 
+  it("uses group open state to resolve open and closed child columns", () => {
+    const groupedColumns: readonly ColumnDef<OrderRow>[] = [
+      { columnId: "id", field: "id", headerName: "ID" },
+      {
+        columnId: "workflow",
+        headerName: "Workflow",
+        openByDefault: false,
+        children: [
+          { columnId: "workflow-summary", field: "status", headerName: "Summary", columnGroupShow: "closed" },
+          { columnId: "workflow-owner", field: "customer", headerName: "Owner", columnGroupShow: "open" },
+          { columnId: "workflow-amount", field: "amount", headerName: "Amount" }
+        ]
+      }
+    ];
+
+    const closedModel = createColumnModel(groupedColumns);
+    const openModel = createColumnModel(groupedColumns, {
+      columnState: { groups: { workflow: { open: true } } }
+    });
+
+    expect(closedModel.visibleLeafColumns.map((column) => column.id)).toEqual([
+      "id",
+      "workflow-summary",
+      "workflow-amount"
+    ]);
+    expect(openModel.visibleLeafColumns.map((column) => column.id)).toEqual([
+      "id",
+      "workflow-owner",
+      "workflow-amount"
+    ]);
+    expect(openModel.byId.get("workflow")).toMatchObject({ kind: "group", open: true });
+  });
+
   it("applies a stable column order without dropping missing columns", () => {
     const model = createColumnModel(columns, {
       columnOrder: ["status", "customer"]
@@ -126,6 +220,36 @@ describe("core column model", () => {
 
     expect(model.order.visible).toEqual(["status", "customer", "order-id", "amount"]);
     expect(model.visibleLeafColumns.map((column) => column.orderIndex)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("keeps marryChildren group leaves contiguous when column order splits them", () => {
+    const model = createColumnModel<OrderRow>(
+      [
+        { columnId: "id", field: "id", headerName: "ID" },
+        {
+          columnId: "workflow",
+          headerName: "Workflow",
+          marryChildren: true,
+          children: [
+            { columnId: "workflow-status", field: "status", headerName: "Status" },
+            { columnId: "workflow-customer", field: "customer", headerName: "Customer" },
+            { columnId: "workflow-amount", field: "amount", headerName: "Amount" }
+          ]
+        },
+        { columnId: "tail", field: "id", headerName: "Tail" }
+      ],
+      {
+        columnOrder: ["workflow-status", "tail", "workflow-customer", "id", "workflow-amount"]
+      }
+    );
+
+    expect(model.order.all).toEqual([
+      "workflow-status",
+      "workflow-customer",
+      "workflow-amount",
+      "tail",
+      "id"
+    ]);
   });
 
   it("applies defaultColumnDef and columnTypes before explicit column options", () => {

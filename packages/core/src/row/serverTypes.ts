@@ -1,5 +1,12 @@
-import type { RowKeyInput } from "./rowIdentity.js";
-import type { GetRowsRequest, GetRowsResult, RowUpdate } from "../types/data.js";
+import type { DuplicateRowKeyPolicy, RowKeyInput } from "./rowIdentity.js";
+import type {
+  DataSourceRetryPolicy,
+  DataSourceStatusSnapshot,
+  GetRowsRequest,
+  GetRowsResult,
+  RowUpdate
+} from "../types/data.js";
+import type { ColumnDef } from "../types/column.js";
 import type {
   AggregateModel,
   FilterModel,
@@ -16,6 +23,7 @@ export interface ServerRowModelOptions<TData = unknown> {
     updateRows?(request: ServerUpdateRowsRequest<TData>): Promise<ServerUpdateRowsResult<TData>>;
   };
   readonly rowKey?: RowKeyInput<TData>;
+  readonly duplicateRowKeyPolicy?: DuplicateRowKeyPolicy;
   readonly pageSize?: number;
   readonly initialPage?: number;
   readonly initialCursor?: string;
@@ -26,6 +34,7 @@ export interface ServerRowModelOptions<TData = unknown> {
   readonly aggregateModel?: AggregateModel;
   readonly pivotModel?: PivotModel;
   readonly snapshotVersion?: string;
+  readonly retryPolicy?: DataSourceRetryPolicy;
 }
 
 export interface ServerRowRequestState {
@@ -38,7 +47,11 @@ export interface ServerRowRequestState {
 
 export interface ServerRowCacheEntry<TData = unknown> {
   readonly cacheKey: string;
+  readonly routeKey: string;
+  readonly routePath: readonly string[];
+  readonly page: number;
   readonly request: GetRowsRequest;
+  readonly dataSourceStatus: DataSourceStatusSnapshot;
   readonly result: GetRowsResult<TData>;
   readonly entries: readonly ServerRowEntry<TData>[];
   readonly lastAccess: number;
@@ -81,7 +94,9 @@ export interface ServerGroupFooterRowEntry {
 export interface ServerLoadResult<TData = unknown> {
   readonly cacheKey: string;
   readonly request: GetRowsRequest;
+  readonly status: DataSourceStatusSnapshot;
   readonly rows: readonly TData[];
+  readonly columns?: readonly ColumnDef<TData>[];
   readonly entries: readonly ServerRowEntry<TData>[];
   readonly rowCount: number;
   readonly cached: boolean;
